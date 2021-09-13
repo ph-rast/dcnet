@@ -1,0 +1,3 @@
+^rcppExports.cpp$
+^stanExports_*
+^\.travis\.yml$
