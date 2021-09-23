@@ -1,15 +1,17 @@
 #' Standardize input data to facilitate computation
 #' 
 #' @param data Time-series data
+#' @param J numeric. Number of groups (individuals)
+#' @param group Vector with group id of full length
 #' @param xC Numeric vector or matrix.
 #' @param P Numeric.
 #' @param Q Numeric.
 #' @param standardize_data Logical.
 #' @param distribution Character.
 #' @param meanstructure Character.
-#' @return bmgarch stan data list. 
+#' @return dcnet stan data list. 
 #' @keywords internal
-standat <- function(data, xC, P, Q, standardize_data, distribution, meanstructure){
+standat <- function(data, J, group, xC, P, Q, standardize_data, distribution, meanstructure) {
 
     if(dim(data)[1] < dim(data)[2]) {
         data = t(data)
@@ -20,22 +22,18 @@ standat <- function(data, xC, P, Q, standardize_data, distribution, meanstructur
     ## Model for meanstructure
     if( meanstructure == "constant" | meanstructure == 0 ) {
         meanstructure <- 0
-    } else if ( meanstructure == "arma" | meanstructure == 1 ){
+    } else if ( meanstructure == "arma" | meanstructure == "ARMA" | meanstructure == 1 ){
         meanstructure <- 1
+    } else if ( meanstructure == "var"  | meanstructure == "VAR"  | meanstructure == 2) {
+        meanstructure <- 2
     } else {
-        stop("meanstructure must be either 'constant' or 'arma'.")
+        stop("meanstructure must be either 'constant', 'ARMA' or 'VAR'.")
     }
-
-    ## Test that all data vectors have variance > 0
-    ## Stop if a vector as zero variance
-    dvar = apply(data, 2, var)
-    if( sum(ifelse(dvar == 0, 1, 0)) > 0 ) stop(
-                  paste0("Datavector ", names(which(dvar == 0 ) ), " has zero variance.") )
-                                                       
+    
     ## Tests on predictor
     ## Pass in a 0 matrix, so that stan does not complain
     if ( is.null(xC) ) {
-        xC = matrix(0, nrow = nrow(data), ncol = ncol(data))
+        xC <- matrix(0, nrow = nrow(data), ncol = ncol(data))
     }
     ## Match dimension of predictor to TS. If only one vector is given, it's assumed that it is the same for all TS's
     if ( is.null(ncol(xC)) ) {
@@ -45,56 +43,65 @@ standat <- function(data, xC, P, Q, standardize_data, distribution, meanstructur
         warning("xC is not of right dimension - adapt xC dimension to match number of TS")
     }
 
+    nobs <- nrow(data)
+
     if( standardize_data ) {
-    ## Standardize time-series
+        ## Standardize time-series
         stdx <- scale(data)
         centered_data <- attr(stdx, "scaled:center")
         scaled_data <- attr(stdx, "scaled:scale")
-        return_standat <- list(T = nrow(stdx),
-                            rts = stdx,
-                            xC = xC,
-                            nt = ncol(stdx),
-                            centered_data = centered_data,
-                            scaled_data = scaled_data,
-                            distribution = distribution,
-                            P = P,
-                            Q = Q,
-                            meanstructure = meanstructure)
-        } else {
+        return_standat <- list(T = nrow(stdx)/J,
+                               rts = stdx,
+                               xC = xC,
+                               nt = ncol(stdx),
+                               centered_data = centered_data,
+                               scaled_data = scaled_data,
+                               distribution = distribution,
+                               P = P,
+                               Q = Q,
+                               meanstructure = meanstructure,
+                               J = J,
+                               nobs = nobs,
+                               group = group)
+    } else {
         ## Unstandardized
-        return_standat <- list(T = nrow(data),
-                                rts = data,
-                                xC = xC,
-                                nt = ncol(data),
-                                distribution = distribution,
-                                P = P,
-                                Q = Q,
-                                meanstructure = meanstructure)
+        return_standat <- list(T = nrow(data)/J,
+                               rts = data,
+                               xC = xC,
+                               nt = ncol(data),
+                               distribution = distribution,
+                               P = P,
+                               Q = Q,
+                               meanstructure = meanstructure,
+                               J = J,
+                               nobs = nobs,
+                               group = group)
     }
     return(return_standat)
 }
 
-##' Draw samples from a specified multivariate GARCH model using 'Stan', given multivariate time-series. Currently supports CCC, DCC, BEKK, and pdBEKK model parameterizations.
+##' Draw samples from a longitudinal partialc correlation network with dynamic correlations. 
 ##'
-##' Four types of paramerizations are implemented. The constant conditional correlation (CCC) and the dynamic conditional correlation \insertCite{@DCC; Engle2002,Engle2001a}{bmgarch}, as well as  BEKK \insertCite{Engle1995}{bmgarch} and a BEKK model with positivity constraints on the diagonals of the ARCH and GARCH parameters "pdBEKK" \insertCite{Rast2020}{bmgarch}.
-##'
-##' The fitted models are 'rstan' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'bmgarch' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation. 
+##' The fitted models are 'rstan' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'dcnet' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation. 
 ##' 
-##' @title Estimate Bayesian Multivariate GARCH
+##' @title Estimate a Bayesian Dynamic Correlation Network
 ##' @param data Time-series or matrix object. A time-series or matrix object containing observations at the same interval.
-##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{bmgarch}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
-##' @param parameterization Character (Default: "CCC"). The type of of parameterization. Must be one of "CCC", "DCC", "BEKK", or "pdBEKK".
+##' @param J ...
+##' @param group Vector with group id
+##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
+##' @param parameterization Character (Default: "DCC"). 
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
 ##' @param iterations Integer (Default: 2000). Number of iterations for each chain (including warmup).
 ##' @param chains Integer (Default: 4). The number of Markov chains.
-##' @param standardize_data Logical (Default: FALSE). Whether data should be standardized to easy computations. 
+##' @param standardize_data Logical (Default: FALSE). Whether data should be standardized. 
 ##' @param distribution Character (Default: "Student_t"). Distribution of innovation: "Student_t"  or "Gaussian"
-##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant'  or 'arma'. Currently arma(1,1) only.
+##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant'  or 'ARMA'. Currently ARMA(1,1) only. OR 'VAR' (VAR1).
+##' @param sampling_algorithm Character (Default" "MCMC"). Define sampling algorithm. Either 'MCMC' or variational Bayes 'VB'.
 ##' @param ... Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. See the documentation in \code{\link[rstan]{stan}}.
-##' @return \code{bmgarch} object.
+##' @return \code{dcnet} object.
 ##' @importFrom Rdpack reprompt
-##' @author Philippe Rast, Stephen R. Martin
+##' @author Philippe Rast
 ##' @references
 ##'    \insertAllCited()
 ##' @export
@@ -103,7 +110,7 @@ standat <- function(data, xC, P, Q, standardize_data, distribution, meanstructur
 ##' data(panas)
 ##' # Fit BEKK(1,1) mgarch model with a ARMA(1,1) meanstructure,
 ##' # and student-t residual distribution
-##' fit <- bmgarch(panas, parameterization = "BEKK",
+##' fit <- dcnet(panas, parameterization = "BEKK",
 ##'                P = 1, Q = 1,
 ##'                meanstructure = "arma",
 ##'                distribution = "Student_t")
@@ -140,16 +147,19 @@ standat <- function(data, xC, P, Q, standardize_data, distribution, meanstructur
 ##' rstan::check_hmc_diagnostics(mf)
 ##' rstan::plot(mf)
 ##' }
-bmgarch <- function(data,
-                   xC = NULL,
-                   parameterization = "CCC",
-                   P = 1,
-                   Q = 1,
-                   iterations = 2000,
-                   chains = 4,
-                   standardize_data = FALSE,
-                   distribution = "Student_t",
-                   meanstructure = "constant", ...) {
+dcnet <- function(data,
+                  J,
+                  group,
+                  xC = NULL,
+                  parameterization = "DCC",
+                  P = 1,
+                  Q = 1,
+                  iterations = 2000,
+                  chains = 4,
+                  standardize_data = FALSE,
+                  distribution = "Gaussian",
+                  meanstructure = "VAR",
+                  sampling_algorithm = "MCMC", ...) {
     if ( tolower(distribution) == "gaussian" ) {
         num_dist <- 0
     } else if ( tolower(distribution) == "student_t" ) {
@@ -158,14 +168,23 @@ bmgarch <- function(data,
         stop( "\n\n Specify distribution: Gaussian or Student_t \n\n")
     }
 
-    return_standat <- standat(data, xC, P, Q,  standardize_data, distribution = num_dist, meanstructure )
-    stan_data <- return_standat[ c("T", "xC", "rts", "nt", "distribution", "P", "Q", "meanstructure")]
+    return_standat <- standat(data,
+                              J,
+                              group,
+                              nobs,
+                              xC,
+                              P,
+                              Q,
+                              standardize_data,
+                              distribution = num_dist,
+                              meanstructure)
+    stan_data <- return_standat[ c("T", "xC", "rts", "nt",
+                                   "distribution", "P", "Q",
+                                   "meanstructure", "J", "nobs", "group")]
 
     stanmodel <- switch(parameterization,
                         CCC = stanmodels$CCCMGARCH,
                         DCC = stanmodels$DCCMGARCH,
-                        BEKK = stanmodels$BEKKMGARCH,
-                        pdBEKK = stanmodels$pdBEKKMGARCH,
                         NULL)
     if(is.null(stanmodel)) {
         stop("Not a valid model specification. ",
@@ -175,14 +194,25 @@ bmgarch <- function(data,
              ".")
     }
 
-    model_fit <- rstan::sampling(stanmodel,
-                                 data = stan_data,
-                                 verbose = TRUE,
-                                 iter = iterations,
-                                 control = list(adapt_delta = .99),
-                                 chains = chains,
-                                 init_r = .05)
-
+    ## MCMC Sampling with NUTS
+    if(sampling_algorithm == 'MCMC' ) {
+        model_fit <- rstan::sampling(stanmodel,
+                                     data = stan_data,
+                                     verbose = TRUE,
+                                     iter = iterations,
+                                     control = list(adapt_delta = .99),
+                                     chains = chains,
+                                     init_r = .05, ...)
+    } else if (sampling_algorithm == 'VB' ) {
+    ## Sampling via Variational Bayes
+    model_fit <- rstan::vb(stanmodel,
+                           data = stan_data,
+                           iter = iterations,
+                           importance_resampling = TRUE, ...)
+    } else {
+        stop( "\n\n Provide sampling algorithm: 'MCMC' or 'VB'\n\n" )
+    }
+    
     ## Model fit is based on standardized values.
     mns <- return_standat$centered_data
     sds <- return_standat$scaled_data
@@ -206,16 +236,17 @@ bmgarch <- function(data,
                        mgarchP = stan_data$P,
                        xC = stan_data$xC,
                        meanstructure = stan_data$meanstructure,
-                       std_data = standardize_data)
-    class(return_fit) <- "bmgarch"
+                       std_data = standardize_data,
+                       sampling_algorithm = sampling_algorithm)
+    class(return_fit) <- "dcnet"
     return(return_fit)
 }
 
 
-#' Models supported by bmgarch
+#' Models supported by dcnet
 #'
 #' To be used when checking whether a parameterization or object type is a supported type.
 #' May facilitate more parameterizations, as we only have to update these, and the switch statements.
 #' @keywords internal
-#' @author Stephen R. Martin
-supported_models <- c("DCC", "CCC", "BEKK", "pdBEKK")
+#' @author Philippe Rast
+supported_models <- c("DCC")

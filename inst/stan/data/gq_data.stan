@@ -10,3 +10,4 @@ int<lower=1> ahead; // forecasted periods
 vector[nt] xC_p[ahead];  // time-varying predictor for conditional H
 vector[nt] future_rts[ahead]; // future observations to obtain log_lik
 int<lower = 0, upper = 1> compute_log_lik;
+int<lower=1> J;                   // number of groups or subjects
