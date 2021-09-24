@@ -141,6 +141,9 @@ model {
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi0_tau ~ cauchy(0, 2); // SD for multiplication with cholesky phi0_L
+  for(j in 1:J){
+  phi0_stdnorm[J] ~ std_normal();
+  }
   // C
   to_vector(beta) ~ std_normal();
   to_vector(c_h) ~ std_normal();

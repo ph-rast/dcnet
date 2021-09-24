@@ -62,17 +62,17 @@
     b_q <- ab_q_rep[2,]
 
     ## location
-    ## Generate random starting values for the location intercept
-    phi0 <- replicate(n = N, runif(n_ts, -5, 5 ))
+    ## Generate random starting values for the location intercept as sum of fixed plus random
+    phi0 <- runif(n_ts, -10, 10) + replicate(n = N, rnorm(n_ts, 0, 5 ))
     
     ## phi is bound by -1;1. n_tsXn_ts matrix
-    ## Create N individual matrices
+    ## Create N individual matricesb
     temp <- replicate(n = N, runif(n_ts^2, -.5, .5) )
     phi <- apply(temp, 2, matrix, ncol = n_ts, simplify = FALSE)
     
     y <- array(NA, dim = c(n_ts, tslength, N))
     ## init y
-    y[,1,] <- 0
+    y[,1,] <- phi0
    
     ## mean
     DCC_mu <- array(0, dim = c(n_ts, tslength, N))

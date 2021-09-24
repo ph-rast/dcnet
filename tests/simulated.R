@@ -1,18 +1,20 @@
 library(dcnet )
 
 ## Create data:
-simdat <- dcnet:::.simuDCC(tslength = 20,  N = 4,  n_ts = 3,  ranef_sd_S = 0.0001 )
-simdat
+N <- 20
+tl <- 20
+nts <- 3
+simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
+simdat[[1]]
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
 X
+X <- array(0,  dim = c(N*tl, nts ) )
 
-X[,2] <- X[,2] + 10
+groupvec <- rep(c(1:N),  each = tl )
 
-groupvec <- rep(c(1:4),  each = 20 )
-
-return_standat <- dcnet:::standat( data = X, J = 4, group = groupvec, xC = groupvec,  P = 1,
+return_standat <- dcnet:::standat( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
                                   standardize_data = TRUE,
                                   Q = 1, distribution = 0, meanstructure = "VAR")
 
@@ -24,8 +26,10 @@ stan_data <- return_standat[ c("T", "xC", "rts", "nt",
 
 stan_data
 stan_data$rts
-stan_data$rts <-
-    array(X,  dim = c(20, 4, 3) )
+stan_data$rts <- array( apply(simdat[[1]], 1, FUN = rbind ), dim = c(tl, N, nts) )
+## same as this from X:  array(X,  dim = c(20, 4, 3) )
+
+
 
 simdat[[1]][,,4]
 
@@ -50,9 +54,11 @@ model_fit <- rstan::sampling(stanmodel,
                                      chains = 4,
                                      init_r = .05)
 
-options(width = 180 )
+
+options(width = 220 )
 model_fit
-print(model_fit, pars =  'phi0')
+
+print(model_fit, pars =  c( 'phi0',  'phi0_stdnorm')) ## What's up wit the stdnorms? Seem WAY to large
 
 
 
