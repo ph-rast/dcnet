@@ -9,10 +9,11 @@
 *.so
 *.hpp
 *.dll
+*.h
 .Rproj.user/
 
 ## Do not ignore this:
 !inst/include/stan_meta_header.hpp
-*.h
-src/stanExports*
-.h
+
+
+src/stanExports_DCCMGARCH.h
