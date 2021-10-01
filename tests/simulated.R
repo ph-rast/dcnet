@@ -35,7 +35,7 @@ simdat[[1]][,,4]
 
 simdat[[1]]
 
-stan_data
+#saveRDS(object =stan_data ,file = '../../TEST/stan_data')
 
 parameterization <- "DCC"
 
@@ -49,16 +49,16 @@ stanmodel
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 200,
+                                     iter = 500,
                                      control = list(adapt_delta = .99),
                                      chains = 4,
                                      init_r = .05)
 
 
 options(width = 220 )
-model_fit
+#model_fit
 
-print(model_fit, pars =  c( 'phi0',  'phi0_stdnorm')) ## What's up wit the stdnorms? Seem WAY to large
+print(model_fit, pars =  c( 'phi0_fixed')) ## What's up wit the stdnorms? Seem WAY to large
 
 
 

@@ -61,6 +61,11 @@ parameters {
 }
 
 transformed parameters {
+  // transform vec_phi to nt*nt parameter matrix
+  //matrix<lower = -1, upper = 1>[nt,nt] phi;
+  vector[nt] phi0[J]; // vector with fixed + random for intercept
+  vector[nt*nt] phi[J]; // vectorized VAR parameter matrix, fixed + random
+  
   cov_matrix[nt] H[T];
   corr_matrix[nt] R[T];
   vector[nt] rr[T-1];
@@ -76,10 +81,13 @@ transformed parameters {
   vector[nt] UPs = upper_limits(a_h);
   vector[nt] ULs = raw_sum_to_b_h_sum(b_h_sum_s, UPs);
   vector<lower = 0, upper = 1>[nt] b_h[P] = simplex_to_bh(b_h_simplex, ULs);
+
+  // VAR phi parameter
+  //phi = 
   
   // Initialize t=1
   for( j in 1:J){
-    mu[1,j,] = phi0;
+    mu[1,j,] = phi0_fixed;
   }
   u[1,] = u1_init;
   D[1,] = D1_init;
@@ -140,9 +148,12 @@ model {
   // priors
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
+  phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi0_tau ~ cauchy(0, 2); // SD for multiplication with cholesky phi0_L
+  phi_tau ~ cauchy(0, 2); // SD for multiplication with cholesky phi0_L
   for(j in 1:J){
-  phi0_stdnorm[J] ~ std_normal();
+    phi0_stdnorm[J] ~ std_normal();
+    phi_stdnorm[J] ~ std_normal();
   }
   // C
   to_vector(beta) ~ std_normal();
@@ -154,9 +165,10 @@ model {
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 50 );
-  to_vector(theta) ~ std_normal();
-  to_vector(phi) ~ std_normal();
-  phi0 ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
+  //to_vector(theta) ~ std_normal();
+  //to_vector(phi) ~ std_normal();
+  phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
+  vec_phi_fixed ~ normal(0, 5);
   //  to_vector(a_h) ~ normal(0, .5);
   //to_vector(b_h) ~ normal(0, .5);
   S ~ lkj_corr( 1 );
@@ -183,4 +195,5 @@ generated quantities {
 /*   vector<lower=0>[nt] c_h_var = exp(c_h); */
 /*   // retrodict */
 /* #include /generated/retrodict_H.stan */
+/* 00:42 */
 }
