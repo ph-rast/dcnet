@@ -2,7 +2,7 @@ library(dcnet )
 
 ## Create data:
 N <- 20
-tl <- 20
+tl <- 40
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
 simdat[[1]]
@@ -49,16 +49,16 @@ stanmodel
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 500,
-                                     control = list(adapt_delta = .99),
-                                     chains = 4,
+                                     iter = 10,
+                                     #control = list(adapt_delta = .99),
+                                     chains = 1,
                                      init_r = .05)
 
 
 options(width = 220 )
 #model_fit
 
-print(model_fit, pars =  c( 'phi0_fixed')) ## What's up wit the stdnorms? Seem WAY to large
+print(model_fit, pars =  c("H", 'UPs')) ## What's up wit the stdnorms? Seem WAY to large
 
 
 
