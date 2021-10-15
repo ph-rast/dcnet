@@ -12,10 +12,12 @@ matrix invvec_to_corr(vector V, int nt) {
   matrix[nt,nt] out;
   int index = 0;
   for(i in 1:nt) {
-    for(j in 1:nt) {
-      index = index + 1; 
+    for(j in 1:nt) { 
       if( i == 1 && j == 1 ) { L[i,j] = 1.0; }
-      if( i >= j ) { L[i,j] = V[index]; }
+      if( i >= j ) {
+	index = index + 1;
+	L[i,j] = V[index];
+      }
     } // invvec
   } // invvec
   out = L*L';
