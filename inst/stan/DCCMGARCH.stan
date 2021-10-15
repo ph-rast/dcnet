@@ -2,6 +2,7 @@
 functions { 
 #include /functions/cov2cor.stan
 #include /functions/jacobian.stan
+#include /functions/invvec.stan
 }
 
 data {
@@ -11,6 +12,10 @@ data {
 transformed data {                                  
   vector[nt] rts_m[J];
   vector[nt] rts_sd[J];
+  int<lower=nt> Sdim = (nt + nt*nt) / 2 - 1; // Dimension of vec(S).
+  // S = S_L*S_L | S_L is a cholesky factor
+  // S_L = invec(S_Lv) | S_Lv is vec(S_L)
+  // Note that S_Lv[1,1] is always 1, which leaves (nt - nt^2) /2 -1 parameters to be estimated
  
 #include /transformed_data/xh_marker.stan
  
@@ -68,7 +73,12 @@ parameters {
   // GARCH q parameters 
   real<lower=0, upper = 1 > a_q; // 
   real<lower=0, upper = (1 - a_q) > b_q; //
-  corr_matrix[nt] S;  // DCC keeps this constant 
+  // Elements for random effects on S
+  // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
+  cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
+  vector<lower=0>[Sdim] S_L_tau; //SD's for random efx
+  vector[Sdim] S_L_stdnorm[J]; 
+  vector[Sdim] S_Lv_fixed; // Vectorized fixed effect for S_L
   // Qr1 init
   cov_matrix[nt] Qr1_init;
   // D1 init
@@ -95,7 +105,14 @@ transformed parameters {
   vector<lower=0, upper = 1>[nt] a_h_sum[J];
   vector<lower=0, upper = 1>[nt] b_h_sum[J];
   
-  
+  // ranef vector for vec(S) part
+  vector[Sdim] S_Lv_r[J];
+  // S_Lv[j] = S_Lv_fixed + S_Lv_r[j]
+  vector[Sdim] S_Lv[J];
+  // S_Lv contains (nt+nt^2)/2-1 elements to be inv-vech into lower tri cholesky factor S_L
+  // Note that S_L[1,1] = 1 as S = S_L*S_L is a corrmat
+  cholesky_factor_corr[nt] S_L[J];
+  corr_matrix[nt] S[J];
   
   cov_matrix[nt] H[T,J];
   corr_matrix[nt] R[T,J];
@@ -182,7 +199,14 @@ transformed parameters {
 	D[t, j, d] = sqrt( vd[j,d] );
       }
       u[t,j,] = diag_matrix(D[t,j,]) \ (rts[t,j,]'- mu[t,j,]); // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
-      Qr[t,j,] = (1 - a_q - b_q) * S + a_q * (u[t-1,j,] * u[t-1,j,]') + b_q * Qr[t-1,j,]; // S and UU' define dimension of Qr
+
+      // All output is in vectorized form
+      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
+      S_Lv[j] = tanh(S_Lv_fixed + S_Lv_r[j]); // keep within -1; 1
+      // S_Lv is vectorized - invvec now:
+      S[j] = invvec_to_corr(S_Lv[j], nt);
+      
+      Qr[t,j,] = (1 - a_q - b_q) * S[j] + a_q * (u[t-1,j,] * u[t-1,j,]') + b_q * Qr[t-1,j,]; // S and UU' define dimension of Qr
       Qr_sdi[t,j,] = 1 ./ sqrt(diagonal(Qr[t,j,])); // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[t,j] = quad_form_diag(Qr[t,j,], Qr_sdi[t,j,]); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
@@ -204,20 +228,25 @@ model {
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
+  //D part in DRD
   c_h_L ~ lkj_corr_cholesky(1);
   a_h_L ~ lkj_corr_cholesky(1);
   b_h_L ~ lkj_corr_cholesky(1);
+  // R part in DRD
+  S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 2); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 2); // SD for multiplication with cholesky phi0_L
   c_h_tau ~ cauchy(0, 2); // SD for c_h ranefs
   a_h_tau ~ cauchy(0, 2); // SD for c_h ranefs
   b_h_tau ~ cauchy(0, 2);
+  S_L_tau ~ cauchy(0, 2); 
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
     c_h_stdnorm[J] ~ std_normal();
     a_h_stdnorm[J] ~ std_normal();
     b_h_stdnorm[J] ~ std_normal();
+    S_L_stdnorm[J] ~ std_normal();
   }
 
 
@@ -240,7 +269,7 @@ model {
   vec_phi_fixed ~ normal(0, 5);
   //  to_vector(a_h) ~ normal(0, .5);
   //to_vector(b_h) ~ normal(0, .5);
-  S ~ lkj_corr( 1 );
+  //  S ~ lkj_corr( 1 );
 
   // likelihood
   for( j in 1:J) {

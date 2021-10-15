@@ -212,7 +212,7 @@ stan_data$rts <- rts
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 100,
+                                     iter = 300,
                                      #control = list(adapt_delta = .99),
                                      chains = 4,
                                      init_r = .05)
