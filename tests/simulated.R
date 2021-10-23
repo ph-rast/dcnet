@@ -1,8 +1,8 @@
 library(dcnet )
 
 ## Create data:
-N <- 5
-tl <- 10
+N <- 50
+tl <- 25
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
 simdat[[1]]
@@ -53,19 +53,41 @@ stanmodel
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 100,
+                                     iter = 500,
                                      #control = list(adapt_delta = .99),
-                                     chains = 1,
+                                     chains = 4,
                                      init_r = .05)
+
+model_fit <- rstan::vb(stanmodel, data = stan_data,
+                       algorithm = "fullrank",
+                       iter = 20000, init_r = 0.01)
 
 
 options(width = 220 )
 #model_fit
 
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
+print(model_fit, pars =  c("S_Lv_fixed")) ## What's up wit the stdnorms? Seem WAY to large
 
-tail( rstan::summary(model_fit, pars = "H")$summary , n =  18)
-N
+slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']
+slv
+slv <- c(1,  slv )
+slv
+L <- matrix(0, ncol = nts, nrow = nts)
+L
+
+index <- 0
+for( j in 1:nts ) {
+    for( i in 1:nts ) {
+        if(i >=  j) {
+            index <-  index + 1
+            L[i,j] <- slv[index]
+        } else next
+    }
+}
+
+cov2cor( L %*% t(L) )
+
                                         #H <- array( rstan::summary(model_fit, pars = "H")$summary[,1], dim = c(N, tl, 3, 3 ) )
 nts
 H <- array( rstan::summary(model_fit, pars = "H")$summary[,"mean"], dim = c(nts, nts, N, tl) )
@@ -89,18 +111,21 @@ for( i in 1:N ) {
     }
 }
 
-
+r21
 #Sys.setenv("DISPLAY"=":0.0")
 
 pdf(file = "./local/corr.pdf", width = 10, height =  6)
+
 plot(1:tl, r21[1,], type =  'l', ylim = c(-1, 1 ), col = "#3299ff60")
 for(i in 2:N ) {
     lines(r21[i,],  col = "#3299ff60" )
 }
+
 dev.off( )
 
 
 pdf(file = "./local/corr.pdf", width = 10, height =  6)
+
 op <- par(mfcol = c(2, 3 ) )
 plot(1:tl, r21[1,], type =  'l', ylim = c(-1, 1 ), col = 2)
 for(i in 2:N ) {
@@ -127,6 +152,7 @@ for(i in 2:N ) {
     lines(r43[i,],  col = i)#paste0("#99f", sprintf("%02d", 1), "f60") )
 }
 op
+
 dev.off( )
 
 
@@ -151,6 +177,9 @@ print(model_fit, pars =  c("S"))
 fit <- dcnet( data = X, J = 4, group = groupvec, iterations = 500, standardize_data = TRUE)
 
 fit
+
+
+
 
 
 ## Real data: Nestler
@@ -197,6 +226,8 @@ stan_data <- return_standat[ c("T", "xC", "rts", "nt",
                                    "distribution", "P", "Q",
                                    "meanstructure", "J", "nobs", "group")]
 
+
+
 rts <- array(NA, dim = c(tl, N, nts))
 
 
@@ -207,15 +238,27 @@ rts[,,4] <- array( X2[,c("gm_organised")], dim = c(tl, N) ) ## time by person
 
 stan_data$rts <- rts
 
+parameterization <- "DCC"
+
+stanmodel <- switch(parameterization,
+                        CCC = dcnet:::stanmodels$CCCMGARCH,
+                        DCC = dcnet:::stanmodels$DCCMGARCH,
+                        NULL)
+
+stanmodel
 
 
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 300,
-                                     #control = list(adapt_delta = .99),
-                                     chains = 4,
-                                     init_r = .05)
+                                     iter = 100,
+                                     control = list(adapt_delta = .95),
+                                     chains = 4)#,
+                                     #init_r = .05)
+
+
+#model_fit <- rstan::vb(stanmodel, data = stan_data,
+#                             iter =  10000)
 
 
 options(width = 220 )

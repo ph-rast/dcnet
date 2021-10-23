@@ -111,7 +111,7 @@ transformed parameters {
   vector[Sdim] S_Lv[J];
   // S_Lv contains (nt+nt^2)/2-1 elements to be inv-vech into lower tri cholesky factor S_L
   // Note that S_L[1,1] = 1 as S = S_L*S_L is a corrmat
-  cholesky_factor_corr[nt] S_L[J];
+  //cholesky_factor_corr[nt] S_L[J];
   corr_matrix[nt] S[J];
   
   cov_matrix[nt] H[T,J];
@@ -202,7 +202,7 @@ transformed parameters {
 
       // All output is in vectorized form
       S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
-      S_Lv[j] = tanh(S_Lv_fixed + S_Lv_r[j]); // keep within -1; 1
+      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // keep within -1; 1
       // S_Lv is vectorized - invvec now:
       S[j] = invvec_to_corr(S_Lv[j], nt);
       
@@ -293,5 +293,5 @@ generated quantities {
 /*   vector<lower=0>[nt] c_h_var = exp(c_h); */
 /*   // retrodict */
 /* #include /generated/retrodict_H.stan */
-/* 18:00 */
+/* 15:13 */
 }
