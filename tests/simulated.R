@@ -2,7 +2,7 @@ library(dcnet )
 
 ## Create data:
 N <- 50
-tl <- 25
+tl <- 12
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
 simdat[[1]]
@@ -41,10 +41,10 @@ simdat[[1]]
 
 #saveRDS(object =stan_data ,file = '../../TEST/stan_data')
 
-parameterization <- "DCC"
+parameterization <- "DCCf"
 
 stanmodel <- switch(parameterization,
-                        CCC = dcnet:::stanmodels$CCCMGARCH,
+                        DCCf = dcnet:::stanmodels$DCCMGARCHfixedS,
                         DCC = dcnet:::stanmodels$DCCMGARCH,
                         NULL)
 
@@ -53,7 +53,8 @@ stanmodel
 model_fit <- rstan::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
-                                     iter = 500,
+                             iter = 2000,
+                             warmup =  1500, 
                                      #control = list(adapt_delta = .99),
                                      chains = 4,
                                      init_r = .05)
@@ -68,6 +69,8 @@ options(width = 220 )
 
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
 print(model_fit, pars =  c("S_Lv_fixed")) ## What's up wit the stdnorms? Seem WAY to large
+print(model_fit, pars =  c("S")) ## What's up wit the stdnorms? Seem WAY to large
+
 
 slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']
 slv
@@ -204,15 +207,18 @@ XL <- reshape(X0, direction = "long",
 
 ## sort by id, then time
 X2 <- XL[order( XL$id,  XL$time), ]
+head(X2 )
+unique(X2$id )
+X2 <- X2[X2$id <= 50,]
+X2 <- X2[X2$time <= 24,]
 
 N <- max( X2$id )
 N
 groupvec <- X2$id
 groupvec
-tl <- dim(XL )[1]/ N
+tl <- dim(X2 )[1]/ N
 tl
 
-head(XL )
 length(groupvec )
 nts <- 4 # Number of variables
 
