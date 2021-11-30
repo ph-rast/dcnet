@@ -1,8 +1,8 @@
 library(dcnet )
 
 ## Create data:
-N <- 50
-tl <- 12
+N <- 5
+tl <- 4
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
 simdat[[1]]
@@ -32,7 +32,7 @@ stan_data$rts <-
 ## same as this from X:  array(X,  dim = c(20, 4, 3) )
 
 
-stan_data$rts[,,3]
+stan_data$rts
 
 
 simdat[[1]][,,4]
