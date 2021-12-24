@@ -2,7 +2,7 @@ library(dcnet )
 
 ## Create data:
 N <- 5
-tl <- 4
+tl <- 40
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
 simdat[[1]]
@@ -41,31 +41,36 @@ simdat[[1]]
 
 #saveRDS(object =stan_data ,file = '../../TEST/stan_data')
 
-parameterization <- "DCCf"
+parameterization <- "VAR"
 
 stanmodel <- switch(parameterization,
-                        DCCf = dcnet:::stanmodels$DCCMGARCHfixedS,
-                        DCC = dcnet:::stanmodels$DCCMGARCH,
-                        NULL)
+                    DCCf = dcnet:::stanmodels$DCCMGARCHfixedS,
+                    DCC = dcnet:::stanmodels$DCCMGARCH,
+                    VAR = dcnet:::stanmodels$VAR,
+                    NULL)
 
 stanmodel
 
-model_fit <- rstan::sampling(stanmodel,
-                                     data = stan_data,
-                                     verbose = TRUE,
+system.time( {
+  model_fit <- rstan::sampling(stanmodel,
+                             data = stan_data,
+                             verbose = TRUE,
                              iter = 2000,
-                             warmup =  1500, 
-                                     #control = list(adapt_delta = .99),
-                                     chains = 4,
-                                     init_r = .05)
-
-model_fit <- rstan::vb(stanmodel, data = stan_data,
-                       algorithm = "fullrank",
-                       iter = 20000, init_r = 0.01)
+                                        #warmup =  1500, 
+                             control = list(adapt_delta = .99),
+                             chains = 4,
+                             init_r = .05)
+})
+#model_fit <- rstan::vb(stanmodel, data = stan_data,
+                       ##algorithm = "fullrank",
+                       #iter = 20000, init_r = 0.01)
 
 
 options(width = 220 )
 #model_fit
+print(model_fit, pars =  c("rescov"))
+print(model_fit, pars =  c("phi"))
+print(model_fit, pars =  c("phi0_tau"))
 
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
 print(model_fit, pars =  c("S_Lv_fixed")) ## What's up wit the stdnorms? Seem WAY to large

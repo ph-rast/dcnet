@@ -9,11 +9,13 @@ using namespace Rcpp;
 
 RcppExport SEXP _rcpp_module_boot_stan_fit4DCCMGARCH_mod();
 RcppExport SEXP _rcpp_module_boot_stan_fit4DCCMGARCHfixedS_mod();
+RcppExport SEXP _rcpp_module_boot_stan_fit4VAR_mod();
 RcppExport SEXP _rcpp_module_boot_stan_fit4forecastDCC_mod();
 
 static const R_CallMethodDef CallEntries[] = {
     {"_rcpp_module_boot_stan_fit4DCCMGARCH_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4DCCMGARCH_mod, 0},
     {"_rcpp_module_boot_stan_fit4DCCMGARCHfixedS_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4DCCMGARCHfixedS_mod, 0},
+    {"_rcpp_module_boot_stan_fit4VAR_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4VAR_mod, 0},
     {"_rcpp_module_boot_stan_fit4forecastDCC_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4forecastDCC_mod, 0},
     {NULL, NULL, 0}
 };
