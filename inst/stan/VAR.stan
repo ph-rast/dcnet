@@ -1,9 +1,4 @@
-// DCC-Parameterization
-functions { 
-#include /functions/cov2cor.stan
-#include /functions/jacobian.stan
-#include /functions/invvec.stan
-}
+// VAR only model w. constant variance
 
 data {
 #include /data/data.stan
@@ -39,7 +34,7 @@ parameters {
 #include /parameters/arma.stan  
 
   // Residual covmat
-  cov_matrix[nt] rescov[J];
+  cov_matrix[nt] rescov;
   real< lower = 2 > nu; // nu for student_t
 }
 
@@ -76,23 +71,23 @@ model {
   }
  
   // Prior for initial state
-  for(j in 1:J){
-    rescov[j,] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
-  }
+  //for(j in 1:J){
+    rescov ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
+  //}
   // Prior on nu for student_t
   nu ~ normal( nt, 50 );
   phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
-  vec_phi_fixed ~ normal(0, 5);
+  vec_phi_fixed ~ normal(0, 0.5);
   
   // likelihood
   for( j in 1:J) {
     if ( distribution == 0 ) {
       for(t in 1:T){
-	rts[t,j,] ~ multi_normal(mu[t,j,], rescov[j,]);
+	rts[t,j,] ~ multi_normal(mu[t,j,], rescov);
       }
     } else if ( distribution == 1 ) {
       for(t in 1:T){
-	rts[t,j,] ~ multi_student_t(nu, mu[t,j,], rescov[j,]);
+	rts[t,j,] ~ multi_student_t(nu, mu[t,j,], rescov);
       }
     }
   }
@@ -106,5 +101,5 @@ generated quantities {
 /*   vector<lower=0>[nt] c_h_var = exp(c_h); */
 /*   // retrodict */
 /* #include /generated/retrodict_H.stan */
-/* dec 1 */
+/* jan 29 2153 */
 }

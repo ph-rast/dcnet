@@ -18,3 +18,4 @@
 
 src/stanExports_DCCMGARCH.h
 *.h
+*.cpp
