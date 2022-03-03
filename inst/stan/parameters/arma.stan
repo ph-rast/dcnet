@@ -18,5 +18,5 @@ vector[nt*nt] phi_stdnorm[J]; // Used to multiply with phi0_sd to obtain ranef o
 
 // this creates uncorrelated random effects that are directly estimated
 //vector[nt*nt] vec_phi_random[J];
-//matrix<lower = -1, upper = 1>[nt,nt] theta;
+//matrix<lower = -1 upper = 1>[nt,nt] theta;
 

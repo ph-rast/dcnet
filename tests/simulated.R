@@ -1,11 +1,13 @@
-library(dcnet )
+#library(dcnet )
 
 ## Create data:
 N <- 5
 tl <- 50
 nts <- 3
 simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(1, 10, 20 ))
-simdat[[1]]
+dim(simdat[[1]])
+
+rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
@@ -27,17 +29,14 @@ stan_data <- return_standat[ c("T", "xC", "rts", "nt",
 
 stan_data
 stan_data$rts
-stan_data$rts <-
-    array( apply(simdat[[1]], 1, FUN = rbind ), dim = c(tl, N, nts) )
+stan_data$rts <- rtsgen
+
 ## same as this from X:  array(X,  dim = c(20, 4, 3) )
 
 
-stan_data$rts <- lapply(seq(dim(stan_data$rts)[3]), function(x) stan_data$rts[,,x])
+
 stan_data$rts
 
-simdat[[1]][,,4]
-
-simdat[[1]]
 
 #saveRDS(object =stan_data ,file = '../../TEST/stan_data')
 
@@ -51,6 +50,7 @@ stanmodel <- switch(parameterization,
 
 stanmodel
 
+
 system.time( {
   model_fit <- rstan::sampling(stanmodel,
                              data = stan_data,
@@ -61,13 +61,28 @@ system.time( {
                              chains = 4,
                              init_r = .05)
 })
-#model_fit <- rstan::vb(stanmodel, data = stan_data,
+
+library(cmdstanr )
+file <- file.path("../inst/stan/VAR.stan" )
+mod <- cmdstan_model(file)
+
+model_fit <- mod$sample(
+                   data = stan_data,
+                   chains = 4,
+                   parallel_chains = 4,
+                   iter_warmup = 500,
+                   iter_sampling = 500)
+
+                                        #model_fit <- rstan::vb(stanmodel, data = stan_data,
                        ##algorithm = "fullrank",
                        #iter = 20000, init_r = 0.01)
 
 
 options(width = 220 )
-#model_fit
+model_fit$summary( )
+model_fit$summary("phi" )
+
+
 print(model_fit, pars =  c("rescov"))
 print(model_fit, pars =  c("phi"))
 print(model_fit, pars =  c("phi0_fixed"))
