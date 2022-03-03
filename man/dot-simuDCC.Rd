@@ -4,7 +4,7 @@
 \alias{.simuDCC}
 \title{Simulate TS's for N individuals}
 \usage{
-.simuDCC(tslength, n_ts, N, ranef_sd_S)
+.simuDCC(tslength, n_ts, N, ranef_sd_S, phi0_fixed = NULL)
 }
 \arguments{
 \item{tslength}{Length of time series, for all N (everyone has same TS length)}
@@ -14,6 +14,8 @@
 \item{N}{Subjects}
 
 \item{ranef_sd_S}{Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number}
+
+\item{phi0_fixed}{Vector of population values of length n_ts}
 }
 \description{
 Simulate TS's for N individuals

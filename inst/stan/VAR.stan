@@ -50,7 +50,8 @@ transformed parameters {
   for( j in 1:J){
     mu[1,j,] = phi0_fixed;
   }
-  
+
+  // Beter to loop first through array, then matrix column and row 
   // iterations geq 2
   for (t in 2:T){
     for( j in 1:J){
@@ -101,5 +102,5 @@ generated quantities {
 /*   vector<lower=0>[nt] c_h_var = exp(c_h); */
 /*   // retrodict */
 /* #include /generated/retrodict_H.stan */
-/* jan 29 2153 */
+/* mar 2 */
 }

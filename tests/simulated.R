@@ -2,9 +2,9 @@ library(dcnet )
 
 ## Create data:
 N <- 5
-tl <- 40
+tl <- 50
 nts <- 3
-simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001 )
+simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(1, 10, 20 ))
 simdat[[1]]
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
@@ -32,8 +32,8 @@ stan_data$rts <-
 ## same as this from X:  array(X,  dim = c(20, 4, 3) )
 
 
+stan_data$rts <- lapply(seq(dim(stan_data$rts)[3]), function(x) stan_data$rts[,,x])
 stan_data$rts
-
 
 simdat[[1]][,,4]
 
@@ -55,7 +55,7 @@ system.time( {
   model_fit <- rstan::sampling(stanmodel,
                              data = stan_data,
                              verbose = TRUE,
-                             iter = 2000,
+                             iter = 200,
                                         #warmup =  1500, 
                              control = list(adapt_delta = .99),
                              chains = 4,
@@ -70,7 +70,9 @@ options(width = 220 )
 #model_fit
 print(model_fit, pars =  c("rescov"))
 print(model_fit, pars =  c("phi"))
+print(model_fit, pars =  c("phi0_fixed"))
 print(model_fit, pars =  c("phi0_tau"))
+print(model_fit, pars =  c("vec_phi_fixed"))
 
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
 print(model_fit, pars =  c("S_Lv_fixed")) ## What's up wit the stdnorms? Seem WAY to large

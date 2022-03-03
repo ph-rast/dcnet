@@ -39,8 +39,9 @@
 ##' @param tslength Length of time series, for all N (everyone has same TS length)
 ##' @param n_ts Number of simultaneous TS per person. Currently only supports 3 or less
 ##' @param N Subjects
-##' @param ranef_sd_S Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number 
-.simuDCC <- function(tslength, n_ts, N, ranef_sd_S) {
+##' @param ranef_sd_S Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number
+##' @param phi0_fixed Vector of population values of length n_ts
+.simuDCC <- function(tslength, n_ts, N, ranef_sd_S, phi0_fixed) {
 
     ## Define fixed diag for c_h on log scale
     log_c_fixed_diag <- rnorm(n_ts, 0, .5)
@@ -62,8 +63,8 @@
     b_q <- ab_q_rep[2,]
 
     ## location
-    ## Generate random starting values for the location intercept as sum of fixed plus random
-    phi0 <- runif(n_ts, -10, 10) + replicate(n = N, rnorm(n_ts, 0, 5 ))
+  ## Generate random starting values for the location intercept as sum of fixed plus random
+  phi0 <- phi0_fixed + replicate(n = N, rnorm(n_ts, 0, .5 ))
     
     ## phi is bound by -1;1. n_tsXn_ts matrix
     ## Create N individual matricesb
@@ -73,26 +74,26 @@
     y <- array(NA, dim = c(n_ts, tslength, N))
     ## init y
     y[,1,] <- phi0
-   
+    
     ## mean
     DCC_mu <- array(0, dim = c(n_ts, tslength, N))
 
     h <- array(.5, dim = c(n_ts, tslength, N))
     DCC_H <- array( NA, c(n_ts,n_ts, tslength, N))
     DCC_R <- array( NA, c(n_ts,n_ts, tslength, N))
-        
+    
     ## Distribution of random effects    
     ## Unconditional Corr;
     ## Fixed (defined as correlation and converted to correlation later):
     Sc <- matrix(c(1.0, 0.2, 0.1,
-                  0.2, 1.0, -.1,
-                  0.1, -.1, 1.0),  ncol = 3 )
+                   0.2, 1.0, -.1,
+                   0.1, -.1, 1.0),  ncol = 3 )
     Sc <- Sc[1:n_ts, 1:n_ts]
     
     ## Add random effects:
     ## Generate N individual unconditional correlation matrices S
     S <- replicate(N, cov2cor( .covranef(Sc , ranef_sd = ranef_sd_S)) )
-        
+    
     ## Q is symmetric
     Q <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
     Qs <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
@@ -101,32 +102,32 @@
     u <- array(NA, c(n_ts,tslength,N))
 
     for(j in 1:N ) {
-        h[,1,j] <- c_h[j,]
- 
-        for(t in 2:tslength) {
-            DCC_mu[,t,j] <- 
-                phi0[,j] + phi[[j]] %*% (y[,t-1,j] - DCC_mu[,t-1,j])
+      h[,1,j] <- c_h[j,]
+      
+      for(t in 2:tslength) {
+        DCC_mu[,t,j] <- 
+          phi0[,j] + phi[[j]] %*% (y[,t-1,j] - DCC_mu[,t-1,j])
 
-            for(i in 1:n_ts) {
-                h[i,t,j] <- sqrt(c_h[j,i] + a_h[[j]][i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[[j]][i]*h[i,t-1,j])
-            }
-            
-            u[,t-1,j] <-
-                solve( diag(h[,t-1,j]) ) %*% (y[,t-1,j] - DCC_mu[,t-1,j])
-
-            Q[,,t,j] <- (1 - a_q[[j]] - b_q[[j]])*S[,,j] +
-                a_q[[j]] * (u[,t-1,j] %*% t(u[,t-1,j])) + 
-                b_q[[j]] * Q[,,t-1,j] 
-            
-            R[,,t,j] <- cov2cor(Q[,,t,j])
-
-            DCC_H[,,t,j] <- diag(h[,t,j])%*%R[,,t,j] %*%diag(h[,t,j])
-            ##
-            y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
-            DCC_R[,,t,j] <- cov2cor(DCC_H[,,t,j] )
+        for(i in 1:n_ts) {
+          h[i,t,j] <- sqrt(c_h[j,i] + a_h[[j]][i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[[j]][i]*h[i,t-1,j])
         }
+        
+        u[,t-1,j] <-
+          solve( diag(h[,t-1,j]) ) %*% (y[,t-1,j] - DCC_mu[,t-1,j])
 
-        DCC_y <- y
+        Q[,,t,j] <- (1 - a_q[[j]] - b_q[[j]])*S[,,j] +
+          a_q[[j]] * (u[,t-1,j] %*% t(u[,t-1,j])) + 
+          b_q[[j]] * Q[,,t-1,j] 
+        
+        R[,,t,j] <- cov2cor(Q[,,t,j])
+
+        DCC_H[,,t,j] <- diag(h[,t,j])%*%R[,,t,j] %*%diag(h[,t,j])
+        ##
+        y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
+        DCC_R[,,t,j] <- cov2cor(DCC_H[,,t,j] )
+      }
+
+      DCC_y <- y
     }
     return(list(DCC_y, DCC_R))
-}
+  }
