@@ -63,8 +63,10 @@ system.time( {
 })
 
 library(cmdstanr )
-file <- file.path("../inst/stan/VAR.stan" )
-mod <- cmdstan_model(file)
+getwd( )
+#file <- file.path("../inst/stan/VAR.stan" )
+file <- file.path("./VAR.stan" )
+mod <- cmdstan_model(file, include_paths = ".")
 
 model_fit <- mod$sample(
                    data = stan_data,
@@ -73,15 +75,13 @@ model_fit <- mod$sample(
                    iter_warmup = 500,
                    iter_sampling = 500)
 
-                                        #model_fit <- rstan::vb(stanmodel, data = stan_data,
-                       ##algorithm = "fullrank",
-                       #iter = 20000, init_r = 0.01)
-
 
 options(width = 220 )
-model_fit$summary( )
+
+model_fit$summary()
 model_fit$summary("phi" )
 
+model_fit$print("phi0_fixed", max_rows = 120)
 
 print(model_fit, pars =  c("rescov"))
 print(model_fit, pars =  c("phi"))

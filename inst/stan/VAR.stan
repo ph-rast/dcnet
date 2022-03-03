@@ -1,39 +1,27 @@
 // VAR only model w. constant variance
 
 data {
-  //#include /data/data.stan
-int<lower=0> nobs;                // num of observations
-int<lower=1> J;                   // number of groups or subjects
-int<lower=1,upper=J> group[nobs]; // vector with group ID
-int<lower=2> T; // lengh of time series
-int<lower=2> nt;    // number of time series
-int<lower=1> Q; // MA component in MGARCH(P,Q), matrix A
-int<lower=1> P; // AR component in MGARCH(P,Q), matrix B
-matrix[50,3] rts[5];  // multivariate time-series; array of length J of Txnt matrix
-vector[nt] xC[nobs];  // TODO - match to rts if to be included // time-varying predictor for constant variance
-int<lower=0, upper=1> distribution; // 0 = Normal; 1 = student_t
-int<lower=0, upper=2> meanstructure; // Select model for location
-
+#include /data/data.stan
 }
 
 transformed data {                                  
-  vector[nt] rts_m[J];
-  vector[nt] rts_sd[J];
+  array[J] vector[nt] rts_m;
+  array[J] vector[nt] rts_sd;
   int<lower=nt> Sdim = (nt + nt*nt) / 2 - 1; // Dimension of vec(S).
  
   //#include /transformed_data/xh_marker.stan
-// Check whether xC contains a predictor or not.
-matrix[nt, nt] xC_m[T];
-int<lower = 0> xC_marker = 0;
-real<lower = 0> cp;
+  // Check whether xC contains a predictor or not.
+  array[T] matrix[nt, nt] xC_m;
+  int<lower = 0> xC_marker = 0;
+  real<lower = 0> cp;
 
-for( t in 1:T ){
-  xC_m[t] = diag_matrix( xC[t] );
-  // add a variable that notes if xC is null or actually a predictor
-  cp = sum( xC_m[t]' * xC_m[t] );
-  if( cp != 0 )
-    xC_marker = xC_marker + 1;
- }
+  for( t in 1:T ){
+    xC_m[t] = diag_matrix( xC[t] );
+    // add a variable that notes if xC is null or actually a predictor
+    cp = sum( xC_m[t]' * xC_m[t] );
+    if( cp != 0 )
+      xC_marker = xC_marker + 1;
+  }
 
   
   if( meanstructure == 0 ){
@@ -54,26 +42,8 @@ for( t in 1:T ){
 
 parameters {
   // VAR parameters 
-  //#include /parameters/arma.stan
-// Fixed effect vector
-vector[nt] phi0_fixed; 
-cholesky_factor_corr[nt] phi0_L;
-vector<lower=0>[nt] phi0_tau; // ranef SD for phi0
-vector[nt] phi0_stdnorm[J]; // Used to multiply with phi0_sd to obtain ranef on phi0
+#include /parameters/arma.stan
   
-// gqs() cant not deal with ? yet - as long as that's not fixed
-// estimate phi and theta anyways
-//matrix[meanstructure ? nt : 0, meanstructure ? nt : 0 ] phi;
-//matrix[meanstructure ? nt : 0, meanstructure ? nt : 0 ] theta;
-
-//matrix<lower = -1, upper = 1>[nt,nt] phi; // TODO lower and upper may need to be removed when adding ranefs
-// Create vecotr for phi here as parameter, then combine it to matrix in transformed parameters block
-vector[nt*nt] vec_phi_fixed;
-cholesky_factor_corr[nt*nt] phi_L;
-vector<lower=0>[nt*nt] phi_tau; // ranef SD for phi0
-vector[nt*nt] phi_stdnorm[J]; // Used to multiply with phi0_sd to obtain ranef on phi0
-  
-
   // Residual covmat
   cov_matrix[nt] rescov;
   real< lower = 2 > nu; // nu for student_t
@@ -82,10 +52,10 @@ vector[nt*nt] phi_stdnorm[J]; // Used to multiply with phi0_sd to obtain ranef o
 transformed parameters {
   // transform vec_phi to nt*nt parameter matrix
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
-  vector[nt] phi0[J]; // vector with fixed + random for intercept
-  vector[nt*nt] phi[J]; // vectorized VAR parameter matrix, fixed + random
+  array[J] vector[nt] phi0; // vector with fixed + random for intercept
+  array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
-  matrix[T,nt] mu[J];
+  array[J] matrix[T,nt] mu;
   
   // Initialize t=1 across all subjects
   for( j in 1:J){
@@ -96,11 +66,7 @@ transformed parameters {
   // iterations geq 2
   for( j in 1:J ){
     for( t in 2:T ){
-      //#include /model_components/mu.stan
-      phi0[j] = phi0_fixed + (diag_pre_multiply(phi0_tau, phi0_L)*phi0_stdnorm[j]);
-phi[j] = vec_phi_fixed + (diag_pre_multiply(phi_tau, phi_L)*phi_stdnorm[j]) ;
-mu[j,t] = ( phi0[j] + to_matrix( phi[j], nt, nt ) * (rts[j,t-1]'- phi0_fixed) )'; //phi0[j]);
-
+#include /model_components/mu.stan
     } 
   }
 }
