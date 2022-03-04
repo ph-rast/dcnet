@@ -9,20 +9,7 @@ transformed data {
   array[J] vector[nt] rts_sd;
   int<lower=nt> Sdim = (nt + nt*nt) / 2 - 1; // Dimension of vec(S).
  
-  //#include /transformed_data/xh_marker.stan
-  // Check whether xC contains a predictor or not.
-  array[T] matrix[nt, nt] xC_m;
-  int<lower = 0> xC_marker = 0;
-  real<lower = 0> cp;
-
-  for( t in 1:T ){
-    xC_m[t] = diag_matrix( xC[t] );
-    // add a variable that notes if xC is null or actually a predictor
-    cp = sum( xC_m[t]' * xC_m[t] );
-    if( cp != 0 )
-      xC_marker = xC_marker + 1;
-  }
-
+#include /transformed_data/xh_marker.stan
   
   if( meanstructure == 0 ){
     for ( j in 1:J ){

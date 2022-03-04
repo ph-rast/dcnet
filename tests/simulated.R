@@ -65,7 +65,7 @@ system.time( {
 library(cmdstanr )
 getwd( )
 #file <- file.path("../inst/stan/VAR.stan" )
-file <- file.path("./VAR.stan" )
+file <- file.path("./DCCMGARCH.stan" )
 mod <- cmdstan_model(file, include_paths = ".")
 
 model_fit <- mod$sample(

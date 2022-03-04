@@ -71,7 +71,7 @@ vector raw_sum_to_b_h_sum(vector b_h_sum_s, vector upperLimits) {
 vector[] simplex_to_bh(vector[] b_h_simplex, vector b_h_sum) {
   int nt = size(b_h_simplex);
   int P = num_elements(b_h_simplex[1]);
-  vector[nt] b_h[P];
+  array[P] vector[nt] b_h;
   for(k in 1:nt) {
     b_h[1:P, k] = to_array_1d(b_h_simplex[k] * b_h_sum[k]);
   }
