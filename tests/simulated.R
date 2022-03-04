@@ -73,7 +73,8 @@ model_fit <- mod$sample(
                    chains = 4,
                    parallel_chains = 4,
                    iter_warmup = 500,
-                   iter_sampling = 500)
+                   iter_sampling = 500,
+                   adapt_delta = 0.95)
 
 
 options(width = 220 )
