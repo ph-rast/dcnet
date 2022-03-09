@@ -1,10 +1,13 @@
-#library(dcnet )
+##library(dcnet )
+library(ks )
+library(MASS )
+source(file = "../R/simulate.R")
 
 ## Create data:
-N <- 5
-tl <- 50
+N <- 10
+tl <- 20
 nts <- 3
-simdat <- dcnet:::.simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(1, 10, 20 ))
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(0, 0, 0 ))
 dim(simdat[[1]])
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
@@ -64,25 +67,40 @@ system.time( {
 
 library(cmdstanr )
 getwd( )
-#file <- file.path("../inst/stan/VAR.stan" )
-file <- file.path("./DCCMGARCH.stan" )
-mod <- cmdstan_model(file, include_paths = ".")
+file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" )
+
+mod <- cmdstan_model(file, include_paths = "../inst/stan/")
+
+stan_data$rts
+
+model_fit <-mod$variational(
+                  data = stan_data,
+##                   threads = 6,
+                  tol_rel_obj = 0.001,
+                   iter =  60000)
+
+model_fit$output( )
 
 model_fit <- mod$sample(
                    data = stan_data,
                    chains = 4,
                    parallel_chains = 4,
-                   iter_warmup = 500,
-                   iter_sampling = 500,
+                   iter_warmup = 2000,
+                   iter_sampling = 1000,
                    adapt_delta = 0.95)
 
 
 options(width = 220 )
 
-model_fit$summary()
 model_fit$summary("phi" )
-
 model_fit$print("phi0_fixed", max_rows = 120)
+
+model_fit$summary("S" )
+model_fit$summary("c_h_fixed" )
+model_fit$summary("c_h_tau" )
+model_fit$summary("c_h_stdnorm" )
+
+
 
 print(model_fit, pars =  c("rescov"))
 print(model_fit, pars =  c("phi"))
