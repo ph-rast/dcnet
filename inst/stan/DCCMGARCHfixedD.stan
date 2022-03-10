@@ -41,32 +41,7 @@ parameters {
 #include /parameters/arma.stan
   // predictor for H
 #include /parameters/predH.stan
-
-  // GARCH h parameters on variance metric
-  vector[nt] c_h_fixed; // variance on log metric
-  vector[nt] a_h_fixed;
-  vector[nt] b_h_fixed;
-
-  // Random effects fo c_h
-  cholesky_factor_corr[nt] c_h_L;
-  vector<lower=0>[nt] c_h_tau;
-  array[J] vector[nt] c_h_stdnorm;
-  // Random effects fo a_h
-  cholesky_factor_corr[nt] a_h_L;
-  vector<lower=0>[nt] a_h_tau; // ranef SD for phi0
-  array[J] vector[nt] a_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
-  // Random effects fo b_h
-  cholesky_factor_corr[nt] b_h_L;
-  vector<lower=0>[nt] b_h_tau; // ranef SD for phi0
-  array[J] vector[nt] b_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
-  
-  // vector<lower = 0,  upper = 1 >[nt] a_h[Q];
-  array[J,nt] simplex[Q] a_h_simplex;
-  //vector<lower=0, upper = 1>[nt] a_h_sum[J];
-  array[J,nt] simplex[P] b_h_simplex; // Simplex for b_h within each timeseries
-  array[J] vector[nt] b_h_sum_s;
-  //vector[nt] b_h_sum_s[J]; // Unconstrained b_h_sum values. b_h[i] = U[i] b_h_simplex[i]; U[i] ~ U(0, 1 - sum(a_h[i]))
-  // vector<lower = 0,  upper = 1 >[nt] b_h[P]; // TODO actually: 1 - a_h, across all Q and P...
+ 
   // GARCH q parameters
   real<lower=0, upper = 1 > a_q; //
   real<lower=0, upper = (1 - a_q) > b_q; //
@@ -84,6 +59,9 @@ parameters {
   vector[nt] u1_init;
 
   real< lower = 2 > nu; // nu for student_t
+
+  vector[nt] D;
+
 }
 
 transformed parameters {
@@ -93,14 +71,6 @@ transformed parameters {
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
   //Scale
-  array[J] vector[nt] c_h;
-  array[J] vector[nt] c_h_random; // variance on log metric
-  //vector[nt] a_h[J];
-  array[J] vector[nt] a_h_random; // variance on log metric
-  array[J] vector[nt] b_h_random;
-
-  array[J] vector<lower=0, upper = 1>[nt] a_h_sum;
-  array[J] vector<lower=0, upper = 1>[nt] b_h_sum;
   
   // ranef vector for vec(S) part
   array[J] vector[Sdim] S_Lv_r;
@@ -115,19 +85,10 @@ transformed parameters {
   array[J,T] corr_matrix[nt] R;
   array[J,T-1] vector[nt] rr;
   array[J,T] vector[nt] mu;
-  array[J,T] vector[nt] D;
   array[J,T] cov_matrix[nt] Qr;
   array[J,T] vector[nt] Qr_sdi;
   array[J,T] vector[nt] u;
-  array[J] vector<lower = 0>[nt] vd;
-  array[J] vector<lower = 0>[nt] ma_d;
-  array[J] vector<lower = 0>[nt] ar_d;
-  
-  array[J,Q] vector<lower=0, upper = 1>[nt] a_h;// = simplex_to_bh(a_h_simplex[J], a_h_sum[J]);
-  array[J] vector[nt] UPs;// = upper_limits(a_h[J]);
-  array[J] vector[nt] ULs;// = raw_sum_to_b_h_sum(b_h_sum_s[J], UPs[J]);
-  array[J,P] vector<lower = 0, upper = 1>[nt] b_h;// = simplex_to_bh(b_h_simplex[J], ULs[J]);
-
+ 
   // This vector is multiplied be simplex; has to be 0<x<1
   // take tanh( fixed + ranef )
   
@@ -136,66 +97,20 @@ transformed parameters {
   
   // Initialize t=1
   for( j in 1:J){
-    for( q in 1:Q){
-      a_h[j,q] = rep_vector(.5, nt);//simplex_to_bh(a_h_simplex[j], a_h_sum[j]);
-    }
-    UPs[j] = upper_limits(a_h[j]);
-    ULs[j] = raw_sum_to_b_h_sum(b_h_sum_s[j], UPs[j]);
-    for( p in 1:P ){
-      b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]);
-    }
     
     mu[j,1] = phi0_fixed;
     u[j,1] = u1_init;
-    D[j,1] = D1_init;
+    
     Qr[j,1] = Qr1_init;
     H[j,1] = Qr[j,1];
     R[j,1] = diag_matrix(rep_vector(1.0, nt));
     Qr_sdi[j,1] = rep_vector(1.0, nt);
-  }
-  
-  // iterations geq 2
-  for( j in 1:J){
-      for (t in 2:T){
+    
+    for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
 #include /model_components/mu.stan
-      c_h_random[j] = (diag_pre_multiply(c_h_tau, c_h_L)*c_h_stdnorm[j]);
-      c_h[j] = c_h_fixed + c_h_random[j];
-
-      a_h_random[j] = (diag_pre_multiply(a_h_tau, a_h_L)*a_h_stdnorm[j]);
-      // Bound sum of fixed and ranef between 0 and 1 with logistic function
-      a_h_sum[j] = rep_vector(1.0, nt) ./ (1 + exp(-(a_h_fixed + a_h_random[j])) );
-
-      b_h_random[j] = (diag_pre_multiply(b_h_tau, b_h_L)*b_h_stdnorm[j]);
-      // Bound sum of fixed and ranef between 0 and 1
-      b_h_sum[j] = rep_vector(1.0, nt) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
-
       
-      for(d in 1:nt){
-	vd[j,d]   = 0.0;
-	ma_d[j,d] = 0.0;
-	ar_d[j,d]   = 0.0;
-	// GARCH MA component
-	for (q in 1:min( t-1, Q) ) {
-	  rr[j, t-q, d] = square( rts[j, t-q, d] - mu[j, t-q, d] );
-	  ma_d[j, d] = ma_d[j, d] + a_h[j, q, d]*rr[j, t-q, d] ;
-	}
-	// print("ma_d: ", "TS:", d, " Value:", ma_d[d], " T:", t);
-	// GARCH AR component
-	for (p in 1:min( t-1, P) ) {
-	  ar_d[j,d] = ar_d[j,d] + b_h[j, p, d]*D[j, t-p, d]^2;
-	}
-	// print("ar_d: ", "TS:", d, " Value:", ar_d[d], " T:", t);
-	// Predictor on diag (given in xC)
-	if ( xC_marker >= 1) {
-	  vd[j,d] = exp( c_h[j,d] + beta[d] * xC[t, d] ) + ma_d[j,d] + ar_d[j,d];
-	} else if ( xC_marker == 0) {
-	  vd[j,d] = exp( c_h[j,d] )  + ma_d[j,d] + ar_d[j,d];
-	}
-
-	D[j, t, d] = sqrt( vd[j,d] );
-      }
-      u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
+      u[j,t,] = diag_matrix(D) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       // All output is in vectorized form
       S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
@@ -207,55 +122,34 @@ transformed parameters {
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
-      H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
+      H[j,t] = quad_form_diag(R[j,t],  D );  // H = DRD;
     }
   }
 }
 model {
-  // print("Upper Limits:", UPs);
-  // UL transform jacobian
-  for(j in 1:J) {
-    for(k in 1:nt) {
-      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
-      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
-    }
-  }
 
   // priors
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   //D part in DRD
-  c_h_L ~ lkj_corr_cholesky(1);
-  a_h_L ~ lkj_corr_cholesky(1);
-  b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
   S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ cauchy(0, 1); // SD for c_h ranefs
-  a_h_tau ~ cauchy(0, 1); // SD for c_h ranefs
-  b_h_tau ~ cauchy(0, 1);
   S_L_tau ~ cauchy(0, 1);
+
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
-    c_h_stdnorm[J] ~ std_normal();
-    a_h_stdnorm[J] ~ std_normal();
-    b_h_stdnorm[J] ~ std_normal();
     S_L_stdnorm[J] ~ std_normal();
   }
-
-
-  
+ 
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ std_normal();
-  to_vector(a_h_fixed) ~ std_normal();
-  to_vector(b_h_fixed) ~ std_normal();
   // Prior for initial state
   Qr1_init ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
-  to_vector(D1_init) ~ lognormal(-1, 1);
+  to_vector(D) ~ cauchy(0, 1);
   to_vector(u1_init) ~ std_normal();
   // Prior on nu for student_t
   //if ( distribution == 1 )

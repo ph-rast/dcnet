@@ -20,3 +20,4 @@ src/stanExports_DCCMGARCH.h
 *.h
 *.cpp
 /inst/stan/DCCMGARCHfixedS
+/inst/stan/DCCMGARCHfixedD

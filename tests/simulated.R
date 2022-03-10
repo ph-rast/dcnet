@@ -67,7 +67,8 @@ system.time( {
 
 library(cmdstanr )
 getwd( )
-file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" )
+#file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" )
+file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" )
 
 mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
@@ -76,7 +77,7 @@ stan_data$rts
 model_fit <-mod$variational(
                   data = stan_data,
 ##                   threads = 6,
-                  tol_rel_obj = 0.001,
+                 ## tol_rel_obj = 0.001,
                    iter =  60000)
 
 model_fit$output( )
@@ -85,7 +86,7 @@ model_fit <- mod$sample(
                    data = stan_data,
                    chains = 4,
                    parallel_chains = 4,
-                   iter_warmup = 2000,
+                   iter_warmup = 1000,
                    iter_sampling = 1000,
                    adapt_delta = 0.95)
 
@@ -95,7 +96,22 @@ options(width = 220 )
 model_fit$summary("phi" )
 model_fit$print("phi0_fixed", max_rows = 120)
 
-model_fit$summary("S" )
+model_fit$print("S", max_rows = 90)
+
+model_fit$print("H", max_rows = 200)
+model_fit$print("R", max_rows = 500)
+
+## individual draws.. not necessary I think
+model_fit$draws()[,, 1]
+lapply(1:10,  function(x) model_fit$draws()[,, x] )
+
+which(unlist(model_fit$summary()[1]) == "R[1,1,1,1]")
+df <- as.data.frame(model_fit$summary())
+head(df)
+
+which(df$variable == "R[1,1,2,1]")
+df[2655:2700,]
+
 model_fit$summary("c_h_fixed" )
 model_fit$summary("c_h_tau" )
 model_fit$summary("c_h_stdnorm" )
