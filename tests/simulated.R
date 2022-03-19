@@ -4,8 +4,8 @@ library(MASS )
 source(file = "../R/simulate.R")
 
 ## Create data:
-N <- 10
-tl <- 20
+N <- 33
+tl <- 30
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(0, 0, 0 ))
 dim(simdat[[1]])
@@ -74,6 +74,8 @@ mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
 stan_data$rts
 
+model_fit <-mod$optimize( data = stan_data)
+
 model_fit <-mod$variational(
                   data = stan_data,
 ##                   threads = 6,
@@ -86,12 +88,16 @@ model_fit <- mod$sample(
                    data = stan_data,
                    chains = 4,
                    parallel_chains = 4,
-                   iter_warmup = 1000,
+                   iter_warmup = 2000,
                    iter_sampling = 1000,
                    adapt_delta = 0.95)
 
 
 options(width = 220 )
+
+model_fit$summary("l_b_q" )
+model_fit$summary("l_a_q_r" )
+model_fit$summary("a_q" )
 
 model_fit$summary("phi" )
 model_fit$print("phi0_fixed", max_rows = 120)

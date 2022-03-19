@@ -12,7 +12,7 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - 1; // Dimension of vec(S).
+  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
@@ -43,8 +43,11 @@ parameters {
 #include /parameters/predH.stan
  
   // GARCH q parameters
-  real<lower=0, upper = 1 > a_q; //
-  real<lower=0, upper = (1 - a_q) > b_q; //
+  //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
+  real l_a_q; // Define on log scale so that it can go below 0
+  array[J] real l_a_q_r;
+  //real<lower=0, upper = (1 - a_q) > b_q; //
+  real l_b_q; //
   // Elements for random effects on S
   // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
   cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
@@ -71,6 +74,8 @@ transformed parameters {
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
   //Scale
+  array[J] real<lower = 0, upper = 1> a_q;
+  array[J] real<lower = 0, upper = 1> b_q;
   
   // ranef vector for vec(S) part
   array[J] vector[Sdim] S_Lv_r;
@@ -105,6 +110,9 @@ transformed parameters {
     H[j,1] = Qr[j,1];
     R[j,1] = diag_matrix(rep_vector(1.0, nt));
     Qr_sdi[j,1] = rep_vector(1.0, nt);
+
+    a_q[j] = 1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
+    b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-l_b_q) );
     
     for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
@@ -113,12 +121,12 @@ transformed parameters {
       u[j,t,] = diag_matrix(D) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       // All output is in vectorized form
-      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
-      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // keep within -1; 1
-      // S_Lv is vectorized - invvec now:
+      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); // SD metric
+      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; //S_Lv(_fixed) is on cholesky L cov metric 
+      // S_Lv is vectorized - invvec now: 
       S[j] = invvec_to_corr(S_Lv[j], nt);
       
-      Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr
+      Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
@@ -129,6 +137,9 @@ transformed parameters {
 model {
 
   // priors
+  l_a_q ~ normal(-0.7, 1);
+  l_b_q ~ normal(-0.7, 1);
+  to_vector(l_a_q_r) ~ std_normal(); 
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
@@ -137,7 +148,7 @@ model {
   S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  S_L_tau ~ cauchy(0, 1);
+  S_L_tau ~ cauchy(0, .25);
 
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();
@@ -146,7 +157,7 @@ model {
   }
  
   // C
-  to_vector(beta) ~ std_normal();
+  // to_vector(beta) ~ std_normal();
   // Prior for initial state
   Qr1_init ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
   to_vector(D) ~ cauchy(0, 1);
