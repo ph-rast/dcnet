@@ -4,12 +4,12 @@ library(MASS )
 source(file = "../R/simulate.R")
 
 ## Create data:
-N <- 33
+N <- 10
 tl <- 30
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(0, 0, 0 ))
 dim(simdat[[1]])
-
+simdat
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
@@ -98,6 +98,7 @@ options(width = 220 )
 model_fit$summary("l_b_q" )
 model_fit$summary("l_a_q_r" )
 model_fit$summary("a_q" )
+model_fit$summary("b_q" )
 
 model_fit$summary("phi" )
 model_fit$print("phi0_fixed", max_rows = 120)

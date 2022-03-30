@@ -108,9 +108,9 @@ transformed parameters {
     
     Qr[j,1] = Qr1_init;
     H[j,1] = Qr[j,1];
-    R[j,1] = diag_matrix(rep_vector(1.0, nt));
-    Qr_sdi[j,1] = rep_vector(1.0, nt);
-
+    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
+    R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    
     a_q[j] = 1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-l_b_q) );
     
@@ -137,8 +137,8 @@ transformed parameters {
 model {
 
   // priors
-  l_a_q ~ normal(-0.7, 1);
-  l_b_q ~ normal(-0.7, 1);
+  l_a_q ~ normal(-3, 1);
+  l_b_q ~ normal(1, 1);
   to_vector(l_a_q_r) ~ std_normal(); 
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
