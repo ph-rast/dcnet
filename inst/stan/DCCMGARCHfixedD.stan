@@ -57,7 +57,7 @@ parameters {
   // Qr1 init
   cov_matrix[nt] Qr1_init;
   // D1 init
-  vector<lower = 0>[nt] D1_init;
+  //vector<lower = 0>[nt] D1_init;
   // u1 init
   vector[nt] u1_init;
 
@@ -107,9 +107,10 @@ transformed parameters {
     u[j,1] = u1_init;
     
     Qr[j,1] = Qr1_init;
-    H[j,1] = Qr[j,1];
+    //H[j,1] = Qr[j,1];
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    H[j,1] = quad_form_diag(R[j,1],  D );
     
     a_q[j] = 1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-l_b_q) );

@@ -127,9 +127,9 @@ transformed parameters {
     u[j,1] = u1_init;
     D[j,1] = D1_init;
     Qr[j,1] = Qr1_init;
-    H[j,1] = Qr[j,1];
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
   }
   
   // iterations geq 2
