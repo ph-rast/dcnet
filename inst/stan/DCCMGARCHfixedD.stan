@@ -123,8 +123,10 @@ transformed parameters {
 
       // All output is in vectorized form
       S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); // SD metric
+      // could take atanh here of fixed + random to create S_Lv and then have one element less
+      // to estimate as cor[1,1] element in chol is always 1 for correlations
       S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; //S_Lv(_fixed) is on cholesky L cov metric 
-      // S_Lv is vectorized - invvec now: 
+      // S_Lv is vectorized - invvec now and return cor: 
       S[j] = invvec_to_corr(S_Lv[j], nt);
       
       Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr

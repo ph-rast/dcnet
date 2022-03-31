@@ -1,6 +1,5 @@
-// DCC-Parameterization
+// DCC-Parameterization with random D components, random S fixed q's
 functions {
-  //#include /functions/cov2cor.stan
 #include /functions/jacobian.stan
 #include /functions/invvec.stan
 }
@@ -12,7 +11,7 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - 1; // Dimension of vec(S).
+  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
@@ -35,7 +34,6 @@ transformed data {
     }
   }
 }
-
 parameters {
   // VAR parameters
 #include /parameters/arma.stan
@@ -149,9 +147,9 @@ transformed parameters {
     u[j,1] = u1_init;
     D[j,1] = D1_init;
     Qr[j,1] = Qr1_init;
-    H[j,1] = Qr[j,1];
-    R[j,1] = diag_matrix(rep_vector(1.0, nt));
-    Qr_sdi[j,1] = rep_vector(1.0, nt);
+    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
+    R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
   }
   
   // iterations geq 2
@@ -199,8 +197,8 @@ transformed parameters {
 
       // All output is in vectorized form
       S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
-      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // keep within -1; 1
-      // S_Lv is vectorized - invvec now:
+      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // S_Lv(_fixed) is on cholesky L cov metric
+      // S_Lv is vectorized - invvec now and return cor:
       S[j] = invvec_to_corr(S_Lv[j], nt);
       
       Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr

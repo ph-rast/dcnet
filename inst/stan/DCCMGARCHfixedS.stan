@@ -1,4 +1,4 @@
-// DCC-Parameterization
+// DCC-Parameterization with random D components and fixed R components (fixed Q and S)
 functions {
 #include /functions/cov2cor.stan
 #include /functions/jacobian.stan
@@ -11,7 +11,6 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - 1; // Dimension of vec(S).
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)

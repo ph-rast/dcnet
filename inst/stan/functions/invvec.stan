@@ -22,7 +22,7 @@ matrix invvec_to_corr(vector V, int nt) {
     } // invvec
   } 
   out = tcrossprod(L); //L*L' ;
-  D = inv_sqrt( diagonal(out) );
+  D = inv_sqrt( diagonal(out) ); // This makes S_Lv basically a chol of cov
   R = quad_form_diag(out, D); //
   return(R);
 }
