@@ -15,7 +15,7 @@ transformed data {
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
-  // Note that S_Lv[1,1] is always 1, which leaves (nt - nt^2) /2 -1 parameters to be estimated
+  // Note that S_Lv[1,1] is always 1, which leaves (nt + nt^2) /2 -1 parameters to be estimated
  
 #include /transformed_data/xh_marker.stan
  
@@ -66,12 +66,18 @@ parameters {
   //vector[nt] b_h_sum_s[J]; // Unconstrained b_h_sum values. b_h[i] = U[i] b_h_simplex[i]; U[i] ~ U(0, 1 - sum(a_h[i]))
   // vector<lower = 0,  upper = 1 >[nt] b_h[P]; // TODO actually: 1 - a_h, across all Q and P...
   // GARCH q parameters
-  real<lower=0, upper = 1 > a_q; //
-  real<lower=0, upper = (1 - a_q) > b_q; //
+  //  real<lower=0, upper = 1 > a_q; //
+  // real<lower=0, upper = (1 - a_q) > b_q; //
+
+  real l_a_q; // Define on log scale so that it can go below 0
+  array[J] real l_a_q_r;
+  //real<lower=0, upper = (1 - a_q) > b_q; //
+  real l_b_q; //
+
   // Elements for random effects on S
   // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
   cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
-  vector<lower=0>[Sdim] S_L_tau; //SD's for random efx
+  vector<lower=0, upper=pi() / 2 >[Sdim] tau_unif;
   array[J] vector[Sdim] S_L_stdnorm;
   vector[Sdim] S_Lv_fixed; // Vectorized fixed effect for S_L
   // Qr1 init
@@ -85,12 +91,16 @@ parameters {
 }
 
 transformed parameters {
+  vector<lower=0>[Sdim] S_L_tau= 1 * tan(tau_unif); //SD's for random efx
   // transform vec_phi to nt*nt parameter matrix
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
-  //Scale
+    //Scale
+  real<lower = 0, upper = 1> a_q;  // fixed arch and garch for R component
+  real<lower = 0, upper = 1> b_q;
+
   array[J] vector[nt] c_h;
   array[J] vector[nt] c_h_random; // variance on log metric
   //vector[nt] a_h[J];
@@ -117,6 +127,7 @@ transformed parameters {
   array[J,T] cov_matrix[nt] Qr;
   array[J,T] vector[nt] Qr_sdi;
   array[J,T] vector[nt] u;
+  
   array[J] vector<lower = 0>[nt] vd;
   array[J] vector<lower = 0>[nt] ma_d;
   array[J] vector<lower = 0>[nt] ar_d;
@@ -131,6 +142,9 @@ transformed parameters {
   
   // VAR phi parameter
   //phi =
+  a_q =       1 / ( 1 + exp( -l_a_q ) );
+  b_q = (1-a_q) / ( 1 + exp( -l_b_q ) );
+
   
   // Initialize t=1
   for( j in 1:J){
@@ -150,6 +164,8 @@ transformed parameters {
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
+
+ 
   }
   
   // iterations geq 2
@@ -220,6 +236,9 @@ model {
   }
 
   // priors
+  l_a_q ~ normal(-3, 1);
+  l_b_q ~ normal(1, 1);
+
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
@@ -231,17 +250,17 @@ model {
   S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ cauchy(0, 1); // SD for c_h ranefs
-  a_h_tau ~ cauchy(0, 1); // SD for c_h ranefs
-  b_h_tau ~ cauchy(0, 1);
-  S_L_tau ~ cauchy(0, 1);
+  c_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
+  a_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
+  b_h_tau ~ cauchy(0, .5);
+  //  S_L_tau ~ cauchy(0, .25); // parametrize as tan(tau) as suggested in stan ref.
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
     c_h_stdnorm[J] ~ std_normal();
     a_h_stdnorm[J] ~ std_normal();
     b_h_stdnorm[J] ~ std_normal();
-    S_L_stdnorm[J] ~ std_normal();
+    S_L_stdnorm[J] ~ std_normal(); 
   }
 
 

@@ -16,7 +16,7 @@ transformed data {
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
-  // Note that S_Lv[1,1] is always 1, which leaves (nt - nt^2) /2 -1 parameters to be estimated
+  // Note that S_Lv[1,1] is always 1, which leaves (nt + nt^2) /2 -1 parameters to be estimated
  
 #include /transformed_data/xh_marker.stan
  
@@ -48,6 +48,7 @@ parameters {
   array[J] real l_a_q_r;
   //real<lower=0, upper = (1 - a_q) > b_q; //
   real l_b_q; //
+  array[J] real l_b_q_r;
   // Elements for random effects on S
   // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
   cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
@@ -112,8 +113,8 @@ transformed parameters {
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D );
     
-    a_q[j] = 1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
-    b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-l_b_q) );
+    a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
+    b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
     
     for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
@@ -142,7 +143,8 @@ model {
   // priors
   l_a_q ~ normal(-3, 1);
   l_b_q ~ normal(1, 1);
-  to_vector(l_a_q_r) ~ std_normal(); 
+  to_vector(l_a_q_r) ~ std_normal();
+  to_vector(l_b_q_r) ~ std_normal();
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
