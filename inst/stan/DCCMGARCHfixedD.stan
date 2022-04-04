@@ -12,7 +12,7 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).
+  int<lower=nt> Sdim = (nt*nt-nt) %/% 2 ; // Dimension of vec(S).
   
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
@@ -123,12 +123,16 @@ transformed parameters {
       u[j,t,] = diag_matrix(D) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       // All output is in vectorized form
-      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); // SD metric
+      // This is overkill:
+      // S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); //SD metric
+      // Just estimate uncorrelated random effects:
+      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);
+       
       // could take atanh here of fixed + random to create S_Lv and then have one element less
       // to estimate as cor[1,1] element in chol is always 1 for correlations
-      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; //S_Lv(_fixed) is on cholesky L cov metric 
+      S_Lv[j] = S_Lv_fixed + S_Lv_r[j] ; //S_Lv(_fixed) is on cholesky L cov metric 
       // S_Lv is vectorized - invvec now and return cor: 
-      S[j] = invvec_to_corr(S_Lv[j], nt);
+      S[j] = invvec_chol_to_corr(S_Lv[j], nt);
       
       Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
@@ -153,7 +157,7 @@ model {
   S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  S_L_tau ~ cauchy(0, .25);
+  S_L_tau ~ cauchy(0, 1);
 
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();

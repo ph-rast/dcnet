@@ -76,10 +76,14 @@ parameters {
 
   // Elements for random effects on S
   // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
-  cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
-  vector<lower=0>[Sdim] S_L_tau; //SD's for random efx
-  array[J] vector[Sdim] S_L_stdnorm;
-  vector[Sdim] S_Lv_fixed; // Vectorized fixed effect for S_L
+  /* cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat */
+  /* vector<lower=0>[Sdim] S_L_tau; //SD's for random efx */
+  /* array[J] vector[Sdim] S_L_stdnorm; */
+  /* vector[Sdim] S_Lv_fixed; // Vectorized fixed effect for S_L */
+  cholesky_factor_corr[nt] S_global_L;
+  array[J] cholesky_factor_corr[nt] S_diff_L;
+  real<lower=0, upper=1> alpha;
+  
   // Qr1 init
   cov_matrix[nt] Qr1_init;
   // D1 init
@@ -110,12 +114,13 @@ transformed parameters {
   array[J] vector<lower=0, upper = 1>[nt] b_h_sum;
   
   // ranef vector for vec(S) part
-  array[J] vector[Sdim] S_Lv_r;
+  //  array[J] vector[Sdim] S_Lv_r;
   // S_Lv[j] = S_Lv_fixed + S_Lv_r[j]
-  array[J] vector[Sdim] S_Lv;
+  // array[J] vector[Sdim] S_Lv;
   // S_Lv contains (nt+nt^2)/2-1 elements to be inv-vech into lower tri cholesky factor S_L
   // Note that S_L[1,1] = 1 as S = S_L*S_L is a corrmat
   //cholesky_factor_corr[nt] S_L[J];
+  // Stephens approach:
   array[J] corr_matrix[nt] S;
   
   array[J,T] cov_matrix[nt] H;
@@ -210,14 +215,16 @@ transformed parameters {
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
-      // All output is in vectorized form:
-      // This is overkill:
-      // S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]);
-      // Just estimate uncorrelated random effects:
-      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);      
-      S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // S_Lv(_fixed) is on cholesky L cov metric
-      // S_Lv is vectorized - invvec now and return cor:
-      S[j] = invvec_chol_to_corr(S_Lv[j], nt);
+      /* // All output is in vectorized form: */
+      /* // This is overkill: */
+      /* // S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); */
+      /* // Just estimate uncorrelated random effects: */
+      /* S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);       */
+      /* S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // S_Lv(_fixed) is on cholesky L cov metric */
+      /* // S_Lv is vectorized - invvec now and return cor: */
+      /* S[j] = invvec_chol_to_corr(S_Lv[j], nt); */
+      
+      S[j] = convex_combine_cholesky(S_global_L, S_diff_L[j], alpha);
       
       Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
@@ -231,6 +238,7 @@ model {
   // print("Upper Limits:", UPs);
   // UL transform jacobian
   for(j in 1:J) {
+    S_diff_L[j] ~ lkj_corr_cholesky(1/alpha);
     for(k in 1:nt) {
       ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
       target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
@@ -249,20 +257,23 @@ model {
   a_h_L ~ lkj_corr_cholesky(1);
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
-  S_L_R ~ lkj_corr_cholesky(1);
+  //  S_L_R ~ lkj_corr_cholesky(1);
+  alpha ~ beta(1,1);
+  S_global_L ~ lkj_corr_cholesky(1);
+  
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   c_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
   a_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
   b_h_tau ~ cauchy(0, .5);
-  S_L_tau ~ cauchy(0, 1);
+  //  S_L_tau ~ cauchy(0, 1);
   for(j in 1:J){
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
     c_h_stdnorm[J] ~ std_normal();
     a_h_stdnorm[J] ~ std_normal();
     b_h_stdnorm[J] ~ std_normal();
-    S_L_stdnorm[J] ~ std_normal(); 
+    //    S_L_stdnorm[J] ~ std_normal(); 
   }
 
 
