@@ -218,7 +218,6 @@ transformed parameters {
       S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // S_Lv(_fixed) is on cholesky L cov metric
       // S_Lv is vectorized - invvec now and return cor:
       S[j] = invvec_chol_to_corr(S_Lv[j], nt);
-      
       Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];

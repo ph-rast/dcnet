@@ -221,11 +221,11 @@ transformed parameters {
       /* // Just estimate uncorrelated random effects: */
       /* S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);       */
       /* S_Lv[j] = S_Lv_fixed + S_Lv_r[j]; // S_Lv(_fixed) is on cholesky L cov metric */
-      /* // S_Lv is vectorized - invvec now and return cor: */
+      /* // S_Lv is vectorized - invvec now and return cor:  */
       /* S[j] = invvec_chol_to_corr(S_Lv[j], nt); */
       
-      S[j] = convex_combine_cholesky(S_global_L, S_diff_L[j], alpha);
-      
+      S[j] = convex_combine_log_chol(S_global_L, S_diff_L[j], alpha);
+        
       Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
@@ -238,7 +238,7 @@ model {
   // print("Upper Limits:", UPs);
   // UL transform jacobian
   for(j in 1:J) {
-    S_diff_L[j] ~ lkj_corr_cholesky(1/alpha);
+    S_diff_L[j] ~ lkj_corr_cholesky( 1/(alpha^2) );
     for(k in 1:nt) {
       ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
       target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);

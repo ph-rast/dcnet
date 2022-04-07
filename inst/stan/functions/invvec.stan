@@ -11,33 +11,77 @@ matrix invvec_chol_to_corr(vector V, int nt) {
   matrix[nt,nt] R;
   int index = 0;
   for(i in 1:nt) {
-    for(j in 1:nt) { 
-      if( i >= j ) {
+    for(j in 1:nt) {
+      if( i == j ) {
+	index = index + 1;
+	L[i,j] = exp( V[index] ); //log cholesky with positivity constraint on diag
+      }
+      if( i > j ) {
 	index = index + 1;
 	L[i,j] = V[index]; //V contains SD's, but here we create chol of Covmat
       }
-      if (i <j) {
+      if (i < j) {
 	L[i,j] = 0.0;
 	  }
     } // invvec
   } 
-  out = tcrossprod(L); //L*L' ;
+  out = multiply_lower_tri_self_transpose(L); //L*L' ;
   D = inv_sqrt( diagonal(out) ); // This makes S_Lv basically a chol of cov
   R = quad_form_diag(out, D); //
   return(R);
 }
 
-/* from mc-stan discussion w. Stephen
+/* Geodesic: from mc-stan discussion w. Stephen
+   but see: https://gmarti.gitlab.io/ml/2021/02/13/swelling-effect-spd-covariance.html
+   This solution leads to swelling
  */
 matrix convex_combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alpha){
   int dim = rows(local_chol_cor);
-  int global_dim = rows(global_chol_cor);
-  matrix[global_dim,global_dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
-  matrix[dim,dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);
-  matrix[dim,dim] L;
-  matrix[dim,dim] combined_chol_cor;
+  matrix[dim,dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
+  matrix[dim,dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);  
+  matrix[dim,dim] combined_cor;
   
-  L = cholesky_decompose((1 - alpha)*global_cor + (alpha)*local_cor);
-  combined_chol_cor=tcrossprod(L); // LL'
-  return(combined_chol_cor);
+  combined_cor = (1 - alpha)*global_cor + (alpha)*local_cor;
+  return(combined_cor);
+}
+
+// Riemannian Log-Cholesky Metric: Average over log_chol, should not lead to swelling
+// cf. Lin (2019) Riemannian geometry of Symmetric PD Matrices via Chol decomp.
+matrix convex_combine_log_chol(matrix global_chol_cor, matrix local_chol_cor, real alpha){
+  int dim = rows(local_chol_cor);
+  matrix[dim,dim] out;
+  matrix[dim,dim] tri_global;
+  matrix[dim,dim] tri_local;
+  matrix[dim,dim] L;
+  vector[dim] D;
+  matrix[dim,dim] R;
+
+  // Create lower tri matrix with 0 on diagonal:
+  // cf. geodesic.chol function from
+  // 
+  tri_global=global_chol_cor - diag_matrix(diagonal(global_chol_cor));
+  tri_local=local_chol_cor - diag_matrix(diagonal(local_chol_cor));;
+  
+  L=tri_global + alpha*(tri_local-tri_global) +
+    diag_matrix(
+		diagonal(global_chol_cor) .* exp(alpha * ( log(diagonal(local_chol_cor)) -
+							   log(diagonal(global_chol_cor))))
+		);
+  
+  out=multiply_lower_tri_self_transpose(L);
+  D = inv_sqrt( diagonal(out) ); // Ensure matrix is a corrmat
+  R = quad_form_diag(out, D); // 
+  return(R);
+}
+
+matrix convex_combine(matrix global_cor, matrix local_cor, real alpha){
+  int dim = rows(local_cor);
+  matrix[dim,dim] R;
+  matrix[dim,dim] combined_cor;
+  vector[dim] D;
+
+  combined_cor = exp( (1 - alpha)*log(global_cor) + (alpha)*log(local_cor));
+  D = inv_sqrt( diagonal(combined_cor) ); // Ensure matrix is a corrmat
+  R = quad_form_diag(combined_cor, D); // 
+  return(R);
 }
