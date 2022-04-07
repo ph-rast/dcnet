@@ -21,3 +21,5 @@ src/stanExports_DCCMGARCH.h
 *.cpp
 /inst/stan/DCCMGARCHfixedS
 /inst/stan/DCCMGARCHfixedD
+/inst/stan/DCCMGARCHconvex
+/inst/stan/DCCMGARCHconvexCor
