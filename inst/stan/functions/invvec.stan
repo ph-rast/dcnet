@@ -31,7 +31,7 @@ matrix invvec_chol_to_corr(vector V, int nt) {
   return(R);
 }
 
-/* Geodesic: from mc-stan discussion w. Stephen
+/* Convex combination of corr mats: from mc-stan discussion w. Stephen
    but see: https://gmarti.gitlab.io/ml/2021/02/13/swelling-effect-spd-covariance.html
    This solution leads to swelling
  */

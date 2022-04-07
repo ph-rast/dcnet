@@ -237,7 +237,7 @@ model {
   // print("Upper Limits:", UPs);
   // UL transform jacobian
   for(j in 1:J) {
-    S_diff[j] ~ lkj_corr(1/alpha);
+    S_diff[j] ~ lkj_corr(1/alpha^2);
     for(k in 1:nt) {
       ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
       target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
