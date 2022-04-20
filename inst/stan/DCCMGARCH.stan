@@ -140,7 +140,6 @@ transformed parameters {
   // take tanh( fixed + ranef )
   
   // VAR phi parameter
-  //phi =
   a_q =       1 / ( 1 + exp( -l_a_q ) );
   b_q = (1-a_q) / ( 1 + exp( -l_b_q ) );
 
@@ -156,19 +155,14 @@ transformed parameters {
       b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]);
     }
     
-    mu[j,1] = phi0_fixed;
+    mu[j,1] = rts[j, 1]'; //phi0_fixed;
     u[j,1] = u1_init;
     D[j,1] = D1_init;
     Qr[j,1] = Qr1_init;
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
-
- 
-  }
   
-  // iterations geq 2
-  for( j in 1:J){
       for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
 #include /model_components/mu.stan
@@ -226,16 +220,9 @@ transformed parameters {
     }
   }
 }
+
 model {
   // print("Upper Limits:", UPs);
-  // UL transform jacobian
-  for(j in 1:J) {
-    for(k in 1:nt) {
-      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
-      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
-    }
-  }
-
   // priors
   l_a_q ~ normal(-3, 1);
   l_b_q ~ normal(1, 1);
@@ -254,17 +241,7 @@ model {
   c_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
   a_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
   b_h_tau ~ cauchy(0, .5);
-  S_L_tau ~ cauchy(0, 1);
-  for(j in 1:J){
-    phi0_stdnorm[J] ~ std_normal();
-    phi_stdnorm[J] ~ std_normal();
-    c_h_stdnorm[J] ~ std_normal();
-    a_h_stdnorm[J] ~ std_normal();
-    b_h_stdnorm[J] ~ std_normal();
-    S_L_stdnorm[J] ~ std_normal(); 
-  }
-
-
+  S_L_tau ~ cauchy(0, .05);
   
   // C
   to_vector(beta) ~ std_normal();
@@ -288,6 +265,18 @@ model {
 
   // likelihood
   for( j in 1:J) {
+    // UL transform jacobian
+    for(k in 1:nt) {
+      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
+      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
+    }
+    phi0_stdnorm[J] ~ std_normal();
+    phi_stdnorm[J] ~ std_normal();
+    c_h_stdnorm[J] ~ std_normal();
+    a_h_stdnorm[J] ~ std_normal();
+    b_h_stdnorm[J] ~ std_normal();
+    S_L_stdnorm[J] ~ std_normal(); 
+      // Likelihood
     if ( distribution == 0 ) {
       for(t in 1:T){
 	rts[j,t] ~ multi_normal(mu[j,t], H[j,t]);

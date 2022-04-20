@@ -12,11 +12,7 @@ matrix invvec_chol_to_corr(vector V, int nt) {
   int index = 0;
   for(i in 1:nt) {
     for(j in 1:nt) {
-      if( i == j ) {
-	index = index + 1;
-	L[i,j] = exp( V[index] ); //log cholesky with positivity constraint on diag
-      }
-      if( i > j ) {
+      if( i >= j ) {
 	index = index + 1;
 	L[i,j] = V[index]; //V contains SD's, but here we create chol of Covmat
       }
@@ -31,9 +27,9 @@ matrix invvec_chol_to_corr(vector V, int nt) {
   return(R);
 }
 
-/* Convex combination of corr mats: from mc-stan discussion w. Stephen
+/* Convex combination of corr mats
    but see: https://gmarti.gitlab.io/ml/2021/02/13/swelling-effect-spd-covariance.html
-   This solution leads to swelling
+   This solution leads to swelling, but should be not a problem in the current application.
  */
 matrix convex_combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alpha){
   int dim = rows(local_chol_cor);
@@ -45,9 +41,13 @@ matrix convex_combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, re
   return(combined_cor);
 }
 
+// Swelling should not be a problem (in terms of interpretatino), as I'm assuming that
+// there's a sampling distribution of correlation matrices. The average correlation
+// would then reflect the fixed effet and individual deviations are random effects.
+//
 // Riemannian Log-Cholesky Metric: Average over log_chol, should not lead to swelling
 // cf. Lin (2019) Riemannian geometry of Symmetric PD Matrices via Chol decomp.
-matrix convex_combine_log_chol(matrix global_chol_cor, matrix local_chol_cor, real alpha){
+matrix geodesic_log_chol(matrix global_chol_cor, matrix local_chol_cor, real alpha){
   int dim = rows(local_chol_cor);
   matrix[dim,dim] out;
   matrix[dim,dim] tri_global;

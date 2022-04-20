@@ -161,19 +161,15 @@ transformed parameters {
       b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]);
     }
     
-    mu[j,1] = phi0_fixed;
+    mu[j,1] = rts[j, 1]'; //phi0_fixed;
     u[j,1] = u1_init;
     D[j,1] = D1_init;
     Qr[j,1] = Qr1_init;
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
-
- 
-  }
   
-  // iterations geq 2
-  for( j in 1:J){
+    // iterations t geq 2
       for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
 #include /model_components/mu.stan
@@ -192,7 +188,7 @@ transformed parameters {
       for(d in 1:nt){
 	vd[j,d]   = 0.0;
 	ma_d[j,d] = 0.0;
-	ar_d[j,d]   = 0.0;
+	ar_d[j,d] = 0.0;
 	// GARCH MA component
 	for (q in 1:min( t-1, Q) ) {
 	  rr[j, t-q, d] = square( rts[j, t-q, d] - mu[j, t-q, d] );
@@ -213,7 +209,7 @@ transformed parameters {
 
 	D[j, t, d] = sqrt( vd[j,d] );
       }
-      u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
+      u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]); // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       /* // All output is in vectorized form: */
       /* // This is overkill: */
@@ -224,7 +220,7 @@ transformed parameters {
       /* // S_Lv is vectorized - invvec now and return cor:  */
       /* S[j] = invvec_chol_to_corr(S_Lv[j], nt); */
       
-      S[j] = convex_combine_log_chol(S_global_L, S_diff_L[j], alpha);
+      S[j] = convex_combine_cholesky(S_global_L, S_diff_L[j], alpha);
         
       Qr[j,t ] = (1 - a_q - b_q) * S[j] + a_q * (u[j, t-1 ] * u[j, t-1 ]') + b_q * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
@@ -236,14 +232,6 @@ transformed parameters {
 }
 model {
   // print("Upper Limits:", UPs);
-  // UL transform jacobian
-  for(j in 1:J) {
-    S_diff_L[j] ~ lkj_corr_cholesky( 1/(alpha^2) );
-    for(k in 1:nt) {
-      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
-      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
-    }
-  }
 
   // priors
   l_a_q ~ normal(-3, 1);
@@ -257,8 +245,8 @@ model {
   a_h_L ~ lkj_corr_cholesky(1);
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
-  //  S_L_R ~ lkj_corr_cholesky(1);
-  alpha ~ beta(1,1);
+  // S_L_R ~ lkj_corr_cholesky(1);
+  alpha ~ beta(2,2);
   S_global_L ~ lkj_corr_cholesky(1);
   
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
@@ -267,17 +255,7 @@ model {
   a_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
   b_h_tau ~ cauchy(0, .5);
   //  S_L_tau ~ cauchy(0, 1);
-  for(j in 1:J){
-    phi0_stdnorm[J] ~ std_normal();
-    phi_stdnorm[J] ~ std_normal();
-    c_h_stdnorm[J] ~ std_normal();
-    a_h_stdnorm[J] ~ std_normal();
-    b_h_stdnorm[J] ~ std_normal();
-    //    S_L_stdnorm[J] ~ std_normal(); 
-  }
 
-
-  
   // C
   to_vector(beta) ~ std_normal();
   to_vector(c_h_fixed) ~ std_normal();
@@ -293,13 +271,28 @@ model {
   //to_vector(theta) ~ std_normal();
   //to_vector(phi) ~ std_normal();
   phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
-  vec_phi_fixed ~ normal(0, 5);
+  vec_phi_fixed ~ normal(0, 1);
   //  to_vector(a_h) ~ normal(0, .5);
   //to_vector(b_h) ~ normal(0, .5);
   //  S ~ lkj_corr( 1 );
 
-  // likelihood
+  
   for( j in 1:J) {
+    // UL transform jacobian
+    S_diff_L[j] ~ lkj_corr_cholesky( 1/(alpha^2) );
+    for(k in 1:nt) {
+      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
+      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
+    }
+    
+    // Priors for J
+    phi0_stdnorm[J] ~ std_normal();
+    phi_stdnorm[J] ~ std_normal();
+    c_h_stdnorm[J] ~ std_normal();
+    a_h_stdnorm[J] ~ std_normal();
+    b_h_stdnorm[J] ~ std_normal();
+
+    // likelihood
     if ( distribution == 0 ) {
       for(t in 1:T){
 	rts[j,t] ~ multi_normal(mu[j,t], H[j,t]);

@@ -1,20 +1,23 @@
 ##library(dcnet )
 library(ks )
+library(clusterGeneration )
 library(MASS )
 source(file = "../R/simulate.R")
 
 ## Create data:
-N <- 10
-tl <- 30
+N <- 50
+tl <- 50
 nts <- 3
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.0001, phi0_fixed =  c(0, 0, 0 ))
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 ),
+                   alpha = .5)
 dim(simdat[[1]])
-simdat
+#simdat
+
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
-X
+
 X <- array(0,  dim = c(N*tl, nts ) )
 
 groupvec <- rep(c(1:N),  each = tl )
@@ -30,7 +33,9 @@ stan_data <- return_standat[ c("T", "xC", "rts", "nt",
                                    "distribution", "P", "Q",
                                    "meanstructure", "J", "nobs", "group")]
 
-stan_data
+stan_data$T
+stan_data$nt
+
 stan_data$rts
 stan_data$rts <- rtsgen
 
@@ -69,8 +74,9 @@ library(cmdstanr )
 getwd( )
 #file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" )
 file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" )
+file <- file.path("../inst/stan/DCCMGARCH.stan" )
 
-mod <- cmdstan_model(file, include_paths = "../inst/stan/")
+mod <- cmdstan_model(file, include_paths = "../../inst/stan/")
 
 stan_data$rts
 
@@ -80,7 +86,7 @@ model_fit <-mod$variational(
                   data = stan_data,
 ##                   threads = 6,
                  ## tol_rel_obj = 0.001,
-                   iter =  60000)
+                   iter =  30000)
 
 model_fit$output( )
 
@@ -88,7 +94,7 @@ model_fit <- mod$sample(
                    data = stan_data,
                    chains = 4,
                    parallel_chains = 4,
-                   iter_warmup = 2000,
+                   iter_warmup = 1000,
                    iter_sampling = 1000,
                    adapt_delta = 0.95)
 
@@ -134,6 +140,13 @@ print(model_fit, pars =  c("vec_phi_fixed"))
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
 print(model_fit, pars =  c("S_Lv_fixed")) ## What's up wit the stdnorms? Seem WAY to large
 print(model_fit, pars =  c("S")) ## What's up wit the stdnorms? Seem WAY to large
+
+
+print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
+
+
+df <- data.frame(posterior::as_draws_df(draws))
+quantile(df$R.1.1.2.1., c(.05, .5, .95))
 
 
 slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']

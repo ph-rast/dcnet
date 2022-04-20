@@ -50,11 +50,10 @@ parameters {
   real l_b_q; //
   array[J] real l_b_q_r;
   // Elements for random effects on S
-  // Ranefs on S are put on VECH(S) lower tri, with dimension (nt + nt^2)/2
-  cholesky_factor_corr[Sdim] S_L_R;  // Cholesky of random efx corrmat
-  vector<lower=0>[Sdim] S_L_tau; //SD's for random efx
-  array[J] vector[Sdim] S_L_stdnorm;
-  vector[Sdim] S_Lv_fixed; // Vectorized fixed effect for S_L
+    cholesky_factor_corr[nt] S_global_L;
+  array[J] cholesky_factor_corr[nt] S_diff_L;
+  real<lower=0, upper=1> alpha;
+  
   // Qr1 init
   cov_matrix[nt] Qr1_init;
   // D1 init
@@ -126,13 +125,14 @@ transformed parameters {
       // This is overkill:
       // S_Lv_r[j] = (diag_pre_multiply(S_L_tau, S_L_R)*S_L_stdnorm[j]); //SD metric
       // Just estimate uncorrelated random effects:
-      S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);
+      //S_Lv_r[j] = (diag_pre_multiply(S_L_tau, diag_matrix(rep_vector(1.0, Sdim)))*S_L_stdnorm[j]);
        
       // could take atanh here of fixed + random to create S_Lv and then have one element less
       // to estimate as cor[1,1] element in chol is always 1 for correlations
-      S_Lv[j] = S_Lv_fixed + S_Lv_r[j] ; //S_Lv(_fixed) is on cholesky L cov metric 
+      //S_Lv[j] = S_Lv_fixed + S_Lv_r[j] ; //S_Lv(_fixed) is on cholesky L cov metric 
       // S_Lv is vectorized - invvec now and return cor: 
-      S[j] = invvec_chol_to_corr(S_Lv[j], nt);
+      //      S[j] = invvec_chol_to_corr(S_Lv[j], nt);
+      S[j] = convex_combine_cholesky(S_global_L, S_diff_L[j], alpha);
        
       Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
@@ -154,17 +154,14 @@ model {
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   //D part in DRD
   // R part in DRD
-  S_L_R ~ lkj_corr_cholesky(1);
+  //S_L_R ~ lkj_corr_cholesky(1);
   phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  S_L_tau ~ cauchy(0, 1);
+  //  S_L_tau ~ cauchy(0, 1);
 
-  for(j in 1:J){
-    phi0_stdnorm[J] ~ std_normal();
-    phi_stdnorm[J] ~ std_normal();
-    S_L_stdnorm[J] ~ std_normal();
-  }
- 
+  alpha ~ beta(2,2);
+  S_global_L ~ lkj_corr_cholesky(1);
+  
   // C
   // to_vector(beta) ~ std_normal();
   // Prior for initial state
@@ -184,6 +181,10 @@ model {
 
   // likelihood
   for( j in 1:J) {
+    S_diff_L[j] ~ lkj_corr_cholesky( 1/(alpha^2) );
+    phi0_stdnorm[J] ~ std_normal();
+    phi_stdnorm[J] ~ std_normal();
+    
     if ( distribution == 0 ) {
       for(t in 1:T){
 	rts[j,t] ~ multi_normal(mu[j,t], H[j,t]);
