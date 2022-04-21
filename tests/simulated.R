@@ -53,9 +53,10 @@ stan_data$rts
 
 library(cmdstanr )
 getwd( )
-file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" ) ## convergence
-file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" ) ##
-file <- file.path("../inst/stan/DCCMGARCH.stan" )
+file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" ) ## convergence with variational
+file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
+##file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" ) ##
+
 
 mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
