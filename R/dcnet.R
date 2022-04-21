@@ -159,7 +159,7 @@ dcnet <- function(data,
                   standardize_data = FALSE,
                   distribution = "Gaussian",
                   meanstructure = "VAR",
-                  sampling_algorithm = "MCMC", ...) {
+                  sampling_algorithm = "HMC", ...) {
     if ( tolower(distribution) == "gaussian" ) {
         num_dist <- 0
     } else if ( tolower(distribution) == "student_t" ) {
@@ -195,8 +195,8 @@ dcnet <- function(data,
     }
 
     ## MCMC Sampling with NUTS
-    if(sampling_algorithm == 'MCMC' ) {
-        model_fit <- rstan::sampling(stanmodel,
+    if(sampling_algorithm == 'HMC' ) {
+        model_fit <- cmdstanr::sampling(stanmodel,
                                      data = stan_data,
                                      verbose = TRUE,
                                      iter = iterations,
@@ -205,7 +205,7 @@ dcnet <- function(data,
                                      init_r = .05, ...)
     } else if (sampling_algorithm == 'VB' ) {
     ## Sampling via Variational Bayes
-    model_fit <- rstan::vb(stanmodel,
+    model_fit <- cmdstanr::variational(stanmodel,
                            data = stan_data,
                            iter = iterations,
                            importance_resampling = TRUE, ...)
@@ -225,7 +225,7 @@ dcnet <- function(data,
                        num_dist = num_dist,
                        iter = iterations,
                        chains = chains,
-                       elapsed_time = rstan::get_elapsed_time(model_fit),
+                       elapsed_time = NA, #cmdstanr::get_elapsed_time(model_fit),
                        date = date(),
                        nt = stan_data$nt,
                        TS_length = stan_data$T,

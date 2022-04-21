@@ -23,7 +23,9 @@ X <- array(0,  dim = c(N*tl, nts ) )
 groupvec <- rep(c(1:N),  each = tl )
 groupvec
 
-return_standat <- dcnet:::standat( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
+source(file = "../R/dcnet.R")
+
+return_standat <- standat( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
                                   standardize_data = TRUE,
                                   Q = 1, distribution = 0, meanstructure = "VAR")
 
@@ -48,35 +50,14 @@ stan_data$rts
 
 #saveRDS(object =stan_data ,file = '../../TEST/stan_data')
 
-parameterization <- "VAR"
-
-stanmodel <- switch(parameterization,
-                    DCCf = dcnet:::stanmodels$DCCMGARCHfixedS,
-                    DCC = dcnet:::stanmodels$DCCMGARCH,
-                    VAR = dcnet:::stanmodels$VAR,
-                    NULL)
-
-stanmodel
-
-
-system.time( {
-  model_fit <- rstan::sampling(stanmodel,
-                             data = stan_data,
-                             verbose = TRUE,
-                             iter = 200,
-                                        #warmup =  1500, 
-                             control = list(adapt_delta = .99),
-                             chains = 4,
-                             init_r = .05)
-})
 
 library(cmdstanr )
 getwd( )
-#file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" )
-file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" )
+file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" ) ## convergence
+file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" ) ##
 file <- file.path("../inst/stan/DCCMGARCH.stan" )
 
-mod <- cmdstan_model(file, include_paths = "../../inst/stan/")
+mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
 stan_data$rts
 
@@ -144,9 +125,21 @@ print(model_fit, pars =  c("S")) ## What's up wit the stdnorms? Seem WAY to larg
 
 print(model_fit, pars =  c("H")) ## What's up wit the stdnorms? Seem WAY to large
 
-
+draws <- model_fit$draws("R")
 df <- data.frame(posterior::as_draws_df(draws))
+
+
+## Person, Time, var, var
 quantile(df$R.1.1.2.1., c(.05, .5, .95))
+quantile(df$R.1.2.2.1., c(.05, .5, .95))
+quantile(df$R.1.3.2.1., c(.05, .5, .95))
+quantile(df$R.1.4.2.1., c(.05, .5, .95))
+
+
+
+quantile(df$R.1.1.2.1., c(.05, .5, .95))
+
+
 
 
 slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']
