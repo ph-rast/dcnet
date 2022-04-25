@@ -56,7 +56,7 @@ getwd( )
 file <- file.path("../inst/stan/DCCMGARCHfixedS.stan" ) ## convergence with variational
 file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
 ##file <- file.path("../inst/stan/DCCMGARCHfixedD.stan" ) ##
-
+file
 
 mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
@@ -83,6 +83,7 @@ model_fit <- mod$sample(
 
 options(width = 220 )
 
+model_fit$summary("l_a_q" )
 model_fit$summary("l_b_q" )
 model_fit$summary("l_a_q_r" )
 model_fit$summary("a_q" )

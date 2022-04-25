@@ -204,10 +204,10 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // priors
-  l_a_q ~ normal(-1.5, 1);
-  l_b_q ~ normal(-1.5, 1);
-  to_vector(l_a_q_r) ~ normal(-4, 1);
-  to_vector(l_b_q_r) ~ normal(-4, 1);
+  l_a_q ~ normal(-1, 1);
+  l_b_q ~ normal(-1, 1);
+  to_vector(l_a_q_r) ~ normal(0, .5);
+  to_vector(l_b_q_r) ~ normal(0, .5);
 
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
