@@ -26,14 +26,17 @@ groupvec
 source(file = "../R/dcnet.R")
 
 return_standat <- standat( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
-                                  standardize_data = TRUE,
-                                  Q = 1, distribution = 0, meanstructure = "VAR")
+                          standardize_data = TRUE,
+                          Q = 1, distribution = 0, meanstructure = "VAR")
 
-return_standat
+return_standat$simplify_ch <- 1
+return_standat$simplify_ah <- 1
+return_standat$simplify_bh <- 1
 
 stan_data <- return_standat[ c("T", "xC", "rts", "nt",
                                    "distribution", "P", "Q",
-                                   "meanstructure", "J", "nobs", "group")]
+                               "meanstructure", "J", "nobs", "group",
+                               "simplify_ch","simplify_ah","simplify_bh")]
 
 stan_data$T
 stan_data$nt
@@ -41,6 +44,7 @@ stan_data$nt
 stan_data$rts
 stan_data$rts <- rtsgen
 
+stan_data
 ## same as this from X:  array(X,  dim = c(20, 4, 3) )
 
 
@@ -67,7 +71,7 @@ model_fit <-mod$optimize( data = stan_data)
 model_fit <-mod$variational(
                   data = stan_data,
 ##                   threads = 6,
-                 ## tol_rel_obj = 0.001,
+##                  tol_rel_obj = 0.005,
                    iter =  30000)
 
 model_fit$output( )

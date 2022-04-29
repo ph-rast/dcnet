@@ -60,11 +60,11 @@ parameters {
   vector<lower=0>[nt] b_h_tau; // ranef SD for phi0
   array[J] vector[nt] b_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
   
-  // vector<lower = 0,  upper = 1 >[nt] a_h[Q];
-  array[J,nt] simplex[Q] a_h_simplex;
-  //vector<lower=0, upper = 1>[nt] a_h_sum[J];
-  array[J,nt] simplex[P] b_h_simplex; // Simplex for b_h within each timeseries
-  array[J] vector[nt] b_h_sum_s;
+  /* // vector<lower = 0,  upper = 1 >[nt] a_h[Q]; */
+  /* array[J,nt] simplex[Q] a_h_simplex; */
+  /* //vector<lower=0, upper = 1>[nt] a_h_sum[J]; */
+  /* array[J,nt] simplex[P] b_h_simplex; // Simplex for b_h within each timeseries */
+  /* array[J] vector[nt] b_h_sum_s; */
 
     // GARCH q parameters
   //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
@@ -118,28 +118,26 @@ transformed parameters {
   array[J] vector<lower = 0>[nt] ma_d;
   array[J] vector<lower = 0>[nt] ar_d;
   
-  array[J,Q] vector<lower=0, upper = 1>[nt] a_h;// = simplex_to_bh(a_h_simplex[J], a_h_sum[J]);
-  array[J] vector[nt] UPs;// = upper_limits(a_h[J]);
-  array[J] vector[nt] ULs;// = raw_sum_to_b_h_sum(b_h_sum_s[J], UPs[J]);
-  array[J,P] vector<lower = 0, upper = 1>[nt] b_h;// = simplex_to_bh(b_h_simplex[J], ULs[J]);
+  /* array[J,Q] vector<lower=0, upper = 1>[nt] a_h;// = simplex_to_bh(a_h_simplex[J], a_h_sum[J]); */
+  /* array[J] vector[nt] UPs;// = upper_limits(a_h[J]); */
+  /* array[J] vector[nt] ULs;// = raw_sum_to_b_h_sum(b_h_sum_s[J], UPs[J]); */
+  /* array[J,P] vector<lower = 0, upper = 1>[nt] b_h;// = simplex_to_bh(b_h_simplex[J], ULs[J]); */
 
   // This vector is multiplied be simplex; has to be 0<x<1
   // take tanh( fixed + ranef )
   
   // VAR phi parameter
- 
 
-  
   // Initialize t=1
   for( j in 1:J){
-    for( q in 1:Q){
-      a_h[j,q] = rep_vector(.5, nt);//simplex_to_bh(a_h_simplex[j], a_h_sum[j]);
-    }
-    UPs[j] = upper_limits(a_h[j]);
-    ULs[j] = raw_sum_to_b_h_sum(b_h_sum_s[j], UPs[j]);
-    for( p in 1:P ){
-      b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]);
-    }
+    /* for( q in 1:Q){ */
+    /*   a_h[j,q] = rep_vector(.5, nt);//simplex_to_bh(a_h_simplex[j], a_h_sum[j]); */
+    /* } */
+    /* UPs[j] = upper_limits(a_h[j]); */
+    /* ULs[j] = raw_sum_to_b_h_sum(b_h_sum_s[j], UPs[j]); */
+    /* for( p in 1:P ){ */
+    /*   b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]); */
+    /* } */
     
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
     u[j,1] = u1_init;
@@ -149,37 +147,56 @@ transformed parameters {
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
+    ## Ranefs
+    ## R part
+    
     a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
-  
-      for (t in 2:T){
+
+    ## D part
+    if(simplify_ch==0){
+      c_h_random[j] = (diag_pre_multiply(c_h_tau, c_h_L)*c_h_stdnorm[j]);
+    } else if(simplify_ch == 1) {
+      c_h_random[j] = (diag_pre_multiply(c_h_tau, diag_matrix(rep_vector(1.0, nt)))*c_h_stdnorm[j]);
+    }
+    c_h[j] = c_h_fixed + c_h_random[j];
+	
+    if(simplify_ah==0){
+      a_h_random[j] = diag_pre_multiply(a_h_tau, a_h_L)*a_h_stdnorm[j];
+    } else if(simplify_ah == 1) {
+      a_h_random[j] = diag_pre_multiply(a_h_tau, diag_matrix(rep_vector(1.0, nt)))*a_h_stdnorm[j];
+    }
+    // Bound sum of fixed and ranef between 0 and 1 with logistic function
+
+    a_h_sum[j] = 1 ./ (1 + exp(-( a_h_fixed + a_h_random[j] )) );
+
+    
+    if(simplify_bh==0){      
+      b_h_random[j] = (diag_pre_multiply(b_h_tau, b_h_L)*b_h_stdnorm[j]);
+    } else if(simplify_bh == 1) {
+      b_h_random[j] = (diag_pre_multiply(b_h_tau, diag_matrix(rep_vector(1.0, nt)))*b_h_stdnorm[j]);
+    }
+    // Bound sum of fixed and ranef between 0 and 1
+    b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
+    
+    for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed
 #include /model_components/mu.stan
-      c_h_random[j] = (diag_pre_multiply(c_h_tau, c_h_L)*c_h_stdnorm[j]);
-      c_h[j] = c_h_fixed + c_h_random[j];
-
-      a_h_random[j] = (diag_pre_multiply(a_h_tau, a_h_L)*a_h_stdnorm[j]);
-      // Bound sum of fixed and ranef between 0 and 1 with logistic function
-      a_h_sum[j] = rep_vector(1.0, nt) ./ (1 + exp(-(a_h_fixed + a_h_random[j])) );
-
-      b_h_random[j] = (diag_pre_multiply(b_h_tau, b_h_L)*b_h_stdnorm[j]);
-      // Bound sum of fixed and ranef between 0 and 1
-      b_h_sum[j] = rep_vector(1.0, nt) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
-
+      
       
       for(d in 1:nt){
 	vd[j,d]   = 0.0;
 	ma_d[j,d] = 0.0;
-	ar_d[j,d]   = 0.0;
+	ar_d[j,d] = 0.0;
 	// GARCH MA component
 	for (q in 1:min( t-1, Q) ) {
 	  rr[j, t-q, d] = square( rts[j, t-q, d] - mu[j, t-q, d] );
-	  ma_d[j, d] = ma_d[j, d] + a_h[j, q, d]*rr[j, t-q, d] ;
+	  ma_d[j, d] = ma_d[j, d] + a_h_sum[j, d]*rr[j, t-q, d] ;
 	}
 	// print("ma_d: ", "TS:", d, " Value:", ma_d[d], " T:", t);
 	// GARCH AR component
 	for (p in 1:min( t-1, P) ) {
-	  ar_d[j,d] = ar_d[j,d] + b_h[j, p, d]*D[j, t-p, d]^2;
+	  ar_d[j,d] = ar_d[j,d] + b_h_sum[j, d]*D[j, t-p, d]^2;
 	}
 	// print("ar_d: ", "TS:", d, " Value:", ar_d[d], " T:", t);
 	// Predictor on diag (given in xC)
@@ -248,10 +265,10 @@ model {
   // likelihood
   for( j in 1:J) {
     // UL transform jacobian
-    for(k in 1:nt) {
-      ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed.
-      target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]);
-    }
+    /* for(k in 1:nt) { */
+    /*   ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed. */
+    /*   target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]); */
+    /* } */
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
     c_h_stdnorm[J] ~ std_normal();

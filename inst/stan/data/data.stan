@@ -9,3 +9,6 @@ array[J] matrix[T,nt] rts;  // multivariate time-series; array of length J of Tx
 array[nobs] vector[nt] xC;  // TODO - match to rts if to be included // time-varying predictor for constant variance
 int<lower=0, upper=1> distribution; // 0 = Normal; 1 = student_t
 int<lower=0, upper=2> meanstructure; // Select model for location
+int<lower=0, upper=1> simplify_ch; // 0 = random effects correlations among nt's, 1 = only ranefs without corrs among nt's
+int<lower=0, upper=1> simplify_ah; // 0 = random effects correlations among nt's, 1 = only ranefs without corrs among nt's
+int<lower=0, upper=1> simplify_bh; // 0 = random effects correlations among nt's, 1 = only ranefs without corrs among nt's
