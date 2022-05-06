@@ -1,86 +1,4 @@
-#' Standardize input data to facilitate computation
-#' 
-#' @param data Time-series data
-#' @param J numeric. Number of groups (individuals)
-#' @param group Vector with group id of full length
-#' @param xC Numeric vector or matrix.
-#' @param P Numeric.
-#' @param Q Numeric.
-#' @param standardize_data Logical.
-#' @param distribution Character.
-#' @param meanstructure Character.
-#' @return dcnet stan data list. 
-#' @keywords internal
-standat <- function(data, J, group, xC, P, Q, standardize_data, distribution, meanstructure) {
-
-    if(dim(data)[1] < dim(data)[2]) {
-        data = t(data)
-        warning("data is wider than it is long. Transposing...")
-    }
-    if ( is.null( colnames( data ) ) ) colnames( data ) = paste0('t', 1:ncol( data ) )
-
-    ## Model for meanstructure
-    if( meanstructure == "constant" | meanstructure == 0 ) {
-        meanstructure <- 0
-    } else if ( meanstructure == "arma" | meanstructure == "ARMA" | meanstructure == 1 ){
-        meanstructure <- 1
-    } else if ( meanstructure == "var"  | meanstructure == "VAR"  | meanstructure == 2) {
-        meanstructure <- 2
-    } else {
-        stop("meanstructure must be either 'constant', 'ARMA' or 'VAR'.")
-    }
-    
-    ## Tests on predictor
-    ## Pass in a 0 matrix, so that stan does not complain
-    if ( is.null(xC) ) {
-        xC <- matrix(0, nrow = nrow(data), ncol = ncol(data))
-    }
-    ## Match dimension of predictor to TS. If only one vector is given, it's assumed that it is the same for all TS's
-    if ( is.null(ncol(xC)) ) {
-        warning("xC is assumed constant across TS's")
-        xC <- matrix(xC, nrow = nrow(data), ncol = ncol(data)) ## Risky, better to throw an error
-    } else if ( dim( xC )[2] != dim( data )[2] ) { ## xC is not a vector  - check if it is of right dimension
-        warning("xC is not of right dimension - adapt xC dimension to match number of TS")
-    }
-
-    nobs <- nrow(data)
-
-    if( standardize_data ) {
-        ## Standardize time-series
-        stdx <- scale(data)
-        centered_data <- attr(stdx, "scaled:center")
-        scaled_data <- attr(stdx, "scaled:scale")
-        return_standat <- list(T = nrow(stdx)/J,
-                               rts = stdx,
-                               xC = xC,
-                               nt = ncol(stdx),
-                               centered_data = centered_data,
-                               scaled_data = scaled_data,
-                               distribution = distribution,
-                               P = P,
-                               Q = Q,
-                               meanstructure = meanstructure,
-                               J = J,
-                               nobs = nobs,
-                               group = group)
-    } else {
-        ## Unstandardized
-        return_standat <- list(T = nrow(data)/J,
-                               rts = data,
-                               xC = xC,
-                               nt = ncol(data),
-                               distribution = distribution,
-                               P = P,
-                               Q = Q,
-                               meanstructure = meanstructure,
-                               J = J,
-                               nobs = nobs,
-                               group = group)
-    }
-    return(return_standat)
-}
-
-##' Draw samples from a longitudinal partialc correlation network with dynamic correlations. 
+##' Draw samples from a longitudinal partial correlation network with dynamic correlations. 
 ##'
 ##' The fitted models are 'rstan' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'dcnet' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation. 
 ##' 
@@ -168,7 +86,7 @@ dcnet <- function(data,
         stop( "\n\n Specify distribution: Gaussian or Student_t \n\n")
     }
 
-    return_standat <- standat(data,
+    return_standat <- stan_data(data,
                               J,
                               group,
                               nobs,

@@ -5,15 +5,19 @@ library(MASS )
 source(file = "../R/simulate.R")
 
 ## Create data:
-N <- 50
-tl <- 50
+N <- 15
+tl <- 8
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 ),
                    alpha = .5)
+simdat[[1]]
 dim(simdat[[1]])
-#simdat
+simdat[[1]]
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
+rtsgen
+typeof(rtsgen )
+dim(rtsgen)
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
@@ -23,12 +27,15 @@ X <- array(0,  dim = c(N*tl, nts ) )
 groupvec <- rep(c(1:N),  each = tl )
 groupvec
 
-source(file = "../R/dcnet.R")
+X
 
-return_standat <- standat( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
+source(file = "../R/stan_data.R")
+
+return_standat <- stan_data( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
                           standardize_data = TRUE,
                           Q = 1, distribution = 0, meanstructure = "VAR")
 
+return_standat
 return_standat$simplify_ch <- 1
 return_standat$simplify_ah <- 1
 return_standat$simplify_bh <- 1
