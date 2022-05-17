@@ -6,7 +6,11 @@
 \alias{dcnet}
 \title{The 'dcnet' package.}
 \description{
-A DESCRIPTION OF THE PACKAGE
+Estimate dynamic conditional partial correlation networks for multilevel time-series data. These
+models are based on multilevel vector autoregressive processes for the means and multilevel dynamic conditional
+correlations (mlDCC) for the residuals. The mlDCC structure contains the longitudinal partial correlations that
+are estimated for each time-point. Sampling is done in stan, a C++ package providing HMC methods for full Bayesian
+inference (cf. \link{http://mc-stan.org}). either via variational Bayes or Hamiltonian Monte Carlo sampling.
 }
 \references{
 Stan Development Team (2020). RStan: the R interface to Stan. R package version 2.21.2. https://mc-stan.org

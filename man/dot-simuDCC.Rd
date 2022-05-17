@@ -4,7 +4,7 @@
 \alias{.simuDCC}
 \title{Simulate TS's for N individuals}
 \usage{
-.simuDCC(tslength, n_ts, N, ranef_sd_S, phi0_fixed = NULL)
+.simuDCC(tslength, n_ts, N, ranef_sd_S, phi0_fixed, alpha = 0.5)
 }
 \arguments{
 \item{tslength}{Length of time series, for all N (everyone has same TS length)}

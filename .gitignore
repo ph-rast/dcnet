@@ -26,3 +26,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/DCCMGARCHconvexCor
 /inst/stan/DCCMGARCHrandQ
 /inst/stan/DCCMGARCHrandS
+*.Rd

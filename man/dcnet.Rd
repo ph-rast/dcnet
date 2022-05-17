@@ -17,7 +17,10 @@ dcnet(
   standardize_data = FALSE,
   distribution = "Gaussian",
   meanstructure = "VAR",
-  sampling_algorithm = "MCMC",
+  sampling_algorithm = "variational",
+  simplify_ch = 1,
+  simplify_ah = 1,
+  simplify_bh = 1,
   ...
 )
 }
@@ -46,60 +49,22 @@ dcnet(
 
 \item{meanstructure}{Character (Default: "constant"). Defines model for means. Either 'constant'  or 'ARMA'. Currently ARMA(1,1) only. OR 'VAR' (VAR1).}
 
-\item{sampling_algorithm}{Character (Default" "MCMC"). Define sampling algorithm. Either 'MCMC' or variational Bayes 'VB'.}
+\item{sampling_algorithm}{Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.}
 
-\item{...}{Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. See the documentation in \code{\link[rstan]{stan}}.}
+\item{...}{Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc.}
 }
 \value{
 \code{dcnet} object.
 }
 \description{
-Draw samples from a longitudinal partialc correlation network with dynamic correlations.
+Draw samples from a longitudinal partial correlation network with dynamic correlations.
 }
 \details{
 The fitted models are 'rstan' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'dcnet' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation.
 }
 \examples{
 \dontrun{
-data(panas)
-# Fit BEKK(1,1) mgarch model with a ARMA(1,1) meanstructure,
-# and student-t residual distribution
-fit <- dcnet(panas, parameterization = "BEKK",
-               P = 1, Q = 1,
-               meanstructure = "arma",
-               distribution = "Student_t")
-
-# Summarize the parameters
-summary(fit)
-
-# Forecast 5 ahead
-fit.fc <- forecast(fit, ahead = 5)
-print(fit.fc)
-
-# Plot mean forecasts
-plot(fit.fc, type = "mean")
-
-# Plot variance forecasts
-plot(fit.fc, type = "var")
-
-# Plot correlation forecasts
-plot(fit.fc, type = "cor")
-
-# Plot modeled data ("backcasted values").
-plot(fit, type = "mean")
-
-# Save "backcasted" values
-fit.bc <- fitted(fit)
-
-# Save estimated and forecasted data as a data.frame
-df.fc <- as.data.frame(fit.fc)
-
-# Access rstan's model fit object
-mf <- fit$model_fit
-
-# Return diagnostics and a plot of the first 10 parameters
-rstan::check_hmc_diagnostics(mf)
-rstan::plot(mf)
+##
 }
 }
 \references{
