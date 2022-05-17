@@ -15,55 +15,16 @@
 ##' @param standardize_data Logical (Default: FALSE). Whether data should be standardized. 
 ##' @param distribution Character (Default: "Student_t"). Distribution of innovation: "Student_t"  or "Gaussian"
 ##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant'  or 'ARMA'. Currently ARMA(1,1) only. OR 'VAR' (VAR1).
-##' @param sampling_algorithm Character (Default" "MCMC"). Define sampling algorithm. Either 'MCMC' or variational Bayes 'VB'.
-##' @param ... Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. See the documentation in \code{\link[rstan]{stan}}.
+##' @param sampling_algorithm Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.
+##' @param ... Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. 
 ##' @return \code{dcnet} object.
-##' @importFrom Rdpack reprompt
 ##' @author Philippe Rast
 ##' @references
 ##'    \insertAllCited()
 ##' @export
 ##' @examples
 ##' \dontrun{
-##' data(panas)
-##' # Fit BEKK(1,1) mgarch model with a ARMA(1,1) meanstructure,
-##' # and student-t residual distribution
-##' fit <- dcnet(panas, parameterization = "BEKK",
-##'                P = 1, Q = 1,
-##'                meanstructure = "arma",
-##'                distribution = "Student_t")
-##'
-##' # Summarize the parameters
-##' summary(fit)
-##'
-##' # Forecast 5 ahead
-##' fit.fc <- forecast(fit, ahead = 5)
-##' print(fit.fc)
-##'
-##' # Plot mean forecasts
-##' plot(fit.fc, type = "mean")
-##' 
-##' # Plot variance forecasts
-##' plot(fit.fc, type = "var")
-##' 
-##' # Plot correlation forecasts
-##' plot(fit.fc, type = "cor")
-##'
-##' # Plot modeled data ("backcasted values").
-##' plot(fit, type = "mean")
-##' 
-##' # Save "backcasted" values
-##' fit.bc <- fitted(fit)
-##'
-##' # Save estimated and forecasted data as a data.frame
-##' df.fc <- as.data.frame(fit.fc)
-##'
-##' # Access rstan's model fit object
-##' mf <- fit$model_fit
-##'
-##' # Return diagnostics and a plot of the first 10 parameters
-##' rstan::check_hmc_diagnostics(mf)
-##' rstan::plot(mf)
+##' ##
 ##' }
 dcnet <- function(data,
                   J,
@@ -77,7 +38,10 @@ dcnet <- function(data,
                   standardize_data = FALSE,
                   distribution = "Gaussian",
                   meanstructure = "VAR",
-                  sampling_algorithm = "HMC", ...) {
+                  sampling_algorithm = "variational",
+                  simplify_ch = 1,
+                  simplify_ah = 1,
+                  simplify_bh = 1, ...) {
     if ( tolower(distribution) == "gaussian" ) {
         num_dist <- 0
     } else if ( tolower(distribution) == "student_t" ) {
@@ -86,24 +50,37 @@ dcnet <- function(data,
         stop( "\n\n Specify distribution: Gaussian or Student_t \n\n")
     }
 
-    return_standat <- stan_data(data,
+    stan_data <- stan_data(data,
                               J,
                               group,
-                              nobs,
                               xC,
                               P,
                               Q,
                               standardize_data,
                               distribution = num_dist,
-                              meanstructure)
-    stan_data <- return_standat[ c("T", "xC", "rts", "nt",
-                                   "distribution", "P", "Q",
-                                   "meanstructure", "J", "nobs", "group")]
+                              meanstructure,
+                              simplify_ch,
+                              simplify_ah,
+                              simplify_bh)
 
+    ## Select stanmodel
+    ## 
+    ## stanmodel <- switch(parameterization,
+    ##                     CCC = stanmodels$CCCMGARCH,
+    ##                     DCC = stanmodels$DCCMGARCH,
+    ##                     NULL)
+
+    ## select CmdStanModel created by cmdstan_model at time of compilation
+    ## rstan
+
+    ccc_file <- file.path("../inst/stan/VAR.stan" )
+    dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
+    
     stanmodel <- switch(parameterization,
-                        CCC = stanmodels$CCCMGARCH,
-                        DCC = stanmodels$DCCMGARCH,
+                        CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/"),
+                        DCC = cmdstan_model(dcc_file, include_paths = "../inst/stan/"),
                         NULL)
+        
     if(is.null(stanmodel)) {
         stop("Not a valid model specification. ",
              parameterization,
@@ -114,26 +91,23 @@ dcnet <- function(data,
 
     ## MCMC Sampling with NUTS
     if(sampling_algorithm == 'HMC' ) {
-        model_fit <- cmdstanr::sampling(stanmodel,
-                                     data = stan_data,
-                                     verbose = TRUE,
-                                     iter = iterations,
-                                     control = list(adapt_delta = .99),
-                                     chains = chains,
-                                     init_r = .05, ...)
-    } else if (sampling_algorithm == 'VB' ) {
-    ## Sampling via Variational Bayes
-    model_fit <- cmdstanr::variational(stanmodel,
-                           data = stan_data,
-                           iter = iterations,
-                           importance_resampling = TRUE, ...)
+      model_fit <- cmdstanr::stanmodel$sample(data = stan_data,
+                                              verbose = TRUE,
+                                              iter = iterations,
+                                              control = list(adapt_delta = .95),
+                                              chains = chains,
+                                              init_r = .05, ...)
+    } else if (sampling_algorithm == 'variational' ) {
+      ## Sampling via Variational Bayes
+      model_fit <- stanmodel$variational(data = stan_data,
+                                         iter = iterations, ...)
     } else {
-        stop( "\n\n Provide sampling algorithm: 'MCMC' or 'VB'\n\n" )
+        stop( "\n\n Provide sampling algorithm: 'HMC' or 'variational'\n\n" )
     }
     
     ## Model fit is based on standardized values.
-    mns <- return_standat$centered_data
-    sds <- return_standat$scaled_data
+    mns <- stan_data$centered_data
+    sds <- stan_data$scaled_data
     ## Values could be converted to original scale using something like this on the estimates
     ## orig_sd = stan_data$rts %*% diag(sds)
     ## orig_scale = orig_sd + array(rep(mns, each = aussi[[1]]$T), dim = c(aussi[[1]]$T, aussi[[1]]$nt) )
@@ -156,6 +130,7 @@ dcnet <- function(data,
                        meanstructure = stan_data$meanstructure,
                        std_data = standardize_data,
                        sampling_algorithm = sampling_algorithm)
+
     class(return_fit) <- "dcnet"
     return(return_fit)
 }
@@ -167,4 +142,4 @@ dcnet <- function(data,
 #' May facilitate more parameterizations, as we only have to update these, and the switch statements.
 #' @keywords internal
 #' @author Philippe Rast
-supported_models <- c("DCC")
+supported_models <- c("CCC", "DCC")

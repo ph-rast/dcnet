@@ -2,7 +2,8 @@
 library(ks )
 library(clusterGeneration )
 library(MASS )
-source(file = "../R/simulate.R")
+
+devtools::load_all( )
 
 ## Create data:
 N <- 15
@@ -17,7 +18,8 @@ simdat[[1]]
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 rtsgen
 typeof(rtsgen )
-dim(rtsgen)
+dim(rtsgen[[1]])
+rtsgen[[1]]
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
@@ -25,38 +27,23 @@ X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(sim
 X <- array(0,  dim = c(N*tl, nts ) )
 
 groupvec <- rep(c(1:N),  each = tl )
-groupvec
+nrow(groupvec)
 
 X
 
 source(file = "../R/stan_data.R")
 
-return_standat <- stan_data( data = X, J = N, group = groupvec, xC = groupvec,  P = 1,
+stan_data <- stan_data( data = rtsgen, J = N, group = groupvec, xC = NULL,  P = 1,
                           standardize_data = TRUE,
                           Q = 1, distribution = 0, meanstructure = "VAR")
 
+
+source(file =  "../R/dcnet.R")
+dcnet( data =  rtsgen, J =  N, group =  groupvec)
+
 return_standat
-return_standat$simplify_ch <- 1
-return_standat$simplify_ah <- 1
-return_standat$simplify_bh <- 1
 
-stan_data <- return_standat[ c("T", "xC", "rts", "nt",
-                                   "distribution", "P", "Q",
-                               "meanstructure", "J", "nobs", "group",
-                               "simplify_ch","simplify_ah","simplify_bh")]
-
-stan_data$T
-stan_data$nt
-
-stan_data$rts
-stan_data$rts <- rtsgen
-
-stan_data
-## same as this from X:  array(X,  dim = c(20, 4, 3) )
-
-
-
-stan_data$rts
+return_standat$rts
 
 
 #saveRDS(object =stan_data ,file = '../../TEST/stan_data')
@@ -71,12 +58,10 @@ file
 
 mod <- cmdstan_model(file, include_paths = "../inst/stan/")
 
-stan_data$rts
-
-model_fit <-mod$optimize( data = stan_data)
+model_fit <-mod$optimize( data = return_standat)
 
 model_fit <-mod$variational(
-                  data = stan_data,
+                  data = return_standat,
 ##                   threads = 6,
 ##                  tol_rel_obj = 0.005,
                    iter =  30000)

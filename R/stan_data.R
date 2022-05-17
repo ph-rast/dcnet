@@ -4,7 +4,7 @@
 #' @param data Multilevel time-series data in long format
 #' @param J numeric. Number of groups (individuals)
 #' @param group Vector with group id of full length
-#' @param xC Numeric vector or matrix.
+#' @param xC Numeric matrix containing predictors.
 #' @param P Numeric. Currently fixed to 1
 #' @param Q Numeric. Currently fixed to 1
 #' @param standardize_data Logical.
@@ -16,7 +16,7 @@
 #' @return dcnet stan data list. 
 #' @keywords internal
 stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distribution = 0,
-                      meanstructure =  'VAR',simplify_ch = 1, simplify_ah = 1, simplify_bh = 1) {
+                      meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1) {
 
   ## Check for data type:
   ## dim data needs to return NULL as the list is a collection of individual matrices for each individual.
@@ -43,11 +43,18 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
     stop("meanstructure must be either 'constant', 'ARMA' or 'VAR'.")
   }
   
+  
   ## Tests on predictor
+  nt <- ncol(data[[1]])
+  
   ## Pass in a 0 matrix, so that stan does not complain
   if ( is.null(xC) ) {
     xC <- matrix(0, ncol = nt, nrow = J * tl)
-  }
+  } else if ( !is.null(xC) ) {
+      ## Test dimension of XC
+      if( ncol(xC) != nt )  stop("xC must have same dimension as data (same number of columns)")
+      if( nrow(xC) != J*tl) stop("xC must have same dimension as data (same number of rows)")
+    }
   ## Match dimension of predictor to TS. If only one vector is given, it's assumed that it is the same for all TS's
   ## if ( is.null(ncol(xC)) ) {
   ##   warning("xC is assumed constant across TS's")
