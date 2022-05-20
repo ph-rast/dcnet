@@ -2,6 +2,7 @@
 
 export(dcnet)
 import(Rcpp)
+import(data.table)
 import(methods)
 importFrom(MASS,mvrnorm)
 importFrom(clusterGeneration,rcorrmatrix)

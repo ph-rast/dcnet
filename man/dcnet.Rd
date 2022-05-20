@@ -12,7 +12,7 @@ dcnet(
   parameterization = "DCC",
   P = 1,
   Q = 1,
-  iterations = 2000,
+  iterations = NULL,
   chains = 4,
   standardize_data = FALSE,
   distribution = "Gaussian",

@@ -1,13 +1,10 @@
 ##library(dcnet )
-library(ks )
-library(clusterGeneration )
-library(MASS )
-
 devtools::load_all( )
+options(width = 250 )
 
 ## Create data:
-N <- 15
-tl <- 8
+N <- 20
+tl <- 50
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 ),
                    alpha = .5)
@@ -27,26 +24,77 @@ X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(sim
 X <- array(0,  dim = c(N*tl, nts ) )
 
 groupvec <- rep(c(1:N),  each = tl )
-nrow(groupvec)
-
-X
-
-source(file = "../R/stan_data.R")
-
-stan_data <- stan_data( data = rtsgen, J = N, group = groupvec, xC = NULL,  P = 1,
-                          standardize_data = TRUE,
-                          Q = 1, distribution = 0, meanstructure = "VAR")
 
 
-source(file =  "../R/dcnet.R")
-dcnet( data =  rtsgen, J =  N, group =  groupvec)
-
-return_standat
-
-return_standat$rts
+fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE)
+print.summary.dcnet(out)
 
 
-#saveRDS(object =stan_data ,file = '../../TEST/stan_data')
+
+fit$model_fit$draws( )
+fit$sampling_algorithm
+
+
+summary.dcnet(fit)
+
+fit$sampling_algorithm
+
+
+print.summary.dcnet( )
+
+
+fit$TS_names
+
+
+ metaNames <- c("param", "distribution", "num_dist", "iter", "chains",
+                   "elapsed_time", "date", "nt", "TS_names", "mgarchQ",
+                   "mgarchP", "meanstructure", "sampling_algorithm")
+
+with(fit,  mget(metaNames) )
+
+fit$param
+object$sampling_algorithm
+sum(grepl("CmdStanFit", class(fit$model_fit )))
+
+
+rtsgen
+stan_data <- stan_data( data =  rtsgen, J =  N, group =  groupvec, xC = NULL, standardize_data = FALSE)
+colnames(stan_data$rts)
+
+## fit is a tibble object
+tbl <- fit$model_fit$summary( mn =  ~ mean(.), sd =  ~ sd(.), qtl = ~ quantile(., probs = CrI ))
+tbl
+
+fit$model_fit$draws( )
+fit$model_fit$time( )
+
+
+#library(tidyverse )
+#tbl %>% filter(grepl('lp|phi0', variable))
+
+
+## Go with data.table
+library(data.table )
+dt <- as.data.table(tbl)
+
+## cf. https://www.geeksforgeeks.org/select-rows-with-partial-string-match-in-r-dataframe/
+## common and arma params
+ap <- "lp|phi0_fixed|phi0_L|phi0_tau|vec_phi_fixed|phi_L|phi_tau"
+
+## DCC params:
+## D
+dccD <- "c_h_fixed|a_h_fixed|b_h_fixed|c_h_L|c_h_tau|a_h_L|a_h_tau|b_h_L|b_h_tau"
+## Q
+dccQ <- "l_a_q|l_a_q_r|l_b_q|l_b_q_r|S"
+
+paste0(dccD, '|', dccQ)
+
+dt[ variable %like% dccQ ]
+
+
+
+
+
 
 
 library(cmdstanr )

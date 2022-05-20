@@ -33,7 +33,7 @@ dcnet <- function(data,
                   parameterization = "DCC",
                   P = 1,
                   Q = 1,
-                  iterations = 2000,
+                  iterations = NULL,
                   chains = 4,
                   standardize_data = FALSE,
                   distribution = "Gaussian",
@@ -91,6 +91,7 @@ dcnet <- function(data,
 
     ## MCMC Sampling with NUTS
     if(sampling_algorithm == 'HMC' ) {
+      if( is.null( iterations ) ) iterations <- 2000
       model_fit <- cmdstanr::stanmodel$sample(data = stan_data,
                                               verbose = TRUE,
                                               iter = iterations,
@@ -99,6 +100,7 @@ dcnet <- function(data,
                                               init_r = .05, ...)
     } else if (sampling_algorithm == 'variational' ) {
       ## Sampling via Variational Bayes
+      if( is.null( iterations ) ) iterations <- 30000
       model_fit <- stanmodel$variational(data = stan_data,
                                          iter = iterations, ...)
     } else {
@@ -117,12 +119,12 @@ dcnet <- function(data,
                        num_dist = num_dist,
                        iter = iterations,
                        chains = chains,
-                       elapsed_time = NA, #cmdstanr::get_elapsed_time(model_fit),
+                       elapsed_time = model_fit$time()$total,
                        date = date(),
                        nt = stan_data$nt,
                        TS_length = stan_data$T,
-                       TS_names = colnames(stan_data$rts),
-                       RTS_last = stan_data$rts[stan_data$T,],
+                       TS_names = colnames(stan_data$rts[[1]]),
+                       #RTS_last = stan_data$rts[stan_data$T,],
                        RTS_full = stan_data$rts,
                        mgarchQ = stan_data$Q,
                        mgarchP = stan_data$P,
