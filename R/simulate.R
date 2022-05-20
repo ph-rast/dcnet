@@ -74,6 +74,9 @@
   phi <- apply(temp, 2, matrix, ncol = n_ts, simplify = FALSE)
   
   y <- array(NA, dim = c(n_ts, tslength, N))
+  ## create named variables:
+  rownames(y) <-  paste0('X',  seq_len(n_ts) )
+
   ## init y
   y[,1,] <- phi0
   
@@ -129,7 +132,6 @@
         y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
         DCC_R[,,t,j] <- cov2cor(DCC_H[,,t,j] )
       }
-
       DCC_y <- y
     }
     return(list(DCC_y, DCC_R))
