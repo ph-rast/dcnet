@@ -3,9 +3,10 @@
 ##' .. content for \details{} ..
 ##' @title 
 ##' @param object 
-##' @return 
+##' @return summary.dcnet object
 ##' @author Philippe Rast
 ##' @import data.table
+##' @export
 summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   
   ## Parameters for each model
@@ -43,7 +44,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   out$model_summary <-  .get_stan_summary(object, params, CrI,
                                           sampling_algorithm = object$sampling_algorithm)
   
-  class(out) <- "summary.bmgarch"
+  class(out) <- "summary.dcnet"
   return(out)
 }
 
@@ -54,6 +55,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 ##' @param CrI 
 ##' @return 
 ##' @author philippe
+##' @keywords internal
 .summarize_draws <- function(X, CrI ) {
   mn <- mean(X)
   sd <- sd(X)
@@ -63,7 +65,17 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 }
 
 
-
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##' @title 
+##' @param object 
+##' @param params 
+##' @param CrI 
+##' @param sampling_algorithm 
+##' @return 
+##' @author philippe
+##' @keywords internal
 .get_stan_summary <- function(object, params, CrI, sampling_algorithm ) {
   if(sampling_algorithm == 'HMC') {
     cols <- c("mean","sd",paste0(CrI*100, "%"), "n_eff", "Rhat")            
@@ -104,6 +116,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 ##' @param ... 
 ##' @return x (invisible) 
 ##' @author philippe
+##' @export
 print.summary.dcnet <- function(x,  ... ) {
   if(x$meta$param == "CCC") {
     .print.summary.ccc(x)
@@ -130,7 +143,15 @@ print.summary.dcnet <- function(x,  ... ) {
 
   return(invisible(x))
 }
-
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##' @title 
+##' @param bmsum 
+##' @param ... 
+##' @return 
+##' @author philippe
+##' @keywords internal
 .print.summary.ccc <- function(bmsum, ...) {
    # Meta-data
     cat(paste0("Model: mlVAR-", bmsum$meta$param, "\n"))
@@ -179,7 +200,7 @@ print.summary.dcnet <- function(x,  ... ) {
 
 
 ##' @title Print helper for DCC.
-##' @param bmsum summary.bmgarch object.
+##' @param bmsum summary.dcnet object.
 ##' @return Void.
 ##' @author Stephen R. Martin, Philippe Rast
 ##' @keywords internal
@@ -224,9 +245,9 @@ print.summary.dcnet <- function(x,  ... ) {
   ## obtain off-diagonal TS varnames
   od_varnames <- full_varnames[corr_only, ]
 
-#########
-                                        # GARCH #
-#########
+  ## #######
+  ## GARCH #
+  ## #######
   cat(paste0("GARCH(", P, ",", Q, ")"), " estimates for conditional variance on D:")
   .newline(2)
 
@@ -284,9 +305,9 @@ print.summary.dcnet <- function(x,  ... ) {
 
 
 ##' @title Print helper for means component.
-##' @param bmsum summary.bmgarch object.
+##' @param bmsum summary.dcnet object.
 ##' @return Void.
-##' @author Stephen R. Martin, Philippe Rast
+##' @author  Philippe Rast
 ##' @keywords internal
 .print.summary.means <- function(bmsum) {
   ms <- bmsum$model_summary
@@ -325,7 +346,7 @@ print.summary.dcnet <- function(x,  ... ) {
 
 
 ##' @title Print helper for Sampling Config.
-##' @param bmsum summary.bmgarch object.
+##' @param bmsum summary.dcnet object.
 ##' @return Void.
 ##' @author Philippe Rast
 ##' @keywords internal
@@ -373,7 +394,7 @@ print.summary.dcnet <- function(x,  ... ) {
 }
 
 ##' @title Print helper for LP component.
-##' @param bmsum summary.bmgarch object.
+##' @param bmsum summary.dcnet object.
 ##' @return Void.
 ##' @keywords internal
 .print.summary.lp <- function(bmsum) {

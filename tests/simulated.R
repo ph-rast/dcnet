@@ -1,16 +1,13 @@
 ##library(dcnet )
-devtools::load_all( )
+#devtools::load_all( )
 options(width = 250 )
 
 ## Create data:
-N <- 20
+N <- 50
 tl <- 50
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 ),
                    alpha = .5)
-simdat[[1]]
-dim(simdat[[1]])
-simdat[[1]]
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 rtsgen
@@ -27,6 +24,11 @@ groupvec <- rep(c(1:N),  each = tl )
 
 
 fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE)
+
+summary(fit )
+
+dcnet::.print.summary.dcc(fit )
+
 print.summary.dcnet(out)
 
 
