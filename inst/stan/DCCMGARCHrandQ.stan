@@ -118,26 +118,11 @@ transformed parameters {
   array[J] vector<lower = 0>[nt] ma_d;
   array[J] vector<lower = 0>[nt] ar_d;
   
-  /* array[J,Q] vector<lower=0, upper = 1>[nt] a_h;// = simplex_to_bh(a_h_simplex[J], a_h_sum[J]); */
-  /* array[J] vector[nt] UPs;// = upper_limits(a_h[J]); */
-  /* array[J] vector[nt] ULs;// = raw_sum_to_b_h_sum(b_h_sum_s[J], UPs[J]); */
-  /* array[J,P] vector<lower = 0, upper = 1>[nt] b_h;// = simplex_to_bh(b_h_simplex[J], ULs[J]); */
-
-  // This vector is multiplied be simplex; has to be 0<x<1
-  // take tanh( fixed + ranef )
-  
+ 
   // VAR phi parameter
 
   // Initialize t=1
   for( j in 1:J){
-    /* for( q in 1:Q){ */
-    /*   a_h[j,q] = rep_vector(.5, nt);//simplex_to_bh(a_h_simplex[j], a_h_sum[j]); */
-    /* } */
-    /* UPs[j] = upper_limits(a_h[j]); */
-    /* ULs[j] = raw_sum_to_b_h_sum(b_h_sum_s[j], UPs[j]); */
-    /* for( p in 1:P ){ */
-    /*   b_h[j,p] = rep_vector(.5, nt); //simplex_to_bh(b_h_simplex[j], ULs[j]); */
-    /* } */
     
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
     u[j,1] = u1_init;
@@ -147,27 +132,33 @@ transformed parameters {
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
-    ## Ranefs
-    ## R part
+    ////////////
+    // Ranefs //
+    ////////////
     
+    // R part
     a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
 
-    ## D part
+    // D part
+    // Should random effect corrleations be estimated:
+    // Full estimation of corrmat with simplify_ch == 0
+    // Estimate only diagonal with simplify_ch == 1
     if(simplify_ch==0){
       c_h_random[j] = (diag_pre_multiply(c_h_tau, c_h_L)*c_h_stdnorm[j]);
     } else if(simplify_ch == 1) {
       c_h_random[j] = (diag_pre_multiply(c_h_tau, diag_matrix(rep_vector(1.0, nt)))*c_h_stdnorm[j]);
     }
     c_h[j] = c_h_fixed + c_h_random[j];
-	
+
+    // Same approach here with simplify_ah
     if(simplify_ah==0){
       a_h_random[j] = diag_pre_multiply(a_h_tau, a_h_L)*a_h_stdnorm[j];
     } else if(simplify_ah == 1) {
       a_h_random[j] = diag_pre_multiply(a_h_tau, diag_matrix(rep_vector(1.0, nt)))*a_h_stdnorm[j];
     }
+    
     // Bound sum of fixed and ranef between 0 and 1 with logistic function
-
     a_h_sum[j] = 1 ./ (1 + exp(-( a_h_fixed + a_h_random[j] )) );
 
     
@@ -178,6 +169,10 @@ transformed parameters {
     }
     // Bound sum of fixed and ranef between 0 and 1
     b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
+    
+    /////////////////////
+    // Model Structure //
+    /////////////////////
     
     for (t in 2:T){
       // Meanstructure model: DROP, if only VAR is allowed

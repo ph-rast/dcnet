@@ -96,10 +96,34 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
     
     ## subset draws of fitted model
     draws <- data.table::data.table( object$model_fit$draws( )[, col_select] )
-    
+
+    ## Stan model estimates l_a_q on logit scale -- transform to SD metric
     ## Compute fixed a_q and b_q
     draws$a_q_fixed <- 1 / (1 + exp( -draws[, "l_a_q"] ))
     draws$b_q_fixed <- draws$a_q_fixed / (1 + exp( -draws[, "l_b_q"] ))
+
+    ## Find (c/a/b)_h_fixed values for nt variables
+    c_h_location <- which( grepl( "c_h_fixed",  names(draws) ) )
+    a_h_location <- which( grepl( "a_h_fixed",  names(draws) ) )
+    b_h_location <- which( grepl( "b_h_fixed",  names(draws) ) )
+
+    ## check length of variables and add brackets [] to facilitate replacement
+    ## with varnames later on
+    c_vars <- length(c_h_location )
+    c_label <- paste0(rep("c_h[",  c_vars),  seq_len(c_vars), "]" )
+    draws[, c_label] <- exp( draws[, ..c_h_location] )
+    
+    
+    ## check length of variables and add brackets [] to facilitate replacement
+    ## with varnames later on
+    a_vars <- length(a_h_location )
+    a_label <- paste0(rep("a_h[",  a_vars),  seq_len(a_vars), "]" )
+    draws[, a_label] <-  1 / ( 1 + exp( -draws[, ..a_h_location] ) )
+    
+    
+    b_vars <- length(b_h_location )
+    b_label <- paste0(rep("b_h[",  b_vars),  seq_len(b_vars), "]" )
+    draws[, b_label] <- draws[, ..a_label] / ( 1 + exp( -draws[, ..b_h_location] ) )
     
     ## Summarize draws
     model_summary <-  t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
@@ -129,21 +153,12 @@ print.summary.dcnet <- function(x,  ... ) {
   .print.summary.means(x)
   .newline(2)
 
-  ## if(x$meta$xC) {
-  ##   .print.summary.beta(x)
-  ##   .newline(2)
-  ## }
-
-  ## if(x$meta$num_dist == 1) {
-  ##   .print.summary.nu(x)
-  ##   .newline(2)
-  ## }
-
   .print.summary.lp(x)
   .newline()
 
   return(invisible(x))
 }
+
 ##' .. content for \description{} (no empty lines) ..
 ##'
 ##' .. content for \details{} ..
@@ -224,7 +239,10 @@ print.summary.dcnet <- function(x,  ... ) {
 
   ## Get indices for params
   ms <- bmsum$model_summary
-  ms <-  ms[!grepl("r\\[", rownames(ms)),] # Remove random effect expressions
+  ms <- ms[!grepl("r\\[", rownames(ms)),] # Remove random effect expressions
+  ms <- ms[!grepl("c_h_fixed", rownames(ms)),] # Remove c_h_fixed effects as they are recomputed
+  ms <- ms[!grepl("a_h_fixed", rownames(ms)),] # Remove a_h_fixed effects as they are recomputed
+  ms <- ms[!grepl("b_h_fixed", rownames(ms)),] # Remove b_h_fixed effects as they are recomputed
 #  ms <-  ms[!grepl("q\\[", rownames(ms)),] # Remove random effect expressions in Q
   ms <-  ms[!grepl("l\\_", rownames(ms)),] # Remove choleski params
   garch_h_index <- grep("_h", rownames(ms))
