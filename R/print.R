@@ -14,8 +14,8 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   var_params <- c("phi0_fixed|phi0_L|phi0_tau|vec_phi_fixed|phi_L|phi_tau")
 
   ccc_params <- c("c_h|a_h|b_h|R|beta|c_h_var")
-  dcc_D_params <- c("c_h_fixed|a_h_fixed|b_h_fixed|c_h_L|c_h_tau|a_h_L|a_h_tau|b_h_L|b_h_tau")
-  dcc_Q_params <- c("l_a_q|l_a_q_r|l_b_q|l_b_q_r|S")
+  dcc_D_params <- c("c_h_fixed|a_h_fixed|b_h_fixed|c_h_tau|a_h_tau|b_h_tau")
+  dcc_Q_params <- c("l_a_q|l_b_q|S")
   dcc_params <- paste0(dcc_D_params, '|', dcc_Q_params)
 
   ## Meta-data needed for printing
@@ -92,16 +92,17 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
     ## extracting draws from here can take a long time -- awkward user experience?
     ## params contains variables of interest given the model type (eg., CCC or DCC)
     ## col_selct returns column position of given variable in params
-    col_select <-
-      which( grepl(params, colnames(object$model_fit$draws( ))) )
+    col_select <- which( grepl(params, colnames(object$model_fit$draws( ))) )
     
     ## subset draws of fitted model
-    draws <-
-      object$model_fit$draws( )[, col_select]
-
+    draws <- data.table::data.table( object$model_fit$draws( )[, col_select] )
+    
+    ## Compute fixed a_q and b_q
+    draws$a_q_fixed <- 1 / (1 + exp( -draws[, "l_a_q"] ))
+    draws$b_q_fixed <- draws$a_q_fixed / (1 + exp( -draws[, "l_b_q"] ))
+    
     ## Summarize draws
-    model_summary <-
-      t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
+    model_summary <-  t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
 
     return(model_summary)
       
@@ -167,7 +168,8 @@ print.summary.dcnet <- function(x,  ... ) {
     .print.config(bmsum)
     # Get indices for params
     ms <- bmsum$model_summary
-    ms <- ms[!grepl("c_h\\[", rownames(ms)),] # Remove c_h; will print c_h_var
+    ms <- ms[!grepl("_r\\[", rownames(ms)),] # Remove random efx expressions
+  
     garch_h_index <- grep("_h", rownames(ms))
     cond_corr_index <- grep("R", rownames(ms))
 
@@ -222,7 +224,9 @@ print.summary.dcnet <- function(x,  ... ) {
 
   ## Get indices for params
   ms <- bmsum$model_summary
-  ##    ms <-  ms[!grepl("c_h\\[", rownames(ms)),] # Remove c_h; will print c_h_var
+  ms <-  ms[!grepl("r\\[", rownames(ms)),] # Remove random effect expressions
+#  ms <-  ms[!grepl("q\\[", rownames(ms)),] # Remove random effect expressions in Q
+  ms <-  ms[!grepl("l\\_", rownames(ms)),] # Remove choleski params
   garch_h_index <- grep("_h", rownames(ms))
   garch_q_index  <- grep("_q", rownames(ms) )
   cond_corr_index <- grep("R", rownames(ms))

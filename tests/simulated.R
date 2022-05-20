@@ -1,5 +1,5 @@
 ##library(dcnet )
-#devtools::load_all( )
+devtools::load_all( )
 options(width = 250 )
 
 ## Create data:
@@ -32,6 +32,12 @@ dcnet::.print.summary.dcc(fit )
 print.summary.dcnet(out)
 
 
+
+
+
+
+###################
+## Manual testing
 
 fit$model_fit$draws( )
 fit$sampling_algorithm
