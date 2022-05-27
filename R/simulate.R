@@ -43,35 +43,49 @@
 ##' @param phi0_fixed Vector of population values of length n_ts
 ##' @importFrom clusterGeneration rcorrmatrix
 
-.simuDCC <- function(tslength, n_ts, N, ranef_sd_S, phi0_fixed, alpha =  0.5) {
+.simuDCC <- function(tslength, n_ts, N,
+                     phi0_fixed = rep(0, n_ts),
+                     phi0_sd = .5,
+                     log_c_fixed = rep(0, n_ts), ## on log scale
+                     log_c_r_sd = 0.1,
+                     a_h_fixed = rep(0, n_ts),
+                     a_h_r_sd = 0.1,## on logit scale
+                     b_h_fixed = rep(0, n_ts),
+                     b_h_r_sd = 0.1,## on logit scale
+                     l_a_q_fixed = 0,
+                     l_a_q_r_sd = 0.1,
+                     l_b_q_fixed = 0,
+                     l_b_q_r_sd = 0.1,                     
+                     ranef_sd_S,  alpha =  0.5) {
 
   ## Define fixed diag for c_h on log scale
-  log_c_fixed_diag <- rnorm(n_ts, 0, .5)
-  
+  log_c_fixed_diag <- log_c_fixed
   ## individual deviations
-  log_c_dev_ind <- t(replicate(N, rnorm(n_ts, 0,  .1 ) ))
-  
+  log_c_dev_ind <- t(replicate(N, rnorm(n_ts, 0,  log_c_r_sd ) ))
   ## combine to fixed +  ranef
   c_h <- exp( log_c_fixed_diag + log_c_dev_ind )
   
   ## Create individual a_h and b_h
-  ab_h_rep <- replicate(N, .ab_h(n_ts ))
-  a_h <- ab_h_rep[1,]
-  b_h <- ab_h_rep[2,]
-  
-  ## Same as with a_h and b_h but these ones are for the corrs. Hence, only one value per N
-  ab_q_rep <- replicate(N, .ab_h(1))
-  a_q <- ab_q_rep[1,]
-  b_q <- ab_q_rep[2,]
+  a_h_random <- t(replicate(N, rnorm(n_ts, 0,  a_h_r_sd ) ))
+  a_h <- 1 / (1 + exp(-( a_h_fixed + a_h_random )))
+
+  ## Create individual a_h and b_h
+  b_h_random <- t(replicate(N, rnorm(n_ts, 0,  b_h_r_sd ) ))
+  b_h <- (1 - a_h) / (1 + exp(-( b_h_fixed + b_h_random )))
+
+  a_q <- 1 / ( 1 + exp(-( l_a_q_fixed + rnorm(N, 0, l_a_q_r_sd) )))
+  b_q <- (1-a_q) / ( 1 + exp(-( l_b_q_fixed + rnorm(N, 0, l_b_q_r_sd) )))
   
   ## location
   ## Generate random starting values for the location intercept as sum of fixed plus random
-  phi0 <- phi0_fixed + replicate(n = N, rnorm(n_ts, 0, .5 ))
+  phi0 <- phi0_fixed + replicate(n = N, rnorm(n_ts, 0, phi0_sd ))
   
   ## phi is bound by -1;1. n_tsXn_ts matrix
-  ## Create N individual matricesb
-  temp <- replicate(n = N, runif(n_ts^2, -.5, .5) )
+  ## Create N individual matrices
+  temp <- replicate(n = N, tanh( rnorm(n_ts^2, 0, .4) ) )
   phi <- apply(temp, 2, matrix, ncol = n_ts, simplify = FALSE)
+  phi
+
   
   y <- array(NA, dim = c(n_ts, tslength, N))
   ## create named variables:
@@ -82,7 +96,7 @@
   
   ## mean
   DCC_mu <- array(0, dim = c(n_ts, tslength, N))
-
+  
   h <- array(.5, dim = c(n_ts, tslength, N))
   DCC_H <- array( NA, c(n_ts,n_ts, tslength, N))
   DCC_R <- array( NA, c(n_ts,n_ts, tslength, N))
@@ -90,22 +104,19 @@
   ## Distribution of random effects    
   ## Unconditional Corr;
   ## Fixed :
-  Sc <- rcorrmatrix( d =  n_ts, alphad = n_ts)
+  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts)
   
   ## Add random effects with convex method
+  ## Dropped random S
+  ## S <- replicate(N, ( (1-alpha) * Sc + alpha * rcorrmatrix( d =  n_ts, alphad = 100) ) )
+  S <- Sc
   
-  S <- replicate(N, ( (1-alpha) * Sc + alpha * rcorrmatrix( d =  n_ts, alphad = 100) ) )
-  
-  ## Old:
-  ## Generate N individual unconditional correlation matrices S
-  #S <- replicate(N, cov2cor( .covranef(Sc , ranef_sd = ranef_sd_S)) )
-    
-    ## Q is symmetric
-    Q <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
-    Qs <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
-    R <-  array(Sc, c(n_ts,n_ts, tslength, N))
+  ## Q is symmetric
+  Q <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
+  Qs <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
+  R <-  array(Sc, c(n_ts,n_ts, tslength, N))
 
-    u <- array(NA, c(n_ts,tslength,N))
+  u <- array(NA, c(n_ts,tslength,N))
 
     for(j in 1:N ) {
       h[,1,j] <- c_h[j,]
@@ -115,24 +126,28 @@
           phi0[,j] + phi[[j]] %*% (y[,t-1,j] - DCC_mu[,t-1,j])
 
         for(i in 1:n_ts) {
-          h[i,t,j] <- sqrt(c_h[j,i] + a_h[[j]][i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[[j]][i]*h[i,t-1,j])
+          h[i,t,j] <-
+            sqrt(c_h[j,i] + a_h[j,i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[j,i]*h[i,t-1,j])
         }
         
         u[,t-1,j] <-
           solve( diag(h[,t-1,j]) ) %*% (y[,t-1,j] - DCC_mu[,t-1,j])
 
-        Q[,,t,j] <- (1 - a_q[[j]] - b_q[[j]]) * S[,,j] +
+        Q[,,t,j] <-
+          (1 - a_q[[j]] - b_q[[j]]) * S + #[,,j] +
           a_q[[j]] * (u[,t-1,j] %*% t(u[,t-1,j])) + 
           b_q[[j]] * Q[,,t-1,j] 
         
         R[,,t,j] <- cov2cor(Q[,,t,j])
-
+        R[,,t,j]
+        
         DCC_H[,,t,j] <- diag(h[,t,j])%*%R[,,t,j] %*%diag(h[,t,j])
+        DCC_H[,,t,j]
         ##
         y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
         DCC_R[,,t,j] <- cov2cor(DCC_H[,,t,j] )
       }
       DCC_y <- y
     }
-    return(list(DCC_y, DCC_R))
+    return(list(DCC_y, DCC_R, S = S))
   }

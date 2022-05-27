@@ -10,7 +10,9 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_f
                    alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
-rtsgen
+## Fixed Corr
+simdat$S
+
 typeof(rtsgen )
 dim(rtsgen[[1]])
 rtsgen[[1]]
