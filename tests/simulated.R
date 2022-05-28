@@ -27,9 +27,11 @@ groupvec <- rep(c(1:N),  each = tl )
 
 fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE)
 
+fit
 summary(fit )
 
-dcnet::.print.summary.dcc(fit )
+
+dcnet::print.summary.dcnet(fit )
 
 print.summary.dcnet(out)
 

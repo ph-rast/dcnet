@@ -8,4 +8,4 @@
   // VAR1
 phi0[j] = phi0_fixed + (diag_pre_multiply(phi0_tau, phi0_L)*phi0_stdnorm[j]);
 phi[j] = vec_phi_fixed + (diag_pre_multiply(phi_tau, phi_L)*phi_stdnorm[j]) ;
-mu[j,t] = phi0[j] + to_matrix( phi[j], nt, nt ) * (rts[j,t-1]'- phi0_fixed) ; //phi0[j]);
+mu[j,t] = phi0[j] + to_matrix( phi[j], nt, nt ) * (rts[j,t-1]'- phi0_fixed) ; //to_matrix fill by column major order

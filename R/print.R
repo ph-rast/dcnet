@@ -41,7 +41,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   }
 
 
-  out$model_summary <-  .get_stan_summary(object, params, CrI,
+  out$model_summary <- .get_stan_summary(object, params, CrI,
                                           sampling_algorithm = object$sampling_algorithm)
   
   class(out) <- "summary.dcnet"
@@ -266,7 +266,7 @@ print.summary.dcnet <- function(x,  ... ) {
   full_varnames <- expand.grid( short_names, short_names)
   ## obtain off-diagonal TS varnames
   od_varnames <- full_varnames[corr_only, ]
-
+  
   ## #######
   ## GARCH #
   ## #######
@@ -336,21 +336,44 @@ print.summary.dcnet <- function(x,  ... ) {
   nt <- bmsum$meta$nt
   TS_names <- bmsum$meta$TS_names
 
-    intercept_index <- grep("phi0", rownames(ms))
-    ar_index <- grep("phi\\[", rownames(ms))
-    ma_index <- grep("theta\\[", rownames(ms))
+  ## Shortened TS names, if needed.
+  short_names <- abbreviate(bmsum$meta$TS_names, minlength = 2)
 
-    ar_indices <- gsub("phi\\[([[:digit:]]+),([[:digit:]]+)]", "\\1,\\2", rownames(ms)[ar_index])
-    ma_indices <- gsub("theta\\[([[:digit:]]+),([[:digit:]]+)]", "\\1,\\2", rownames(ms)[ma_index])
-    ar_indices <- strsplit(ar_indices, ",")
-    ma_indices <- strsplit(ma_indices, ",")
-##    ar_indices <- apply(do.call(rbind, ar_indices), 1:2, as.numeric)
-##    ma_indices <- apply(do.call(rbind, ma_indices), 1:2, as.numeric)
+  ## obtain all combinations of TS varnames for VAR parameter matrix
+  full_varnames <- expand.grid( short_names, short_names)
 
-    rownames(ms)[intercept_index] <- paste0("(Intercept)_", bmsum$meta$TS_names)
-##    rownames(ms)[ar_index] <- paste0("Phi_", TS_names[ar_indices[,1]], "-", TS_names[ar_indices[,2]])
-##    rownames(ms)[ma_index] <- paste0("Theta_", TS_names[ma_indices[,1]], "-", TS_names[ma_indices[,2]])
+  ## VAR intercept portion
+  intercept_index <-  grep("phi0_(?!L)", rownames(ms), perl = TRUE)
+  intercept_rownames <- paste0(gsub("[|[0-9]+]", "_", rownames(ms[intercept_index,]), perl = TRUE),
+                               rep(short_names, 2))
 
+  intercept_table <- ms[intercept_index,]
+  rownames(intercept_table) <- intercept_rownames
+  intercept_table
+
+  
+  ## VAR parameter matrix: Returned vectorized 
+  ar_fixed_index <- grep("phi_(?!L)+fix", rownames(ms), perl = TRUE)
+  ar_tau_index <-   grep("phi_(?!L)+tau", rownames(ms), perl = TRUE)
+
+  ## vec_phi in stan is converted to matrix with stan's to_matrix() function that fills
+  ## with column-major order
+  phi_varnames <- paste0(substr( full_varnames[,1], 1, 2), substr( full_varnames[,2], 1, 2))
+  
+  ar_fixed_rownames <-gsub("vec_",  "", 
+                           paste0(gsub("[|[0-9]+]", "_", rownames(ms[ar_fixed_index,]), perl = TRUE ), phi_varnames ))
+  ar_fixed_rownames
+  ar_fixed_table <- ms[ar_fixed_index,]
+  rownames(ar_fixed_table ) <- ar_fixed_rownames
+  ar_fixed_table
+  
+  ar_tau_rownames <- paste0(gsub("[|[0-9]+]", "_", rownames(ms[ar_tau_index,]), perl = TRUE ), phi_varnames )
+  ar_tau_rownames
+  ar_tau_table <- ms[ar_tau_index,]
+  rownames(ar_tau_table ) <- ar_tau_rownames
+  ar_tau_table
+
+  
     if(bmsum$meta$meanstructure == 0) {
         means_index <- intercept_index
         msg <- "Intercept estimates on the location:"
@@ -358,12 +381,12 @@ print.summary.dcnet <- function(x,  ... ) {
         means_index <- c(intercept_index, ar_index, ma_index)
         msg <- "ARMA(1,1) estimates on the location:"
     } else if(bmsum$meta$meanstructure == 2) {
-        means_index <- c(intercept_index, ar_index)
+#        means_index <- c(intercept_index, ar_index)
         msg <- "VAR(1) estimates on the location:"       
     }
     cat(msg)
     .newline(2)
-    print(round(ms[means_index,], digits = bmsum$meta$digits))
+    print(round(rbind(intercept_table, ar_fixed_table, ar_tau_table), digits = bmsum$meta$digits))
 }
 
 
