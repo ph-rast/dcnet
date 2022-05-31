@@ -42,7 +42,7 @@ jobs:
           install.packages(c("remotes"))
           remotes::install_deps(dependencies = TRUE)
           remotes::install_github("stan-dev/cmdstanr")
-          cmdstanr::install_cmdstan()
+          cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
           
       - uses: r-lib/actions/setup-r-dependencies@v1
         with:
