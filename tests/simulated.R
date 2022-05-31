@@ -1,6 +1,6 @@
 ##library(dcnet )
 devtools::load_all( )
-options(width = 250 )
+options(width = 200 )
 
 ## Create data:
 N <- 50
