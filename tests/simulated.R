@@ -200,7 +200,7 @@ quantile(df$R.1.1.2.1., c(.05, .5, .95))
 
 
 
-slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']
+#slv <- rstan::summary(model_fit, pars = "S_Lv_fixed")$summary[,'97.5%']
 slv
 slv <- c(1,  slv )
 slv
@@ -221,7 +221,7 @@ cov2cor( L %*% t(L) )
 
                                         #H <- array( rstan::summary(model_fit, pars = "H")$summary[,1], dim = c(N, tl, 3, 3 ) )
 nts
-H <- array( rstan::summary(model_fit, pars = "H")$summary[,"mean"], dim = c(nts, nts, N, tl) )
+#H <- array( rstan::summary(model_fit, pars = "H")$summary[,"mean"], dim = c(nts, nts, N, tl) )
 
 r21 <- array(NA, dim = c(N, tl ) )
 r31 <- r21
@@ -382,13 +382,13 @@ stanmodel <- switch(parameterization,
 stanmodel
 
 
-model_fit <- rstan::sampling(stanmodel,
-                                     data = stan_data,
-                                     verbose = TRUE,
-                                     iter = 100,
-                                     control = list(adapt_delta = .95),
-                                     chains = 4)#,
-                                     #init_r = .05)
+## model_fit <- rstan::sampling(stanmodel,
+##                                      data = stan_data,
+##                                      verbose = TRUE,
+##                                      iter = 100,
+##                                      control = list(adapt_delta = .95),
+##                                      chains = 4)#,
+##                                      #init_r = .05)
 
 
 #model_fit <- rstan::vb(stanmodel, data = stan_data,

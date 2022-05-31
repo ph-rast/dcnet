@@ -1,6 +1,6 @@
 ##' Draw samples from a longitudinal partial correlation network with dynamic correlations. 
 ##'
-##' The fitted models are 'rstan' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'dcnet' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation. 
+##' The fitted models are 'cmdstanr' objects and all posterior parameter estimates can be obtained and can be examined with either the 'rstan' toolbox, plotted and printed using generic functions  or passed to 'dcnet' functions to 'forecast' or compute 'model_weights' or compute fit statistics based on leave-future-out cross-validation. 
 ##' 
 ##' @title Estimate a Bayesian Dynamic Correlation Network
 ##' @param data Time-series or matrix object. A time-series or matrix object containing observations at the same interval.
