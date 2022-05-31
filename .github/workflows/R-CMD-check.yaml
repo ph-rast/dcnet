@@ -38,8 +38,11 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-      - run: install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
-      - run: cmdstanr::install_cmdstan()
+      - run: |
+          install.packages(c("remotes")
+          remotes::install_deps(dependencies = TRUE)
+          remotes::install_github("stan-dev/cmdstanr")
+          cmdstanr::install_cmdstan()
           
       - uses: r-lib/actions/setup-r-dependencies@v1
         with:
