@@ -42,6 +42,8 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v1
         with:
           extra-packages: rcmdcheck
+          
+      - name: install additional dependencies
         run: |
           install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos"))) |
           cmdstanr::install_cmdstan()
