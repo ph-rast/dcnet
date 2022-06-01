@@ -38,7 +38,7 @@ jobs:
          with:
            r-version: ${{ matrix.config.r }}
            http-user-agent: ${{ matrix.config.http-user-agent }}
-           use-public-rspm: false
+           use-public-rspm: true
           
       #    # Install packages declared in DESCRIPTION:
       # - uses: r-lib/actions/setup-r-dependencies@v2
