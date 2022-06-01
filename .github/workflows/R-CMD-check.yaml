@@ -48,9 +48,8 @@ jobs:
             remotes
             
       - name: Install cmdstan and cmdstanr      
-        run: |
-           remotes::install_github("stan-dev/cmdstanr")
-           cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
+        run: remotes::install_github("stan-dev/cmdstanr")
+           #cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
         shell: Rscript {0}
           
       - uses: r-lib/actions/check-r-package@v2
