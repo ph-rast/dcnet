@@ -46,6 +46,11 @@ jobs:
             any::rcmdcheck
             any::remotes
 
+      - name: Install Rtools42 (Windows)
+        if: runner.os == 'windows'
+        run: |
+          pacman -Syu Rtools42 --noconfirm
+            
       - name: Install cmdstan(r)
         run: |
           remotes::install_github("stan-dev/cmdstanr")
