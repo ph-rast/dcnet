@@ -38,7 +38,7 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-      - run: |
+        run: |
           install.packages( "remotes" )
           remotes::install_deps(dependencies = TRUE)
           remotes::install_github("stan-dev/cmdstanr")
