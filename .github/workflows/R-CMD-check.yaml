@@ -38,6 +38,8 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
+          if: runner.os == 'Windows'
+          rtools-version: '42'
           
          # Install packages declared in DESCRIPTION:
       - uses: r-lib/actions/setup-r-dependencies@v2
@@ -45,12 +47,11 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::remotes
-            any::rstantools
 
       # - name: Install Rtools42 (Windows)
-      #   if: runner.os == 'windows'
+      #   if: runner.os == 'Windows'
       #   run: |
-      #     pacman -Syu Rtools42 --noconfirm
+      #     pacman -Syu rtools42 --noconfirm
             
       - name: Install cmdstan(r)
         run: |
