@@ -45,11 +45,12 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::remotes
+            aby::rtools
 
-      - name: Install Rtools42 (Windows)
-        if: runner.os == 'windows'
-        run: |
-          pacman -Syu Rtools42 --noconfirm
+      # - name: Install Rtools42 (Windows)
+      #   if: runner.os == 'windows'
+      #   run: |
+      #     pacman -Syu Rtools42 --noconfirm
             
       - name: Install cmdstan(r)
         run: |
