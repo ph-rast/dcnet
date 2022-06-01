@@ -43,13 +43,14 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
-            rcmdcheck
-            remotes
+            any::rcmdcheck
+            any::remotes
 
-      # - name: Install cmdstan(r)
-      #   run: remotes::install_github("stan-dev/cmdstanr")
+      - name: Install cmdstan(r)
+        run: |
+          remotes::install_github("stan-dev/cmdstanr")
       #      #cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
-      #   shell: Rscript {0}
+        shell: Rscript {0}
       
       # - uses: r-lib/actions/check-r-package@v2
 
