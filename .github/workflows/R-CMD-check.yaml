@@ -38,8 +38,13 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-          if: runner.os == 'Windows'
-          rtools-version: '42'
+          rtools-version: '42' ## needed for Windows
+
+      - name: Fix toolchain for Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          check_cmdstan_toolchain(fix = TRUE)
           
          # Install packages declared in DESCRIPTION:
       - uses: r-lib/actions/setup-r-dependencies@v2
@@ -47,12 +52,7 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::remotes
-
-      # - name: Install Rtools42 (Windows)
-      #   if: runner.os == 'Windows'
-      #   run: |
-      #     pacman -Syu rtools42 --noconfirm
-            
+         
       - name: Install cmdstan(r)
         run: |
           remotes::install_github("stan-dev/cmdstanr")
