@@ -39,12 +39,12 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
           
-      #    # Install packages declared in DESCRIPTION:
-      # - uses: r-lib/actions/setup-r-dependencies@v2
-      #   with:
-      #     extra-packages: |
-      #       rcmdcheck
-      #       remotes
+         # Install packages declared in DESCRIPTION:
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            rcmdcheck
+            remotes
 
       # - name: Install cmdstan(r)
       #   run: remotes::install_github("stan-dev/cmdstanr")
