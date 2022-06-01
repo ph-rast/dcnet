@@ -1,7 +1,4 @@
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title 
+##' @title Summarize dcnet object
 ##' @param object 
 ##' @return summary.dcnet object
 ##' @author Philippe Rast
@@ -65,10 +62,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 }
 
 
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title 
+##' @title Internal function that computes summary stats
 ##' @param object 
 ##' @param params 
 ##' @param CrI 
@@ -159,10 +153,7 @@ print.summary.dcnet <- function(x,  ... ) {
   return(invisible(x))
 }
 
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title 
+##' @title Print helper for CCC
 ##' @param bmsum 
 ##' @param ... 
 ##' @return 
