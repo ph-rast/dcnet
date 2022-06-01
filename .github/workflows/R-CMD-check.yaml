@@ -44,6 +44,8 @@ jobs:
           extra-packages: |
             rcmdcheck
             remotes
+            
+      - name: Install cmdstanr and cmdstan
         run: |
           remotes::install_github("stan-dev/cmdstanr")
           cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
