@@ -38,16 +38,17 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-        run: |
-          install.packages( "remotes" )
-          remotes::install_deps(dependencies = TRUE)
-          remotes::install_github("stan-dev/cmdstanr")
-          cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
           
       - uses: r-lib/actions/setup-r-dependencies@v1
         with:
-          extra-packages: rcmdcheck
+          extra-packages: |
+            rcmdcheck
+            remotes
+        run: |
+          remotes::install_github("stan-dev/cmdstanr")
+          cmdstanr::install_cmdstan( dir = file.path(Sys.getenv("HOME"), ".cmdstan") )
 
+          
       - uses: r-lib/actions/check-r-package@v1
 
       - name: Show testthat output
