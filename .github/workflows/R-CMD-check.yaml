@@ -48,20 +48,12 @@ jobs:
             any::remotes
          
       - name: Install cmdstan(r) on Windows
-        if: runner.os == 'Windows'
         run: |
           remotes::install_github("stan-dev/cmdstanr")
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan( )
+          cmdstanr::install_cmdstan( )        
         shell: Rscript {0}
-
-      - name: Install cmdstan(r) on Ubuntu
-        if: runner.os == 'Ubuntu'
-        run: |
-          remotes::install_github("stan-dev/cmdstanr")
-          cmdstanr::install_cmdstan( )
-        shell: Rscript {0}
-
         
       - uses: r-lib/actions/check-r-package@v2
 
