@@ -3,7 +3,6 @@
 S3method(print,summary.dcnet)
 S3method(summary,dcnet)
 export(dcnet)
-import(Rcpp)
 import(data.table)
 import(methods)
 importFrom(MASS,mvrnorm)
