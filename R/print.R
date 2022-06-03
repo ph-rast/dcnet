@@ -47,7 +47,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 
 ##' Internal function to compute summary stats from posterior draws
 ##' Called in .get_stan_summary
-##' @title 
+##' @title  Internal function to compute summary stats from posterior draws
 ##' @param X 
 ##' @param CrI 
 ##' @return 

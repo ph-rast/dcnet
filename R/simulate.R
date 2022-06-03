@@ -104,7 +104,7 @@
   ## Distribution of random effects    
   ## Unconditional Corr;
   ## Fixed :
-  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts)
+  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
   
   ## Add random effects with convex method
   ## Dropped random S

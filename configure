@@ -1,4 +1,0 @@
-# Generated  by hand.
-
-#! /bin/sh
-"${R_HOME}/bin/Rscript" -e "cmdstanr::cmdstan_model('./inst/stan/DCCMGARCHrandQ.stan',  include_paths = './inst/stan/')"

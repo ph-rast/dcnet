@@ -4,9 +4,9 @@ options(width = 200 )
 
 ## Create data:
 N <- 50
-tl <- 50
-nts <- 3
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 ),
+tl <- 100
+nts <- 4
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 , 0),
                    alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
