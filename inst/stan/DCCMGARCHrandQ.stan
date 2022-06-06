@@ -70,10 +70,13 @@ parameters {
   //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
   real l_a_q; // Define on log scale so that it can go below 0
   array[J] real l_a_q_r;
+  real<lower=0> l_a_q_sigma; //random effect variance
+  
   //real<lower=0, upper = (1 - a_q) > b_q; //
   real l_b_q; //
   array[J] real l_b_q_r;
-
+  real<lower=0> l_b_q_sigma; //random effect variance
+  
   corr_matrix[nt] S;  
 
   // Qr1 init
@@ -218,8 +221,10 @@ model {
   // priors
   l_a_q ~ normal(-1, 1);
   l_b_q ~ normal(1.7, 1);
-  to_vector(l_a_q_r) ~ normal(0, .005);
-  to_vector(l_b_q_r) ~ normal(0, .005);
+  l_a_q_sigma ~ cauchy(0, 0.1);
+  to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
+  l_b_q_sigma ~ cauchy(0, 0.1);
+  to_vector(l_b_q_r) ~ normal(0, l_b_q_sigma);
 
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects

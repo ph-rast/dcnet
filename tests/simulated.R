@@ -27,12 +27,13 @@ groupvec <- rep(c(1:N),  each = tl )
 
 fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE)
 
-fit
+dcnet::.get_stan_summary(fit$model_fit, )
+
+devtools::load_all( )
 summary(fit )
 
 
 dcnet::print.summary.dcnet(fit )
-
 print.summary.dcnet(out)
 
 

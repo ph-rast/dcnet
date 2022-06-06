@@ -29,7 +29,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   ## Get the model summaries. print.summary.dcnet will process this + meta.
   params <- switch(object$param,
                    CCC = paste0(ccc_params,'|', var_params, '|', common_params),
-                   DCC = paste0(dcc_params,'|',var_params,'|', common_params),
+                   DCC = paste0(dcc_params,'|', var_params,'|', common_params),
                    NULL
                    )
   if(is.null(params)) {
@@ -110,11 +110,11 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
     
     ## check length of variables and add brackets [] to facilitate replacement
     ## with varnames later on
+    ## the ".." is a data.table thing: https://rdatatable.gitlab.io/data.table/articles/datatable-faq.html
     a_vars <- length(a_h_location )
     a_label <- paste0(rep("a_h[",  a_vars),  seq_len(a_vars), "]" )
     draws[, a_label] <-  1 / ( 1 + exp( -draws[, ..a_h_location] ) )
-    
-    
+        
     b_vars <- length(b_h_location )
     b_label <- paste0(rep("b_h[",  b_vars),  seq_len(b_vars), "]" )
     draws[, b_label] <- draws[, ..a_label] / ( 1 + exp( -draws[, ..b_h_location] ) )
@@ -234,8 +234,9 @@ print.summary.dcnet <- function(x,  ... ) {
   ms <- ms[!grepl("c_h_fixed", rownames(ms)),] # Remove c_h_fixed effects as they are recomputed
   ms <- ms[!grepl("a_h_fixed", rownames(ms)),] # Remove a_h_fixed effects as they are recomputed
   ms <- ms[!grepl("b_h_fixed", rownames(ms)),] # Remove b_h_fixed effects as they are recomputed
-#  ms <-  ms[!grepl("q\\[", rownames(ms)),] # Remove random effect expressions in Q
-  ms <-  ms[!grepl("l\\_", rownames(ms)),] # Remove choleski params
+  
+  ms <-  ms[!grepl("l_a_q\\b", rownames(ms) ),] # Remove log scale random effects
+  ms <-  ms[!grepl("l_b_q\\b", rownames(ms) ),] # Remove log scale random effects  
   garch_h_index <- grep("_h", rownames(ms))
   garch_q_index  <- grep("_q", rownames(ms) )
   cond_corr_index <- grep("R", rownames(ms))
@@ -279,9 +280,9 @@ print.summary.dcnet <- function(x,  ... ) {
   print(round( garch_h_out, digits = digits) )
   .newline(2)
 
-#####
-                                        # Q #
-#####
+  ## ###
+  ## Q #
+  ## ###
   cat("GARCH(1,1) estimates for conditional variance on Q:")
   .newline(2)
   rn = rownames(ms[garch_q_index,])
