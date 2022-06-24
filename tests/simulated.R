@@ -6,8 +6,8 @@ options(width = 200 )
 N <- 50
 tl <- 100
 nts <- 4
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, phi0_fixed =  c(0, 0, 0 , 0),
-                   alpha = .5)
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1,
+                   phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 ## Fixed Corr
@@ -25,7 +25,8 @@ X <- array(0,  dim = c(N*tl, nts ) )
 groupvec <- rep(c(1:N),  each = tl )
 
 
-fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE)
+fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE,
+             iterations = 400, sampling_algorithm = 'HMC')
 
 dcnet::.get_stan_summary(fit$model_fit, )
 
@@ -315,6 +316,8 @@ fit
 
 
 ## Real data: Nestler
+devtools::load_all( )
+
 dfs <- read.table("./local/dataFlip.txt", header = TRUE ) 
 head( dfs )
 
@@ -324,7 +327,8 @@ dat1 <- dfs[,c("id","day", "gm_sociable",  "gm_creative", "gm_friendly", "gm_org
 X0 <- reshape(dat1, idvar = "id", timevar = "day", direction = "wide",
         v.names = c("gm_sociable",  "gm_creative", "gm_friendly", "gm_organised"))
 
-## REplace missings with 0
+X0
+## Replace missings with 0
 X0[is.na(X0 )] <- 0
 
 head(X0 )
@@ -338,8 +342,9 @@ XL <- reshape(X0, direction = "long",
 X2 <- XL[order( XL$id,  XL$time), ]
 head(X2 )
 unique(X2$id )
+X2$time
 X2 <- X2[X2$id <= 50,]
-X2 <- X2[X2$time <= 24,]
+X2 <- X2[X2$time <= 70,]
 
 N <- max( X2$id )
 N
@@ -351,6 +356,88 @@ tl
 length(groupvec )
 nts <- 4 # Number of variables
 
+## X2 needs to be a list of N matrices with dimension ntsXtl 
+## Drop id and time variable
+tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, 3:6])
+str(tsdat)
+
+
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = TRUE,
+             sampling_algorithm = 'variational')
+
+summary(fit)
+
+getwd( )
+saveRDS( fit,  file = './local/fit_nestler.Rds')
+
+## Plots
+## R[id, timepoint, variable, variable]
+## Take median of posterior distribution
+
+out <- NULL
+for(i in 1:N) {
+  out <- c(out,sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[,paste0('R[',i,',',x,',1,2]')])))
+}
+
+
+## Nested loop through first row of correlations (1,2; 1,3; 1,4 ...) for all tl and all N
+plout <- sapply(2:nts,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',1,',p,']')]))
+  })
+})
+
+
+df <- data.frame( plout, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
+names(df)[1:3] <- c('cor12',  'cor13',  'cor14' )
+head(df)
+
+
+library(ggplot2 )
+
+c12 <- ggplot(df,  aes(x = time,  y = cor12 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(Sociable, Creative)")
+c13 <- ggplot(df,  aes(x = time,  y = cor13 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(Sociable, Friendly)")
+c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) )+  scale_y_continuous("PCor(Sociable, Organised)")
+
+
+plout2 <- sapply(3:nts,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',2,',p,']')]))
+  })
+})
+
+df2 <- data.frame( plout2, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
+names(df2)[1:2] <- c('cor23',  'cor24' )
+head(df2)
+
+c23 <- ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(Creative, Friendly)")
+c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(Creative, Organised)")
+
+
+plout3 <- sapply(4,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',3,',p,']')]))
+  })
+})
+
+df3 <- data.frame( plout3, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
+names(df3)[1] <- c('cor34')
+head(df3)
+
+c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) )+  scale_y_continuous("PCor(Friendly, Organised)")
+
+nn <- ggplot( ) + theme_void()
+
+library(patchwork )
+
+(c12 | c13 | c14 ) /
+( nn | c23 | c24 ) /
+( nn | nn  | c34 )  
+
+
+
+
+## OLD
 return_standat <- dcnet:::standat( data = X2[,c("gm_sociable",  "gm_creative", "gm_friendly", "gm_organised")],
                                   J = N, group = groupvec, xC = groupvec,  P = 1,
                                   standardize_data = TRUE,
