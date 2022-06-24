@@ -104,11 +104,20 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
                            simplify_ah = simplify_ah,
                            simplify_bh = simplify_bh)
   } else {
-    ## Unstandardized
+    ## Unstandardized, only centered
+    ctrx <- data
+    centered_data <- matrix(NA, nrow = J, ncol = nt)
+    
+    for( i in 1:J ) {
+      ctrx[[i]] <- scale(data[[i]], center = TRUE, scale = FALSE)
+      centered_data[i,] <- attr(ctrx[[i]], "scaled:center")
+    }
+
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J
-                           rts = data,
+                           rts = ctrx,
                            xC = xC,
-                           nt = ncol(data[[1]]),
+                           nt = ncol(ctrx[[1]]),
+                           centered_data = centered_data,
                            distribution = distribution,
                            P = P,
                            Q = Q,

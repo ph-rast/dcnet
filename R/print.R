@@ -81,7 +81,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 
   ## Depending on estimation method, extraction differs:
   ## Variational
-  if( object$sampling_algorithm == "variational" ) {
+  if(tolower( object$sampling_algorithm ) == "variational" ) {
 
     ## extracting draws from here can take a long time -- awkward user experience?
     ## params contains variables of interest given the model type (eg., CCC or DCC)
@@ -124,8 +124,48 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 
     return(model_summary)
       
-  } else if(object$sampling_algorithm == "HMC" ) {
-    print("Todo")
+  } else if(tolower( object$sampling_algorithm ) == "hmc" ) {
+
+    ## extracting draws from here can take a long time -- awkward user experience?
+    ## params contains variables of interest given the model type (eg., CCC or DCC)
+    ## col_selct returns column position of given variable in params
+    col_select <- which( grepl(params, colnames(object$model_fit$draws( ))) )
+    
+    ## subset draws of fitted model
+    draws <- data.table::data.table( object$model_fit$draws( )[, col_select] )
+
+    ## Stan model estimates l_a_q on logit scale -- transform to SD metric
+    ## Compute fixed a_q and b_q
+    draws$a_q_fixed <- 1 / (1 + exp( -draws[, "l_a_q"] ))
+    draws$b_q_fixed <- draws$a_q_fixed / (1 + exp( -draws[, "l_b_q"] ))
+
+    ## Find (c/a/b)_h_fixed values for nt variables
+    c_h_location <- which( grepl( "c_h_fixed",  names(draws) ) )
+    a_h_location <- which( grepl( "a_h_fixed",  names(draws) ) )
+    b_h_location <- which( grepl( "b_h_fixed",  names(draws) ) )
+
+    ## check length of variables and add brackets [] to facilitate replacement
+    ## with varnames later on
+    c_vars <- length(c_h_location )
+    c_label <- paste0(rep("c_h[",  c_vars),  seq_len(c_vars), "]" )
+    draws[, c_label] <- exp( draws[, ..c_h_location] )
+        
+    ## check length of variables and add brackets [] to facilitate replacement
+    ## with varnames later on
+    ## the ".." is a data.table thing: https://rdatatable.gitlab.io/data.table/articles/datatable-faq.html
+    a_vars <- length(a_h_location )
+    a_label <- paste0(rep("a_h[",  a_vars),  seq_len(a_vars), "]" )
+    draws[, a_label] <-  1 / ( 1 + exp( -draws[, ..a_h_location] ) )
+        
+    b_vars <- length(b_h_location )
+    b_label <- paste0(rep("b_h[",  b_vars),  seq_len(b_vars), "]" )
+    draws[, b_label] <- draws[, ..a_label] / ( 1 + exp( -draws[, ..b_h_location] ) )
+    
+    ## Summarize draws
+    model_summary <-  t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
+
+    return(model_summary)
+
   } 
 }
 
