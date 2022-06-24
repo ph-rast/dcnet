@@ -89,22 +89,32 @@ dcnet <- function(data,
              ".")
     }
 
-    ## MCMC Sampling with NUTS
-    if(sampling_algorithm == 'HMC' ) {
-      if( is.null( iterations ) ) iterations <- 2000
-      model_fit <- cmdstanr::stanmodel$sample(data = stan_data,
-                                              verbose = TRUE,
-                                              iter = iterations,
-                                              control = list(adapt_delta = .95),
-                                              chains = chains,
-                                              init_r = .05, ...)
-    } else if (sampling_algorithm == 'variational' ) {
+    ## HMC Sampling
+    if( tolower( sampling_algorithm ) == 'hmc') {
+      if( is.null( iterations ) ) {
+        iter_warmup <- 1000
+        iter_sampling <- 1000
+      } else if ( !is.null( iterations ) ) {
+        iter_warmup <- round(iterations/2 )
+        iter_sampling <- iterations - iter_warmup
+      }
+
+      ## 
+      max_cores <- parallel::detectCores()
+      model_fit <- stanmodel$sample(data = stan_data,
+                                    iter_warmup = iter_warmup,
+                                    iter_sampling =  iter_sampling,
+                                    adapt_delta = .95,
+                                    chains = chains,
+                                    parallel_chains = min( max_cores,  chains ), 
+                                    ...)
+    } else if ( tolower(sampling_algorithm) == 'variational' ) {
       ## Sampling via Variational Bayes
       if( is.null( iterations ) ) iterations <- 30000
       model_fit <- stanmodel$variational(data = stan_data,
                                          iter = iterations, ...)
     } else {
-        stop( "\n\n Provide sampling algorithm: 'HMC' or 'variational'\n\n" )
+      stop( "\n\n Provide sampling algorithm: 'HMC' or 'variational'\n\n" )
     }
     
     ## Model fit is based on standardized values.
