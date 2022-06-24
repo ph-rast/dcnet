@@ -79,10 +79,13 @@ parameters {
   
   corr_matrix[nt] S;  
 
+  // R1 init
+  array[J] corr_matrix[nt] R1_init;
+  
   // Qr1 init
-  cov_matrix[nt] Qr1_init;
+  array[J] cov_matrix[nt] Qr1_init;
   // D1 init
-  vector<lower = 0>[nt] D1_init;
+  array[J] vector<lower = 0>[nt] D1_init;
   // u1 init
   vector[nt] u1_init;
 
@@ -128,10 +131,13 @@ transformed parameters {
   for( j in 1:J){
     
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
-    u[j,1] = u1_init;
-    D[j,1] = D1_init;
-    Qr[j,1] = Qr1_init;
+    D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
+    u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
+    Qr[j,1] = Qr1_init[j];//((rts[j]' * rts[j]) / (nt - 1));//
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
+    
+    //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
+    //diag_matrix(rep_vector(1.0, nt));
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
@@ -248,8 +254,7 @@ model {
   to_vector(a_h_fixed) ~ std_normal();
   to_vector(b_h_fixed) ~ std_normal();
   // Prior for initial state
-  Qr1_init ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
-  to_vector(D1_init) ~ lognormal(-1, 1);
+  
   to_vector(u1_init) ~ std_normal();
   // Prior on nu for student_t
   //if ( distribution == 1 )
@@ -264,6 +269,9 @@ model {
 
   // likelihood
   for( j in 1:J) {
+    R1_init[j] ~ lkj_corr( 1 );
+    to_vector(D1_init[j]) ~ lognormal(-1, 1);
+    Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
     /* for(k in 1:nt) { */
     /*   ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed. */
