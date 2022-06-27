@@ -137,7 +137,7 @@ transformed parameters {
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
     //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
-    //diag_matrix(rep_vector(1.0, nt));
+    // R[j,1]=diag_matrix(rep_vector(1.0, nt));
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
