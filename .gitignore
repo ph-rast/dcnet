@@ -16,6 +16,8 @@
 !inst/include/stan_meta_header.hpp
 
 /tests/local
+*.Rds
+!/tests/local/ptsd.R
 
 src/stanExports_DCCMGARCH.h
 *.h
