@@ -27,3 +27,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/DCCMGARCHrandQ
 /inst/stan/DCCMGARCHrandS
 *.Rd
+/inst/stan/VAR

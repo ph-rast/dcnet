@@ -296,13 +296,8 @@ model {
 }
 
 generated quantities {
-/*   matrix[nt,T] rts_out[J]; */
-/*   real log_lik[T]; */
-/*   corr_matrix[nt] corH[T]; */
-/*   // for the no-predictor case */
-/*   vector<lower=0>[nt] c_h_var = exp(c_h); */
-/*   // retrodict */
-/* #include /generated/retrodict_H.stan */
-/* 15:13 */
+
+#include /generated/retrodict.stan
+
 }
 
