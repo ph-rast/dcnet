@@ -15,8 +15,12 @@
 ## Do not ignore this:
 !inst/include/stan_meta_header.hpp
 
-/tests/local
+/tests/local/*.R
+/tests/local/*.txt
 *.Rds
+*.org
+*.csv
+*.sav
 !/tests/local/ptsd.R
 
 src/stanExports_DCCMGARCH.h
