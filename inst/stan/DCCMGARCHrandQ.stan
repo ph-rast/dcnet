@@ -133,11 +133,12 @@ transformed parameters {
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
     D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
     u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
-    Qr[j,1] = Qr1_init[j];//((rts[j]' * rts[j]) / (nt - 1));//
+    Qr[j,1] = Qr1_init[j];//
+    //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
     //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
-    // R[j,1]=diag_matrix(rep_vector(1.0, nt));
+    //R[j,1]=diag_matrix(rep_vector(1.0, nt));
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
@@ -269,7 +270,7 @@ model {
 
   // likelihood
   for( j in 1:J) {
-    R1_init[j] ~ lkj_corr( 1 );
+    //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
@@ -296,13 +297,8 @@ model {
 }
 
 generated quantities {
-/*   matrix[nt,T] rts_out[J]; */
-/*   real log_lik[T]; */
-/*   corr_matrix[nt] corH[T]; */
-/*   // for the no-predictor case */
-/*   vector<lower=0>[nt] c_h_var = exp(c_h); */
-/*   // retrodict */
-/* #include /generated/retrodict_H.stan */
-/* 15:13 */
+
+#include /generated/retrodict.stan
+
 }
 
