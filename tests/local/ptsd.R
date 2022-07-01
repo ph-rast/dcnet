@@ -9,7 +9,7 @@ ptsd_comp <- ptsd#[complete.cases( ptsd ), ]
 head( ptsd_comp )
 
 ## Select some variables
-dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy', 'positive', 'horror')]
+dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')]
 head(dat1 )
 dat1[dat1$id == "P002",]
 
@@ -28,7 +28,7 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror'))
+              v.names = c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
 
 X0
 ## Replace missings with 50
@@ -45,12 +45,11 @@ XL <- reshape(X0, direction = "long",
 XL
 ## sort by id, then time
 X2 <- XL[order( XL$id,  XL$time), ]
-head(X2)
-
+head(X2, n =  100)
 ##
-X2 <- X2[X2$time <= 70,]
+X2 <- X2[X2$time <= 95,]
 sum(is.na(X2))
-
+dim(X2 )[1]
 ## Replace all missing with 50...  lol
 #X2[is.na(X2 )] <- 50
 
@@ -68,7 +67,9 @@ nts <- 4 # Number of variables
 
 ## X2 needs to be a list of N matrices with dimension ntsXtl 
 ## Drop id and time variable
-tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, 3:(2+nts)])
+c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
+varnames <- c('horror', 'agg', 'shame', 'calm')
+tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
 
 tsdat
@@ -80,7 +81,7 @@ setwd( "../")
 tsdat
 
 fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = TRUE,
-             sampling_algorithm = 'HMC')
+             sampling_algorithm = 'variational')
 
 summary(fit)
 
@@ -99,10 +100,12 @@ waic <- function(log_lik ) {
 }
 
 waic(log_lik = log_lik)
+loo::waic( log_lik)
+loo::loo( log_lik)
 
 
 fit_const <- dcnet( data = tsdat, J =  N, group =  groupvec, parameterization = 'CCC',
-                   standardize_data = TRUE,
+                   standardize_data = FALSE,
                    sampling_algorithm = 'variational')
 
 
@@ -110,7 +113,7 @@ log_lik_loc <- grep( "log_lik", colnames(fit_const$model_fit$draws( )) )
 log_lik_const <- fit_const$model_fit$draws( )[, log_lik_loc]
 waic( log_lik = fit_const$model_fit$draws( )[, log_lik_loc] )
 
-loo::waic( log_lik )
+loo::waic( log_lik_const )
 m1 <- loo::loo( log_lik )
 m2 <- loo::loo( x = log_lik_const)
 
@@ -124,7 +127,7 @@ head(rts_out)
 rts_out[, 18:25]
 
 #saveRDS( fit,  file = './local/ptsd.Rds')
-load(file = './local/ptsd.Rds')
+#load(file = './local/ptsd.Rds')
 
 ## Plots
 ## R[id, timepoint, variable, variable]
@@ -150,10 +153,14 @@ head(df)
 
 
 library(ggplot2 )
+varnames
 #'enthus', 'fear', 'angry', 'happy'
-c12 <- ggplot(df,  aes(x = time,  y = cor12 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(enthus, fear)")
-c13 <- ggplot(df,  aes(x = time,  y = cor13 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(enthus, angry)")
-c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) )+  scale_y_continuous("PCor(enthus, happy)")
+c12 <- ggplot(df,  aes(x = time,  y = cor12 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[2], ")") )
+c13 <- ggplot(df,  aes(x = time,  y = cor13 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[3], ")") )
+c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[4], ")") )
 
 
 plout2 <- sapply(3:nts,  function(p) {
@@ -166,8 +173,10 @@ df2 <- data.frame( plout2, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  e
 names(df2)[1:2] <- c('cor23',  'cor24' )
 head(df2)
 
-c23 <- ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(fear, angry)")
-c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +  scale_y_continuous("PCor(fear, happy)")
+c23 <- ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[3], ")") )
+c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[4], ")") )
 
 
 plout3 <- sapply(4,  function(p) {
@@ -180,7 +189,8 @@ df3 <- data.frame( plout3, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  e
 names(df3)[1] <- c('cor34')
 head(df3)
 
-c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) )+  scale_y_continuous("PCor(angry, happy)")
+c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+  scale_y_continuous(paste0("PCor(", varnames[3], ", ", varnames[4], ")"))
 
 nn <- ggplot( ) + theme_void()
 
@@ -196,14 +206,36 @@ ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.
 
 
 
-X <- as.matrix( scale( tsdat[[1]], scale = F) )
-X
 
-V <- (t(X)%*%X / 69)
+## Compare Density
 
-D <- matrix(0, ncol = 4, nrow = 4)
-diag(D) <- sqrt(diag(V))
-Ds <- solve(D)
 
-Ds%*%V%*%Ds
+y_rep_loc <- grep( "rts_out", colnames(fit_const$model_fit$draws( )) )
+y_rep <-fit_const$model_fit$draws( )[, y_rep_loc]
+str(y_rep)
 
+plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.6))
+for(i in sample(nrow(y_rep), size = 20)){
+    lines(density( as.numeric(y_rep[i,]) ) , col = '#33333375', lwd = 1)
+}
+
+lines(density(unlist(fit$RTS_full)), col = 'red', lwd = 3)
+
+dev.off()
+
+
+## regexp variable 1
+sel <- grep( pattern = "rts_out\\[[0-9]+,[0-95]+,1" , x = colnames(y_rep), perl = TRUE)
+
+y_rep_1 <- data.table( cbind(yrep = y_rep[sel], time = rep(1:95, N ), id = rep(1:N, each = 95 ) ))
+y_rep_1$id <- as.factor(y_rep_1$id )
+head(y_rep_1)
+
+ggplot(y_rep_1,  aes(x = time, y = yrep, color = id)) + geom_line( )
+
+
+df2 <- data.table(out = fit$RTS_full[[1]][, "horror"], time = seq(1:95))
+
+df2 <- data.table(out = tsdat[[1]][, "horror"], time = seq(1:95))
+ggplot(y_rep_1[y_rep_1$id == "1",],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
+## CHECK hwo if RTS if manipulated in dcnet function
