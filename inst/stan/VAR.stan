@@ -7,7 +7,7 @@ data {
 transformed data {                                  
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) / 2 - 1; // Dimension of vec(S).
+  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).
  
 #include /transformed_data/xh_marker.stan
   
@@ -42,11 +42,11 @@ transformed parameters {
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
-  array[J] matrix[T,nt] mu;
+  array[J,T] vector[nt] mu;
   
   // Initialize t=1 across all subjects
   for( j in 1:J){
-    mu[j,1] = phi0_fixed';
+    mu[j,1] = rts[j, 1]';
   }
 
   // Beter to loop first through array, then matrix column and row 
@@ -90,11 +90,24 @@ model {
 }
 
 generated quantities {
-/*   matrix[nt,T] rts_out[J]; */
-/*   real log_lik[T]; */
-/*   corr_matrix[nt] corH[T]; */
-/*   // for the no-predictor case */
-/*   vector<lower=0>[nt] c_h_var = exp(c_h); */
-/*   // retrodict */
-/* #include /generated/retrodict_H.stan */
+  
+array[J] matrix[T, nt] rts_out;
+array[J] vector[T] log_lik;
+
+if ( distribution == 0 ){
+  for( j in 1:J ) {
+    for (t in 1:T) {
+      rts_out[j,t] = multi_normal_rng(mu[j,t], rescov)';
+      log_lik[j,t] = multi_normal_lpdf(rts[j,t] | mu[j,t], rescov);
+    }
+  }
+ } else if ( distribution == 1 ) {
+  for( j in 1:J ) {
+    for (t in 1:T) {
+      rts_out[j,t] = multi_student_t_rng(nu, mu[j,t], rescov)';
+      log_lik[j,t] = multi_student_t_lpdf(rts[j,t] | nu, mu[j,t], rescov);
+    }
+    }
+ }
+
 }
