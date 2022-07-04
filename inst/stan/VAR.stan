@@ -1,5 +1,4 @@
 // VAR only model w. constant variance
-
 data {
 #include /data/data.stan
 }
