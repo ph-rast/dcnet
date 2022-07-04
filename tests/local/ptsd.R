@@ -10,7 +10,7 @@ head( ptsd_comp )
 
 ## Select some variables
 dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy',
-                      'positive', 'horror', 'agg', 'shame', 'calm')]
+                      'positive', 'horror', 'agg', 'shame', 'calm', 'morning')]
 head(dat1 )
 dat1[dat1$id == "P002",]
 
@@ -29,8 +29,8 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
-X0
+              v.names = c('morning','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
+head(X0)
 ## Replace missings with 50
 #X0[is.na(X0 )] <- 50
 
@@ -71,14 +71,18 @@ nts <- 4 # Number of variables
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
 varnames <- c('horror', 'agg', 'shame', 'calm')
-tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, 3:(2+nts)])
+names(X2 )
+tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
 
 tsdat
 
 devtools::load_all( )
 
-tst <- dcnet::stan_data(data = tsdat, xC = NULL, S_pred = NULL,
+S_pred <- lapply(seq_len(N), function(x) X2[X2$id == x, 'morning'])
+S_pred
+
+tst <- dcnet::stan_data(data = tsdat, xC = NULL, S_pred = S_pred,
                  J =  N, group =  groupvec, standardize_data = TRUE)
 
 str(tst)
@@ -88,8 +92,8 @@ getwd( )
 setwd( "../")
 tsdat
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = TRUE,
-             sampling_algorithm = 'variational')
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
+             standardize_data = TRUE, sampling_algorithm = 'variational')
 
 summary(fit)
 
@@ -217,8 +221,8 @@ ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.
 ## Compare Density
 
 
-y_rep_loc <- grep( "rts_out", colnames(fit_const$model_fit$draws( )) )
-y_rep <-fit_const$model_fit$draws( )[, y_rep_loc]
+y_rep_loc <- grep( "rts_out", colnames(fit$model_fit$draws( )) )
+y_rep <-fit$model_fit$draws( )[, y_rep_loc]
 str(y_rep)
 
 plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.6))

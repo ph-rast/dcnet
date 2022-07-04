@@ -281,6 +281,7 @@ print.summary.dcnet <- function(x,  ... ) {
   garch_q_index  <- grep("_q", rownames(ms) )
   cond_corr_index <- grep("R", rownames(ms))
   S_index = grep("S", rownames(ms))
+  S2_index = grep("S2", rownames(ms))
 
   ## Settings
   nt <- bmsum$meta$nt
@@ -352,6 +353,22 @@ print.summary.dcnet <- function(x,  ... ) {
   }
 
   print(round(S_out, digits = digits))
+
+
+  cat("Unconditional correlation 'S2' in Q:")
+  .newline(2)
+  S2_out <- ms[S2_index[corr_only],]
+  if (nt == 2) {
+    tmp <- matrix( S2_out, nrow = 1 )
+    rownames(tmp) <- paste( paste0("R_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
+    colnames(tmp) <- names(S2_out)
+    S2_out <- tmp 
+  } else {
+    rownames(S2_out) <- paste( paste0("S2_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
+  }
+
+  print(round(S2_out, digits = digits))
+  
 }
 
 
