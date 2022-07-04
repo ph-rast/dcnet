@@ -66,7 +66,7 @@ parameters {
   /* array[J,nt] simplex[P] b_h_simplex; // Simplex for b_h within each timeseries */
   /* array[J] vector[nt] b_h_sum_s; */
 
-    // GARCH q parameters
+  // GARCH q parameters
   //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
   real l_a_q; // Define on log scale so that it can go below 0
   array[J] real l_a_q_r;
@@ -77,7 +77,8 @@ parameters {
   array[J] real l_b_q_r;
   real<lower=0> l_b_q_sigma; //random effect variance
   
-  corr_matrix[nt] S;  
+  corr_matrix[nt] S;
+  corr_matrix[nt] S2;
 
   // R1 init
   array[J] corr_matrix[nt] R1_init;
@@ -133,11 +134,12 @@ transformed parameters {
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
     D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
     u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
-    Qr[j,1] = Qr1_init[j];//((rts[j]' * rts[j]) / (nt - 1));//
+    Qr[j,1] = Qr1_init[j]; //
+    //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
     //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
-    // R[j,1]=diag_matrix(rep_vector(1.0, nt));
+    //R[j,1]=diag_matrix(rep_vector(1.0, nt));
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
 
@@ -213,7 +215,12 @@ transformed parameters {
 	D[j, t, d] = sqrt( vd[j,d] );
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
-      Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+      //Introduce predictor for S (time-varying)
+      if (S_pred[j,t] == 0){
+	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+      } else if (S_pred[j,t] == 1){
+	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S2 + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1];
+      }
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
@@ -266,10 +273,11 @@ model {
   //  to_vector(a_h) ~ normal(0, .5);
   //to_vector(b_h) ~ normal(0, .5);
   S ~ lkj_corr( 1 );
+  S2 ~ lkj_corr( 1 );
 
   // likelihood
   for( j in 1:J) {
-    R1_init[j] ~ lkj_corr( 1 );
+    //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian

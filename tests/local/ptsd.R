@@ -78,6 +78,12 @@ tsdat
 
 devtools::load_all( )
 
+tst <- dcnet::stan_data(data = tsdat, xC = NULL, S_pred = NULL,
+                 J =  N, group =  groupvec, standardize_data = TRUE)
+
+str(tst)
+tst
+
 getwd( )
 setwd( "../")
 tsdat
