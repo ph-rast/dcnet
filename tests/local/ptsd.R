@@ -10,7 +10,7 @@ head( ptsd_comp )
 
 ## Select some variables
 dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy',
-                      'positive', 'horror', 'agg', 'shame', 'calm', 'morning')]
+                      'positive', 'horror', 'agg', 'shame', 'calm', 'morning','eve','night')]
 head(dat1 )
 dat1[dat1$id == "P002",]
 
@@ -29,7 +29,7 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('morning','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
+              v.names = c('morning','eve', 'night','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
 head(X0)
 ## Replace missings with 50
 #X0[is.na(X0 )] <- 50
@@ -79,14 +79,13 @@ tsdat
 
 devtools::load_all( )
 
-S_pred <- lapply(seq_len(N), function(x) X2[X2$id == x, 'morning'])
+X2$evenight <- ifelse(X2[, c('eve')] == 1 | X2[, c('night')] == 1, 1, 0)
+
+S_pred <- lapply(seq_len(N), function(x) X2[X2$id == x, 'morning'] )
+S_pred <- lapply(seq_len(N), function(x) c(rep(0,  47), rep(1, 48 )) )
+S_pred <- lapply(seq_len(N), function(x) X2[X2$id == x, 'evenight'] )
+
 S_pred
-
-tst <- dcnet::stan_data(data = tsdat, xC = NULL, S_pred = S_pred,
-                 J =  N, group =  groupvec, standardize_data = TRUE)
-
-str(tst)
-tst
 
 getwd( )
 setwd( "../")
@@ -96,6 +95,25 @@ fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
              standardize_data = TRUE, sampling_algorithm = 'variational')
 
 summary(fit)
+
+## Diff in S and S2
+
+Ds12 <- fit$model_fit$draws( )[, 'S[1,2]'] - fit$model_fit$draws( )[, 'S2[1,2]']
+Ds13 <- fit$model_fit$draws( )[, 'S[1,3]'] - fit$model_fit$draws( )[, 'S2[1,3]']
+Ds14 <- fit$model_fit$draws( )[, 'S[1,4]'] - fit$model_fit$draws( )[, 'S2[1,4]']
+Ds23 <- fit$model_fit$draws( )[, 'S[2,3]'] - fit$model_fit$draws( )[, 'S2[2,3]']
+Ds24 <- fit$model_fit$draws( )[, 'S[2,4]'] - fit$model_fit$draws( )[, 'S2[2,4]']
+Ds34 <- fit$model_fit$draws( )[, 'S[3,4]'] - fit$model_fit$draws( )[, 'S2[3,4]']
+
+plot(density(Ds14 ) )
+quantile( Ds12, probs = c(.05, .95) )
+quantile( Ds13, probs = c(.05, .95) )
+quantile( Ds14, probs = c(.05, .95) )
+quantile( Ds23, probs = c(.05, .95) )
+quantile( Ds24, probs = c(.05, .95) )
+quantile( Ds34, probs = c(.05, .95) )
+
+
 
 
 ## Extract log_lik
@@ -255,3 +273,23 @@ ggplot(y_rep_1[y_rep_1$id == paste0(id),],  aes(x = time, y = yrep)) + geom_line
 df2 <- data.table(out = tsdat[[1]][, "horror"], time = seq(1:95))
 ggplot(y_rep_1[y_rep_1$id == "1",],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
 ## CHECK hwo if RTS if manipulated in dcnet function
+
+
+library(qgraph )
+
+grep('S', colnames(fit$model_fit$draws( )) )
+colMeans( fit$model_fit$draws( )[, 1041:1056] )
+colMeans( fit$model_fit$draws( )[, 1057:1072] )
+
+mS <- matrix( colMeans( fit$model_fit$draws( )[, 1041:1056] ), ncol =  4, byrow =  TRUE)
+mS2 <- matrix( colMeans( fit$model_fit$draws( )[, 1057:1072] ), ncol =  4, byrow =  TRUE)
+
+mS2
+
+fit$model_fit$draws( )[, c( 'S[1,2]','S[1,3]','S[1,4]','S[2,3]','S[2,4]','S[3,4]')]
+
+
+qgraph::qgraph(mS2, labels = varnames)
+
+## needs to be list of full cormats
+qgraph::qgraph.animate( list())
