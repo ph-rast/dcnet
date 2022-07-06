@@ -5,6 +5,7 @@
 #' @param J numeric. Number of groups (individuals)
 #' @param group Vector with group id of full length
 #' @param xC Numeric matrix containing predictors.
+#' @param S_pred Integer matrix containing predictors for each datapoing.
 #' @param P Numeric. Currently fixed to 1
 #' @param Q Numeric. Currently fixed to 1
 #' @param standardize_data Logical.
@@ -15,7 +16,7 @@
 #' @param simplify_bh Numeric value indicating whether random effects correlations should be simplfied to just diagonal matrix: 1 = yes; 0 = no.
 #' @return dcnet stan data list. 
 #' @keywords internal
-stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distribution = 0,
+stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data, distribution = 0, 
                       meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1) {
 
   ## Check for data type:
@@ -26,11 +27,9 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
 
   ## Check if content is numeric:
   
-  
   ## Check whether var(variables)>0:
   
-  
-##  if ( is.null( colnames( data ) ) ) colnames( data ) = paste0('t', 1:ncol( data ) )
+  ##  if ( is.null( colnames( data ) ) ) colnames( data ) = paste0('t', 1:ncol( data ) )
 
   ## Model for meanstructure
   if( meanstructure == "constant" | meanstructure == 0 ) {
@@ -54,7 +53,12 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
       ## Test dimension of XC
       if( ncol(xC) != nt )  stop("xC must have same dimension as data (same number of columns)")
       if( nrow(xC) != J*tl) stop("xC must have same dimension as data (same number of rows)")
-    }
+  }
+
+  if ( is.null(S_pred) ) {
+    S_pred <- lapply(1:J, FUN =  function(x) rep(0, tl))
+  }
+  
   ## Match dimension of predictor to TS. If only one vector is given, it's assumed that it is the same for all TS's
   ## if ( is.null(ncol(xC)) ) {
   ##   warning("xC is assumed constant across TS's")
@@ -90,6 +94,7 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J
                            rts = stdx,
                            xC = xC,
+                           S_pred = S_pred,
                            nt = ncol(stdx[[1]]),
                            centered_data = centered_data,
                            scaled_data = scaled_data,
@@ -116,6 +121,7 @@ stan_data <- function(data, J, group, xC, P = 1, Q = 1, standardize_data, distri
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J
                            rts = ctrx,
                            xC = xC,
+                           S_pred = S_pred,
                            nt = ncol(ctrx[[1]]),
                            centered_data = centered_data,
                            distribution = distribution,

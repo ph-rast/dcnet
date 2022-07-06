@@ -7,6 +7,7 @@
 ##' @param J ...
 ##' @param group Vector with group id
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
+##' @param S_pred Dummy for S, for each time-point (same dimension as data)
 ##' @param parameterization Character (Default: "DCC"). 
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
@@ -16,6 +17,9 @@
 ##' @param distribution Character (Default: "Student_t"). Distribution of innovation: "Student_t"  or "Gaussian"
 ##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant'  or 'ARMA'. Currently ARMA(1,1) only. OR 'VAR' (VAR1).
 ##' @param sampling_algorithm Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.
+##' @param simplify_ch Random efx on ch 
+##' @param simplify_ah Randon efx on ah
+##' @param simplify_bh Random efx on bh
 ##' @param ... Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. 
 ##' @return \code{dcnet} object.
 ##' @author Philippe Rast
@@ -30,6 +34,7 @@ dcnet <- function(data,
                   J,
                   group,
                   xC = NULL,
+                  S_pred =  NULL,
                   parameterization = "DCC",
                   P = 1,
                   Q = 1,
@@ -51,17 +56,18 @@ dcnet <- function(data,
     }
 
     stan_data <- stan_data(data,
-                              J,
-                              group,
-                              xC,
-                              P,
-                              Q,
-                              standardize_data,
-                              distribution = num_dist,
-                              meanstructure,
-                              simplify_ch,
-                              simplify_ah,
-                              simplify_bh)
+                           J,
+                           group,
+                           xC,
+                           S_pred,
+                           P,
+                           Q,
+                           standardize_data,
+                           distribution = num_dist,
+                           meanstructure,
+                           simplify_ch,
+                           simplify_ah,
+                           simplify_bh)
 
     ## Select stanmodel
     ## 

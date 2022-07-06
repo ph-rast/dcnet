@@ -9,7 +9,8 @@ ptsd_comp <- ptsd#[complete.cases( ptsd ), ]
 head( ptsd_comp )
 
 ## Select some variables
-dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')]
+dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy',
+                      'positive', 'horror', 'agg', 'shame', 'calm', 'morning')]
 head(dat1 )
 dat1[dat1$id == "P002",]
 
@@ -28,9 +29,8 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
-
-X0
+              v.names = c('morning','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
+head(X0)
 ## Replace missings with 50
 #X0[is.na(X0 )] <- 50
 
@@ -45,11 +45,13 @@ XL <- reshape(X0, direction = "long",
 XL
 ## sort by id, then time
 X2 <- XL[order( XL$id,  XL$time), ]
-head(X2, n =  100)
+head(X2, n =  10)
+
 ##
 X2 <- X2[X2$time <= 95,]
 sum(is.na(X2))
-dim(X2 )[1]
+dim(X2)[1]
+
 ## Replace all missing with 50...  lol
 #X2[is.na(X2 )] <- 50
 
@@ -69,6 +71,7 @@ nts <- 4 # Number of variables
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
 varnames <- c('horror', 'agg', 'shame', 'calm')
+names(X2 )
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
 
@@ -76,12 +79,21 @@ tsdat
 
 devtools::load_all( )
 
+S_pred <- lapply(seq_len(N), function(x) X2[X2$id == x, 'morning'])
+S_pred
+
+tst <- dcnet::stan_data(data = tsdat, xC = NULL, S_pred = S_pred,
+                 J =  N, group =  groupvec, standardize_data = TRUE)
+
+str(tst)
+tst
+
 getwd( )
 setwd( "../")
 tsdat
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = TRUE,
-             sampling_algorithm = 'variational')
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
+             standardize_data = TRUE, sampling_algorithm = 'variational')
 
 summary(fit)
 
@@ -102,7 +114,6 @@ waic <- function(log_lik ) {
 waic(log_lik = log_lik)
 loo::waic( log_lik)
 loo::loo( log_lik)
-
 
 fit_const <- dcnet( data = tsdat, J =  N, group =  groupvec, parameterization = 'CCC',
                    standardize_data = FALSE,
@@ -210,8 +221,8 @@ ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.
 ## Compare Density
 
 
-y_rep_loc <- grep( "rts_out", colnames(fit_const$model_fit$draws( )) )
-y_rep <-fit_const$model_fit$draws( )[, y_rep_loc]
+y_rep_loc <- grep( "rts_out", colnames(fit$model_fit$draws( )) )
+y_rep <-fit$model_fit$draws( )[, y_rep_loc]
 str(y_rep)
 
 plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.6))
@@ -226,15 +237,20 @@ dev.off()
 
 ## regexp variable 1
 sel <- grep( pattern = "rts_out\\[[0-9]+,[0-95]+,1" , x = colnames(y_rep), perl = TRUE)
+dim(y_rep[,sel])
 
-y_rep_1 <- data.table( cbind(yrep = y_rep[sel], time = rep(1:95, N ), id = rep(1:N, each = 95 ) ))
+y_rep_1 <- data.table( cbind(yrep = colMeans( y_rep[,sel] ), time = rep(1:95, N ), id = rep(1:N, each = 95 ) ))
 y_rep_1$id <- as.factor(y_rep_1$id )
 head(y_rep_1)
 
 ggplot(y_rep_1,  aes(x = time, y = yrep, color = id)) + geom_line( )
 
 
-df2 <- data.table(out = fit$RTS_full[[1]][, "horror"], time = seq(1:95))
+id <- 4
+df2 <- data.table(out = fit_const$RTS_full[[id]][, "horror"], time = seq(1:95))
+head(df2 )
+ggplot(y_rep_1[y_rep_1$id == paste0(id),],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
+## CHECK hwo if RTS if manipulated in dcnet function
 
 df2 <- data.table(out = tsdat[[1]][, "horror"], time = seq(1:95))
 ggplot(y_rep_1[y_rep_1$id == "1",],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
