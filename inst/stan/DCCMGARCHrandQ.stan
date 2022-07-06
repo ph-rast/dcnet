@@ -134,7 +134,8 @@ transformed parameters {
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
     D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
     u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
-    Qr[j,1] = Qr1_init[j]; //
+    Qr[j,1] = Qr1_init[j];//
+
     //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     

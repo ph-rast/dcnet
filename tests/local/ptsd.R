@@ -116,7 +116,7 @@ loo::waic( log_lik)
 loo::loo( log_lik)
 
 fit_const <- dcnet( data = tsdat, J =  N, group =  groupvec, parameterization = 'CCC',
-                   standardize_data = TRUE,
+                   standardize_data = FALSE,
                    sampling_algorithm = 'variational')
 
 
@@ -124,7 +124,7 @@ log_lik_loc <- grep( "log_lik", colnames(fit_const$model_fit$draws( )) )
 log_lik_const <- fit_const$model_fit$draws( )[, log_lik_loc]
 waic( log_lik = fit_const$model_fit$draws( )[, log_lik_loc] )
 
-loo::waic( log_lik )
+loo::waic( log_lik_const )
 m1 <- loo::loo( log_lik )
 m2 <- loo::loo( x = log_lik_const)
 
@@ -252,3 +252,6 @@ head(df2 )
 ggplot(y_rep_1[y_rep_1$id == paste0(id),],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
 ## CHECK hwo if RTS if manipulated in dcnet function
 
+df2 <- data.table(out = tsdat[[1]][, "horror"], time = seq(1:95))
+ggplot(y_rep_1[y_rep_1$id == "1",],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
+## CHECK hwo if RTS if manipulated in dcnet function
