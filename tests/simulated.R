@@ -3,15 +3,16 @@ devtools::load_all( )
 options(width = 200 )
 
 ## Create data:
-N <- 50
-tl <- 100
-nts <- 4
+N <- 30
+tl <- 60
+nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1,
                    phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 ## Fixed Corr
 simdat$S
+simdat$DCC_R
 
 typeof(rtsgen )
 dim(rtsgen[[1]])
@@ -25,8 +26,78 @@ X <- array(0,  dim = c(N*tl, nts ) )
 groupvec <- rep(c(1:N),  each = tl )
 
 
+getwd( )
+
+#setwd("./tests")
+
 fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE,
-             iterations = 400, sampling_algorithm = 'HMC')
+             iterations = 10000, sampling_algorithm = 'variational')
+
+## ## Obtain median R[1,2] across all N
+## r12 <- NA
+## for(seqlen in 1:tl ) {
+##   r12[seqlen] <- median(fit$model_fit$draws( )[, paste0('R[1,', seqlen, ',1,2]')  ])
+## }
+## r12
+
+
+## Compute median pcor across all N from generating simdat
+genP <- apply(simdat$DCC_R[1,2,1:tl,],1, median)
+genP
+
+genRaw <- apply(simdat$RawCorr[1,2,1:tl,],1, median)
+genRaw
+
+cor(genRaw[-1],  genP[-1] )
+
+
+## Obtain median R's across all samples and all N from estimated
+plout <- sapply(1:N,  function(f) {
+  sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',1,',2,']')]))
+})
+obsR <- apply(plout, 1, median)
+
+## How close are the estimates?
+cor(genP,  obsR, use = "pairwise.complete.obs")
+
+## Transform H to pcor
+precision12 <- sapply(1:N,  function(f) {
+  sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('precision[',f,',',x,',1,',2,']')]))
+})
+precision11 <- sapply(1:N,  function(f) {
+  sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('precision[',f,',',x,',1,',1,']')]))
+})
+precision22 <- sapply(1:N,  function(f) {
+  sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('precision[',f,',',x,',2,',2,']')]))
+})
+
+## compute pcro for elements 1,2 
+pcor12 <- -apply(precision12, 1, median)/sqrt(apply(precision11, 1, median)*apply(precision22, 1, median))
+
+## How close are the estimates?
+cor(genP,  pcor12, use = "pairwise.complete.obs")
+
+cbind(genP, pcor12)
+plot(1:tl, genP,  type = 'l', ylim = c(-.3, 0.4))
+lines(1:tl, pcor12, col = 'red')
+
+
+lines(1:tl, obsR, col = 'blue')
+lines(1:tl, genRaw, col = 'green')
+
+## Looks like R is indeed tracing the raw correlation among variables and not the pcor.
+## pcor12 and genP are indeed pcorrs
+
+
+median(fit$model_fit$draws( )[, 'S[1,2]'])
+
+
+
+
+cor( cbind(obs = simdat$DCC_R[1,2,1:30,1], gen = r12 )[-1,] )
+median(r12)
+simdat$S
+
 
 dcnet::.get_stan_summary(fit$model_fit, )
 

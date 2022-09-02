@@ -2,6 +2,7 @@
 functions {
 #include /functions/jacobian.stan
 #include /functions/invvec.stan
+#include /functions/cov2cor.stan
 }
 
 data {
@@ -305,8 +306,14 @@ model {
 }
 
 generated quantities {
-
+  array[J,T] cov_matrix[nt] precision;
+ // array[J,T] cov_matrix[nt] pcor;
 #include /generated/retrodict.stan
-
+  for(j in 1:J){
+    for(t in 1:T){
+      precision[j,t] = inverse(H[j,t]);
+ //     pcor[j, t] = diag_matrix(rep_vector(1.0, nt)) - cov2cor(precision[j,t]);
+    }
+  }
 }
 

@@ -100,6 +100,7 @@
   h <- array(.5, dim = c(n_ts, tslength, N))
   DCC_H <- array( NA, c(n_ts,n_ts, tslength, N))
   DCC_R <- array( NA, c(n_ts,n_ts, tslength, N))
+  RawCorr <- array( NA, c(n_ts,n_ts, tslength, N))
   
   ## Distribution of random effects    
   ## Unconditional Corr;
@@ -145,9 +146,12 @@
         DCC_H[,,t,j]
         ##
         y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
-        DCC_R[,,t,j] <- cov2cor(DCC_H[,,t,j] )
+        ## compute partial corr from DCC_H
+        DCC_R[,,t,j] <- cov2cor( solve(DCC_H[,,t,j]) ) * ( diag(n_ts) - 1)
+        ## Obtain simple corr
+        RawCorr[,,t,j] <- cov2cor(DCC_H[,,t,j])
       }
       DCC_y <- y
     }
-    return(list(DCC_y, DCC_R, S = S))
+    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr))
   }

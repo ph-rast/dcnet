@@ -70,7 +70,7 @@ nts <- 4 # Number of variables
 ## X2 needs to be a list of N matrices with dimension ntsXtl 
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
-varnames <- c('horror', 'agg', 'shame', 'calm')
+varnames <- c('horror', 'fear', 'happy', 'calm')
 names(X2 )
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
@@ -91,7 +91,7 @@ getwd( )
 setwd( "../")
 tsdat
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL,
              standardize_data = TRUE, sampling_algorithm = 'variational')
 
 summary(fit)
@@ -223,6 +223,9 @@ c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.leg
 
 nn <- ggplot( ) + theme_void()
 
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor12.pdf",  plot = c12,  width = 5, height = 3 )
+
+
 ggplot(df3, aes(x = time,  y = cor34 , color = id)) + geom_line( )
 
 library(patchwork )
@@ -231,7 +234,7 @@ library(patchwork )
 ( nn | c23 | c24 ) /
   ( nn | nn  | c34 )
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.pdf", width = 8, height = 8)
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.pdf", width = 8, height = 5.5)
 
 
 
