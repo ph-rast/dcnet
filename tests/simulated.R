@@ -3,9 +3,9 @@ devtools::load_all( )
 options(width = 200 )
 
 ## Create data:
-N <- 30
-tl <- 60
-nts <- 3
+N <- 20
+tl <- 50
+nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1,
                    phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
 
@@ -28,7 +28,7 @@ groupvec <- rep(c(1:N),  each = tl )
 
 getwd( )
 
-#setwd("./tests")
+setwd("./tests")
 
 fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE,
              iterations = 10000, sampling_algorithm = 'variational')

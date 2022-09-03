@@ -10,7 +10,8 @@ head( ptsd_comp )
 
 ## Select some variables
 dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy',
-                      'positive', 'horror', 'agg', 'shame', 'calm', 'morning','eve','night')]
+                      'positive', 'horror', 'agg', 'shame',
+                      'calm', 'morning','eve','night', 'sleepy', 'fatigue', 'mem')]
 head(dat1 )
 dat1[dat1$id == "P002",]
 
@@ -29,7 +30,7 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('morning','eve', 'night','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm'))
+              v.names = c('morning','eve', 'night','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm','sleepy', 'fatigue', 'mem'))
 head(X0)
 ## Replace missings with 50
 #X0[is.na(X0 )] <- 50
@@ -70,7 +71,7 @@ nts <- 4 # Number of variables
 ## X2 needs to be a list of N matrices with dimension ntsXtl 
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
-varnames <- c('horror', 'fear', 'happy', 'calm')
+varnames <- c('horror', 'sleepy', 'fatigue', 'mem')
 names(X2 )
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
@@ -175,6 +176,39 @@ plout <- sapply(2:nts,  function(p) {
   })
 })
 
+plout2 <- sapply(3:nts,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',2,',p,']')]))
+  })
+})
+
+plout3 <- sapply(4,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',3,',p,']')]))
+  })
+})
+
+
+plout <- sapply(2:nts,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',1,',p,']')]))
+  })
+})
+
+plout2 <- sapply(3:nts,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',2,',p,']')]))
+  })
+})
+
+plout3 <- sapply(4,  function(p) {
+  sapply(1:N,  function(f) {
+    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',3,',p,']')]))
+  })
+})
+
+
+
 
 df <- data.frame( plout, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
 names(df)[1:3] <- c('cor12',  'cor13',  'cor14' )
@@ -192,11 +226,6 @@ c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.lege
   scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[4], ")") )
 
 
-plout2 <- sapply(3:nts,  function(p) {
-  sapply(1:N,  function(f) {
-    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',2,',p,']')]))
-  })
-})
 
 df2 <- data.frame( plout2, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
 names(df2)[1:2] <- c('cor23',  'cor24' )
@@ -208,11 +237,6 @@ c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.leg
   scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[4], ")") )
 
 
-plout3 <- sapply(4,  function(p) {
-  sapply(1:N,  function(f) {
-    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',3,',p,']')]))
-  })
-})
 
 df3 <- data.frame( plout3, time = rep(seq(1:tl), N ), id = as.factor(rep(1:N,  each = tl)))
 names(df3)[1] <- c('cor34')
