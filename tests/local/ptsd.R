@@ -247,7 +247,7 @@ c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.leg
 
 nn <- ggplot( ) + theme_void()
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor12.pdf",  plot = c12,  width = 5, height = 3 )
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/zero-order.pdf",  plot = c12,  width = 5, height = 3 )
 
 
 ggplot(df3, aes(x = time,  y = cor34 , color = id)) + geom_line( )
@@ -258,7 +258,7 @@ library(patchwork )
 ( nn | c23 | c24 ) /
   ( nn | nn  | c34 )
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/pcor.pdf", width = 8, height = 5.5)
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
 
 
 
