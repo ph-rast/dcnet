@@ -30,7 +30,8 @@ getwd( )
 
 setwd("./tests")
 
-fit <- dcnet( data =  rtsgen, J =  N, group =  groupvec, standardize_data = FALSE,
+fit <- dcnet( data =  rtsgen, parameterization = 'DCPC' , J =  N,
+             group =  groupvec, standardize_data = FALSE,
              iterations = 10000, sampling_algorithm = 'variational')
 
 ## ## Obtain median R[1,2] across all N
@@ -60,7 +61,7 @@ obsR <- apply(plout, 1, median)
 ## How close are the estimates?
 cor(genP,  obsR, use = "pairwise.complete.obs")
 
-## Transform H to pcor
+## Transform H to pcor (only for non DIRD
 precision12 <- sapply(1:N,  function(f) {
   sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('precision[',f,',',x,',1,',2,']')]))
 })
@@ -71,7 +72,7 @@ precision22 <- sapply(1:N,  function(f) {
   sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('precision[',f,',',x,',2,',2,']')]))
 })
 
-## compute pcro for elements 1,2 
+## compute pcor for elements 1,2 
 pcor12 <- -apply(precision12, 1, median)/sqrt(apply(precision11, 1, median)*apply(precision22, 1, median))
 
 ## How close are the estimates?

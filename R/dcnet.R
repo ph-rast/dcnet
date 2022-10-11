@@ -8,7 +8,7 @@
 ##' @param group Vector with group id
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
 ##' @param S_pred Dummy for S, for each time-point (same dimension as data)
-##' @param parameterization Character (Default: "DCC"). 
+##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCPC' or 'DCC'. 
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
 ##' @param iterations Integer (Default: 2000). Number of iterations for each chain (including warmup).
@@ -81,10 +81,12 @@ dcnet <- function(data,
 
     ccc_file <- file.path("../inst/stan/VAR.stan" )
     dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
+    dcpc_file <- file.path("../inst/stan/DCPCrand.stan" )
     
     stanmodel <- switch(parameterization,
                         CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/"),
                         DCC = cmdstan_model(dcc_file, include_paths = "../inst/stan/"),
+                        DCPC = cmdstan_model(dcpc_file, include_paths = "../inst/stan/"),
                         NULL)
         
     if(is.null(stanmodel)) {
@@ -160,4 +162,4 @@ dcnet <- function(data,
 #' May facilitate more parameterizations, as we only have to update these, and the switch statements.
 #' @keywords internal
 #' @author Philippe Rast
-supported_models <- c("CCC", "DCC")
+supported_models <- c("CCC", "DCC", "DCPC")
