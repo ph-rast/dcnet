@@ -81,7 +81,7 @@ dcnet <- function(data,
 
     ccc_file <- file.path("../inst/stan/VAR.stan" )
     dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
-    dcpc_file <- file.path("../inst/stan/DCPCrand.stan" )
+    dcpc_file <- file.path("../inst/stan/DCPCfixedDelta.stan" )
     
     stanmodel <- switch(parameterization,
                         CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/"),

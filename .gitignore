@@ -35,3 +35,4 @@ src/stanExports_DCCMGARCH.h
 *.Rd
 /inst/stan/VAR
 /inst/stan/DCPCrand
+/inst/stan/DCPCfixedDelta
