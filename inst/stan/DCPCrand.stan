@@ -12,8 +12,7 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).
-  
+  //int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).  
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
   // Note that S_Lv[1,1] is always 1, which leaves (nt + nt^2) /2 -1 parameters to be estimated
@@ -78,14 +77,14 @@ parameters {
   array[J] real l_b_q_r;
   real<lower=0> l_b_q_sigma; //random effect variance
   
-  corr_matrix[nt] S;
+  cholesky_factor_corr[nt] S;
   corr_matrix[nt] S2;
 
   // R1 init
   array[J] corr_matrix[nt] R1_init;
   
   // Qr1 init
-  array[J] cov_matrix[nt] Qr1_init;
+  //  array[J] cov_matrix[nt] Qr1_init;
   // D1 init
   array[J] vector<lower = 0>[nt] D1_init;
   // u1 init
@@ -115,19 +114,19 @@ transformed parameters {
   
   array[J,T] cov_matrix[nt] H;
   array[J,T] corr_matrix[nt] R;  // R is part cor
-  array[J,T] corr_matrix[nt] IR; // the I-R marix in D (I-R)^-1 D
+  array[J,T] corr_matrix[nt] R0; // the I-R marix in D (I-R)^-1 D
   array[J,T-1] vector[nt] rr;
   array[J,T] vector[nt] mu;
   array[J,T] vector<lower = 0>[nt] D;
-  array[J,T] cov_matrix[nt] Qr;
-  array[J,T] vector[nt] Qr_sdi;
+  //  array[J,T] cov_matrix[nt] Qr;
+  //  array[J,T] vector[nt] Qr_sdi;
   array[J,T] vector[nt] u;
   
   array[J] vector<lower = 0>[nt] vd;
   array[J] vector<lower = 0>[nt] ma_d;
   array[J] vector<lower = 0>[nt] ar_d;
   
- 
+  array[J,T] matrix[nt,nt] IR;
   // VAR phi parameter
 
   // Initialize t=1
@@ -138,14 +137,14 @@ transformed parameters {
     D[j,1] = D1_init[j];
     //u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
     u[j,1] = u1_init;    
-    Qr[j,1] = Qr1_init[j];//
+    //    Qr[j,1] = Qr1_init[j];//
 
-    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
+    //    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
-    R[j,1] = diag_matrix(rep_vector(1.0, nt));//quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
-    H[j,1] = diag_matrix(rep_vector(1.0, nt));//quad_form_diag(R[j,1],  D[j,1]);
+    R[j,1] = identity_matrix(nt);//quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    H[j,1] = identity_matrix(nt);//quad_form_diag(R[j,1],  D[j,1]);
 
-    IR[j,1] = diag_matrix(rep_vector(1.0, nt)); // Fill first matrix
+    R0[j,1] = identity_matrix(nt); // Fill first matrix
 
     ////////////
     // Ranefs //
@@ -227,16 +226,17 @@ transformed parameters {
       //manual p. 482 re:Inverses - inv(D)*a = D \ a
       //Introduce predictor for S (time-varying)
       if (S_pred[j,t] == 0){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S  + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       } else if (S_pred[j,t] == 1){
 	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S2 + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1];
       }
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
-      //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
+      //R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); //Partial Correlatin Matrix
-      IR[j,t] = inverse( -R[j,t] + diag_matrix(rep_vector(2.0, nt)) ); //Instead of I - R, do -R + 2, so that diag of R = 1 instead of 0; This is a corrmat, I think...
-      H[j,t] = quad_form_diag( IR[j,t],  D[j,t] );  //  D here must contain the inverted sqrt'd precision elements; 1/sqrt(diag(theta))
-      //H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
+      
+      R0[j,t] = cov2cor( inverse_spd( -R[j,t] + 2 .* identity_matrix(nt) ) ); //Instead of I - R, do -R + 2, so that diag of R = 1 instead of 0; This is a corrmat, I think...
+      H[j,t] = quad_form_diag( R0[j,t],  D[j,t] );  //  D here must contain the inverted sqrt'd precision elements; 1/sqrt(diag(theta))
+     
     }
   }
 }
@@ -244,11 +244,11 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // priors
-  l_a_q ~ normal(-1, 1);
-  l_b_q ~ normal(2, 1);
-  l_a_q_sigma ~ cauchy(0, 0.1);
+  l_a_q ~ normal(-10, 1);
+  l_b_q ~ normal(-10, 1);
+  l_a_q_sigma ~ normal(0,1);//cauchy(0, 0.1);
   to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
-  l_b_q_sigma ~ cauchy(0, 0.1);
+  l_b_q_sigma ~ normal(0,1);//cauchy(0, 0.1);
   to_vector(l_b_q_r) ~ normal(0, l_b_q_sigma);
 
   // VAR
@@ -284,14 +284,14 @@ model {
   vec_phi_fixed ~ normal(0, 5);
   //  to_vector(a_h) ~ normal(0, .5);
   //to_vector(b_h) ~ normal(0, .5);
-  S ~ lkj_corr( 10 );
-  S2 ~ lkj_corr( 10 );
+  S ~ lkj_corr_cholesky(1);
+  S2 ~ lkj_corr( 1 );
 
   // likelihood
   for( j in 1:J) {
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
-    Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
+    //    Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
     /* for(k in 1:nt) { */
     /*   ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed. */

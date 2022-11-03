@@ -1,17 +1,22 @@
 ##library(dcnet )
+# we recommend running this is a fresh R session or restarting your current session
+#install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+#remotes::install_github("stan-dev/cmdstanr")
+#cmdstanr::install_cmdstan( )
+
 devtools::load_all( )
 options(width = 200 )
 
 ## Create data:
-N <- 20
-tl <- 50
-nts <- 4
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1,
+N <- 50
+tl <- 30
+nts <- 3
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, l_b_q_r_sd = 0.0001,
                    phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 ## Fixed Corr
-simdat$S
+simdat$S[2,3]
 simdat$DCC_R
 
 typeof(rtsgen )
@@ -30,17 +35,24 @@ getwd( )
 
 setwd("./tests")
 
-fit <- dcnet( data =  rtsgen, parameterization = 'DCPC' , J =  N,
+devtools::load_all( )
+
+fit <- dcnet( data =  rtsgen, parameterization = 'DCC' , J =  N,
              group =  groupvec, standardize_data = FALSE,
              iterations = 10000, sampling_algorithm = 'variational')
 
-## ## Obtain median R[1,2] across all N
-## r12 <- NA
-## for(seqlen in 1:tl ) {
-##   r12[seqlen] <- median(fit$model_fit$draws( )[, paste0('R[1,', seqlen, ',1,2]')  ])
-## }
-## r12
 
+median(fit$model_fit$draws( )[,'S[2,3]'])
+quantile(fit$model_fit$draws( )[,'S[2,3]'], probs = c(.05, .50, .95))
+
+
+
+## Obtain median R[1,2] across all N
+r12 <- NA
+for(seqlen in 1:tl ) {
+  r12[seqlen] <- median(fit$model_fit$draws( )[, paste0('R[1,', seqlen, ',1,2]')  ])
+}
+r12
 
 ## Compute median pcor across all N from generating simdat
 genP <- apply(simdat$DCC_R[1,2,1:tl,],1, median)

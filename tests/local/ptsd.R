@@ -256,7 +256,7 @@ library(patchwork )
 
 (c12 | c13 | c14 ) /
 ( nn | c23 | c24 ) /
-  ( nn | nn  | c34 )
+( nn | nn  | c34 )
 
 ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
 
