@@ -80,13 +80,16 @@ dcnet <- function(data,
     ## rstan
 
     ccc_file <- file.path("../inst/stan/VAR.stan" )
-    dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
+    dcc_file <- file.path("../inst/stan/DCCMultiThread.stan" )
     dcpc_file <- file.path("../inst/stan/DCPCrand.stan" )
     
     stanmodel <- switch(parameterization,
-                        CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/"),
-                        DCC = cmdstan_model(dcc_file, include_paths = "../inst/stan/"),
-                        DCPC = cmdstan_model(dcpc_file, include_paths = "../inst/stan/"),
+                        CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/",
+                                            cpp_options = list(stan_threads = TRUE)),
+                        DCC = cmdstan_model(dcc_file, include_paths = "../inst/stan/",
+                                            cpp_options = list(stan_threads = TRUE)),
+                        DCPC = cmdstan_model(dcpc_file, include_paths = "../inst/stan/",
+                                             cpp_options = list(stan_threads = TRUE)),
                         NULL)
         
     if(is.null(stanmodel)) {
