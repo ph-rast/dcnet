@@ -4,8 +4,55 @@
 #remotes::install_github("stan-dev/cmdstanr")
 #cmdstanr::install_cmdstan( )
 
+
+
+ivv <- function(V,  nt ) {
+  vnt <- length(V )
+  z <- diag(0, nt)
+  L <- diag(0, nt)
+  index <- 0
+   for(j in 1:nt) {
+    for(i in 1:nt) {
+      if( i > j ) {
+	index = index + 1
+	z[i,j] = V[index]
+      }
+      if (i < j) {
+	z[i,j] = 0
+	  }
+    }
+   }
+  for(i in 1:nt) {
+    for(j in 1:nt){
+      if(i < j){
+        L[i,j]=0
+      }
+      if(i == j){
+        if(i == 1){
+          L[i,j]=1
+        }
+        if(i > 1){ 
+          L[i,j]=sqrt( 1 - sum( L[i, 1:j]^2 ) )
+        }
+      }
+      if(i > j){
+        L[i,j]=z[i,j]*sqrt(1 - sum( L[i,1:j]^2) )
+      }
+    }
+  }
+    return(L)
+}
+
+
+L <- ivv(c(0.4, 0.2, 0.5, 0.3, 0.1, 0.6), 4)
+
+
+L%*%t(L)
+
+
+
 devtools::load_all( )
-options(width = 200 )
+options(width = 200, crayon.enabled = FALSE)
 
 ## Create data:
 N <- 50
@@ -38,12 +85,21 @@ setwd("./tests")
 devtools::load_all( )
 
 fit <- dcnet( data =  rtsgen, parameterization = 'DCC' , J =  N,
-             group =  groupvec, standardize_data = FALSE,
-             iterations = 10000, sampling_algorithm = 'variational')
+             group =  groupvec, standardize_data = FALSE, init = 0,
+             iterations = 500, threads_per_chain = 2, sampling_algorithm = 'hmc')
+
+data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed',
+                                                            'c_h_fixed', 'a_h_fixed', 'b_h_fixed',
+                                                            'l_a_q', 'l_b_q', 'Sfixed') ))
+w <- ivv(
+  data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$mean,
+  3)
+w%*%t(w)
+simdat$S
 
 
-median(fit$model_fit$draws( )[,'S[2,3]'])
-quantile(fit$model_fit$draws( )[,'S[2,3]'], probs = c(.05, .50, .95))
+fit$model_fit$draws( )[,'Sfixed']
+quantile(fit$model_fit$draws( )[,'Sfixed'], probs = c(.05, .50, .95))
 
 
 
@@ -61,13 +117,12 @@ genP
 genRaw <- apply(simdat$RawCorr[1,2,1:tl,],1, median)
 genRaw
 
-cor(genRaw[-1],  genP[-1] )
-
 
 ## Obtain median R's across all samples and all N from estimated
 plout <- sapply(1:N,  function(f) {
   sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('R[',f,',',x,',1,',2,']')]))
 })
+plout
 obsR <- apply(plout, 1, median)
 
 ## How close are the estimates?

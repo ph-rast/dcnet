@@ -1,29 +1,49 @@
 /*
-  Perform inverse vectorization and return a correlation matrix via cholesky
+   Perform inverse vectorization and return a correlation matrix via cholesky
   @param V array of SD vector to be turned into lower cholesky of a covariance matrix
   @return matrix[Dsd] icr
+  based off: https://mc-stan.org/docs/reference-manual/cholesky-factors-of-correlation-matrices-1.html
  */
-matrix invvec_chol_to_corr(vector V, int nt) {
+matrix invvec_to_corr(vector V, int nt) {
   int vnt = num_elements(V);
-  matrix[nt,nt] L = diag_matrix(rep_vector(1.0, nt));
-  matrix[nt,nt] out;
-  vector[nt] D;
+  matrix[nt,nt] z = diag_matrix(rep_vector(0.0, nt));
+  matrix[nt,nt] L = diag_matrix(rep_vector(0.0, nt));  
   matrix[nt,nt] R;
   int index = 0;
-  for(i in 1:nt) {
-    for(j in 1:nt) {
-      if( i >= j ) {
+  // create lower tri with diag 0
+  for(j in 1:nt) {
+    for(i in 1:nt) {
+      if( i > j ) {
 	index = index + 1;
-	L[i,j] = V[index]; //V contains SD's, but here we create chol of Covmat
+	z[i,j] = V[index]; //V contains SD's, but here we create chol of Covmat
       }
       if (i < j) {
-	L[i,j] = 0.0;
+	z[i,j] = 0.0;
 	  }
-    } // invvec
-  } 
-  out = multiply_lower_tri_self_transpose(L); //L*L' ;
-  D = inv_sqrt( diagonal(out) ); // This makes S_Lv basically a chol of cov
-  R = quad_form_diag(out, D); //
+    }
+  }
+  // z , with entries in the range (-1,1), is then transformed to the Cholesky factor x, by taking
+  // Construct lower cholesky L
+  for(i in 1:nt) {
+    for(j in 1:nt){
+      if(i < j){
+	L[i,j]=0.0;
+      }
+      if(i == j){
+	if(i == 1){
+	  L[i,j]=1.0;
+	    }
+	if(i > 1){ // Diagonal beyond [1,1]
+	  L[i,j]=sqrt( 1 - sum( L[i, 1:j]^2 ) );
+	}
+      }
+      if(i > j){
+	L[i,j]=z[i,j]*sqrt(1 - sum( L[i, 1:j]^2) );
+      }
+    }
+  }
+  // obtain R=LL'
+  R = multiply_lower_tri_self_transpose(L);
   return(R);
 }
 
