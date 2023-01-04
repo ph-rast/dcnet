@@ -83,7 +83,6 @@ getwd( )
 setwd("./tests")
 
 devtools::load_all( )
-
 fit <- dcnet( data =  rtsgen, parameterization = 'DCC' , J =  N,
              group =  groupvec, standardize_data = FALSE, init = 0,
              iterations = 500, threads_per_chain = 2, sampling_algorithm = 'hmc')

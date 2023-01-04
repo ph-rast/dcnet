@@ -68,10 +68,7 @@ parameters {
   array[J] real l_b_q_r;
   real<lower=0> l_b_q_sigma; //random effect variance
   
-  //corr_matrix[nt] S;
-  array[J] vector<lower=0>[Sdim] S_vec_stdnorm; 
-  array[J] vector<lower=0>[Sdim] S_vec_tau; 
-  vector[Sdim] S_vec_fixed; // Vectorized fixed effect for S
+  corr_matrix[nt] S;
   
   corr_matrix[nt] S2;
 
@@ -121,10 +118,6 @@ transformed parameters {
   array[J] vector<lower = 0>[nt] ar_d;
   
 
-  // fixed + ranef vector for vec(S) part
-  array[J] vector[Sdim] S_Lv;
-  array[J] corr_matrix[nt] S;
-  
   // VAR phi parameter
 
   // Initialize t=1
@@ -216,11 +209,9 @@ transformed parameters {
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
-      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
-      S[j] = invvec_to_corr(S_Lv[j], nt);
       //Introduce predictor for S (time-varying)
       if (S_pred[j,t] == 0){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       } else if (S_pred[j,t] == 1){
 	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S2 + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1];
       }
@@ -277,13 +268,10 @@ model {
   //to_vector(b_h) ~ normal(0, .5);
   //S ~ lkj_corr( 1 );
   S2 ~ lkj_corr( 1 );
-  S_vec_fixed ~ std_normal();
+  S ~ lkj_corr( 1 );
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau[j] ~ gamma(.1, 1);
-    S_vec_stdnorm[j] ~ std_normal();
-  
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
@@ -321,6 +309,4 @@ generated quantities {
       pcor[j, t] = - cov2cor(precision[j,t]);
     }
   }
-  Sfixed= invvec_to_corr(S_vec_fixed, nt);
 }
-

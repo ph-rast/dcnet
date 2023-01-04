@@ -78,7 +78,6 @@ str(tsdat)
 
 tsdat
 
-devtools::load_all( )
 
 X2$evenight <- ifelse(X2[, c('eve')] == 1 | X2[, c('night')] == 1, 1, 0)
 
@@ -92,8 +91,10 @@ getwd( )
 setwd( "../")
 tsdat
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL,
-             standardize_data = TRUE, sampling_algorithm = 'variational')
+devtools::load_all( )
+
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
+             standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 summary(fit)
 
@@ -132,7 +133,10 @@ waic <- function(log_lik ) {
 
 waic(log_lik = log_lik)
 loo::waic( log_lik)
-loo::loo( log_lik)
+f2 <- loo::loo( log_lik)
+f2
+f1
+loo::loo_compare(f1, f2 )
 
 fit_const <- dcnet( data = tsdat, J =  N, group =  groupvec, parameterization = 'CCC',
                    standardize_data = FALSE,
@@ -247,7 +251,7 @@ c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.leg
 
 nn <- ggplot( ) + theme_void()
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/zero-order.pdf",  plot = c12,  width = 5, height = 3 )
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order.pdf",  plot = c12,  width = 5, height = 3 )
 
 
 ggplot(df3, aes(x = time,  y = cor34 , color = id)) + geom_line( )
@@ -258,7 +262,7 @@ library(patchwork )
 ( nn | c23 | c24 ) /
 ( nn | nn  | c34 )
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2022/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
 
 
 

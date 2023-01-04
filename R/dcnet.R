@@ -80,7 +80,7 @@ dcnet <- function(data,
     ## rstan
 
     ccc_file <- file.path("../inst/stan/VAR.stan" )
-    dcc_file <- file.path("../inst/stan/DCCMultiThread.stan" )
+    dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
     dcpc_file <- file.path("../inst/stan/DCPCrand.stan" )
     
     stanmodel <- switch(parameterization,
