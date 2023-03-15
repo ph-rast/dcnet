@@ -71,7 +71,7 @@ nts <- 4 # Number of variables
 ## X2 needs to be a list of N matrices with dimension ntsXtl 
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
-varnames <- c('horror', 'sleepy', 'fatigue', 'mem')
+varnames <- c('horror', 'fear', 'happy', 'calm')
 names(X2 )
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
@@ -93,7 +93,7 @@ tsdat
 
 devtools::load_all( )
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = S_pred,
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL,
              standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 summary(fit)
@@ -223,11 +223,11 @@ library(ggplot2 )
 varnames
 #'enthus', 'fear', 'angry', 'happy'
 c12 <- ggplot(df,  aes(x = time,  y = cor12 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[2], ")") )
+  scale_y_continuous( paste0("Cor(", varnames[1], ", ", varnames[2], ")") )
 c13 <- ggplot(df,  aes(x = time,  y = cor13 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[3], ")") )
+  scale_y_continuous( paste0("Cor(", varnames[1], ", ", varnames[3], ")") )
 c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[4], ")") )
+  scale_y_continuous( paste0("Cor(", varnames[1], ", ", varnames[4], ")") )
 
 
 
@@ -236,9 +236,9 @@ names(df2)[1:2] <- c('cor23',  'cor24' )
 head(df2)
 
 c23 <- ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[3], ")") )
+  scale_y_continuous( paste0("Cor(", varnames[2], ", ", varnames[3], ")") )
 c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[4], ")") )
+  scale_y_continuous( paste0("Cor(", varnames[2], ", ", varnames[4], ")") )
 
 
 
@@ -247,11 +247,11 @@ names(df3)[1] <- c('cor34')
 head(df3)
 
 c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
-  scale_y_continuous(paste0("PCor(", varnames[3], ", ", varnames[4], ")"))
+  scale_y_continuous(paste0("Cor(", varnames[3], ", ", varnames[4], ")"))
 
 nn <- ggplot( ) + theme_void()
-
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order.pdf",  plot = c12,  width = 5, height = 3 )
+c12
+ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order1.pdf",  plot = c12,  width = 5, height = 3 )
 
 
 ggplot(df3, aes(x = time,  y = cor34 , color = id)) + geom_line( )

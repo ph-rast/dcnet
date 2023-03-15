@@ -12,7 +12,7 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
+  int<lower=1> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
    
 #include /transformed_data/xh_marker.stan
  
@@ -80,7 +80,7 @@ parameters {
   // D1 init
   array[J] vector<lower = 0>[nt] D1_init;
   // u1 init
-  vector[nt] u1_init;
+  array[J] vector[nt] u1_init;
 
   real< lower = 2 > nu; // nu for student_t
 }
@@ -124,11 +124,12 @@ transformed parameters {
   for( j in 1:J){
     
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
-    D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
-    u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
+    //D[j,1] = sqrt( diagonal((rts[j,1:10]' * rts[j,1:10]) / (10 - 1)) );//
+    D[j,1] = D1_init[j];
+    u[j,1] = u1_init[j];//( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
     Qr[j,1] = Qr1_init[j];//
 
-    //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
+    //Qr[j,1] = ((rts[j,1:5]' * rts[j,1:5]) / (5 - 1));// Werden alle flach
     Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
     //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
@@ -161,7 +162,7 @@ transformed parameters {
     } else if(simplify_ah == 1) {
       a_h_random[j] = diag_pre_multiply(a_h_tau, diag_matrix(rep_vector(1.0, nt)))*a_h_stdnorm[j];
     }
-    
+     
     // Bound sum of fixed and ranef between 0 and 1 with logistic function
     a_h_sum[j] = 1 ./ (1 + exp(-( a_h_fixed + a_h_random[j] )) );
 
@@ -256,7 +257,6 @@ model {
   to_vector(b_h_fixed) ~ std_normal();
   // Prior for initial state
   
-  to_vector(u1_init) ~ std_normal();
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 50 );
@@ -272,8 +272,9 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    //R1_init[j] ~ lkj_corr( 1 );
+    R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
+    to_vector(u1_init[j]) ~ std_normal();
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
     /* for(k in 1:nt) { */
@@ -299,14 +300,14 @@ model {
 }
 
 generated quantities {
-  array[J,T] cov_matrix[nt] precision;
-  array[J,T] matrix[nt,nt] pcor;
-  matrix[nt,nt] Sfixed;
+  /* array[J,T] cov_matrix[nt] precision; */
+  /* array[J,T] matrix[nt,nt] pcor; */
+  /* matrix[nt,nt] Sfixed; */
 #include /generated/retrodict.stan
-  for(j in 1:J){
-    for(t in 1:T){
-      precision[j,t] = inverse(H[j,t]);
-      pcor[j, t] = - cov2cor(precision[j,t]);
-    }
-  }
+  /* for(j in 1:J){ */
+  /*   for(t in 1:T){ */
+  /*     precision[j,t] = inverse(H[j,t]); */
+  /*     pcor[j, t] = - cov2cor(precision[j,t]); */
+  /*   } */
+  /* } */
 }
