@@ -83,7 +83,7 @@ parameters {
   // D1 init
   array[J] vector<lower = 0>[nt] D1_init;
   // u1 init
-  vector[nt] u1_init;
+  array[J] vector[nt] u1_init;
 
   real< lower = 2 > nu; // nu for student_t
 }
@@ -131,8 +131,8 @@ transformed parameters {
   for( j in 1:J){
     
     mu[j,1] = rts[j, 1]'; //phi0_fixed;
-    D[j,1] = sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
-    u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
+    D[j,1] = D1_init[j];//sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
+    u[j,1] = u1_init[j];//( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
     Qr[j,1] = Qr1_init[j];//
 
     //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
@@ -216,7 +216,8 @@ transformed parameters {
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
-      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
+      //      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
+      S_Lv[j] = tanh( S_vec_fixed  + S_vec_tau[j] );
       S[j] = invvec_to_corr(S_Lv[j], nt);
       //Introduce predictor for S (time-varying)
       if (S_pred[j,t] == 0){
@@ -265,7 +266,6 @@ model {
   to_vector(b_h_fixed) ~ std_normal();
   // Prior for initial state
   
-  to_vector(u1_init) ~ std_normal();
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 50 );
@@ -281,11 +281,12 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau[j] ~ gamma(.1, 1);
+    S_vec_tau[j] ~ gamma(.05, 2);
     S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
+    to_vector(u1_init[j]) ~ std_normal();
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
     /* for(k in 1:nt) { */
