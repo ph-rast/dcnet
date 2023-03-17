@@ -217,7 +217,7 @@ transformed parameters {
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       //      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
-      S_Lv[j] = tanh( S_vec_fixed  + S_vec_tau[j] );
+      S_Lv[j] = tanh( S_vec_fixed  + S_vec_stdnorm[j] );
       S[j] = invvec_to_corr(S_Lv[j], nt);
       //Introduce predictor for S (time-varying)
       if (S_pred[j,t] == 0){
@@ -281,8 +281,8 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau[j] ~ gamma(.05, 2);
-    S_vec_stdnorm[j] ~ std_normal();
+    S_vec_tau[j] ~ gamma( .5, 1);
+    S_vec_stdnorm[j] ~ normal(0, 0.75);
   
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
