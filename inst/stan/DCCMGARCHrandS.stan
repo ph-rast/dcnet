@@ -69,12 +69,12 @@ parameters {
   real<lower=0> l_b_q_sigma; //random effect variance
   
   //corr_matrix[nt] S;
-  array[J] vector<lower=0>[Sdim] S_vec_stdnorm; 
-  array[J] vector<lower=0>[Sdim] S_vec_tau; 
+  array[J] vector[Sdim] S_vec_stdnorm; 
+  //  array[J] vector<lower=0>[Sdim] S_vec_tau; 
   vector[Sdim] S_vec_fixed; // Vectorized fixed effect for S
+  vector[Sdim] S_vec_fixed2; // Vectorized fixed effect for S
+  array[J] vector[Sdim] S_vec_sd;
   
-  corr_matrix[nt] S2;
-
   // R1 init
   array[J] corr_matrix[nt] R1_init;
   
@@ -217,16 +217,16 @@ transformed parameters {
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
       //      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
-      S_Lv[j] = tanh( S_vec_fixed  + S_vec_stdnorm[j] );
-      S[j] = invvec_to_corr(S_Lv[j], nt);
-      //Introduce predictor for S (time-varying)
       if (S_pred[j,t] == 0){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+	S_Lv[j] = tanh( S_vec_fixed  + S_vec_stdnorm[j] );
       } else if (S_pred[j,t] == 1){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S2 + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1];
+	S_Lv[j] = tanh( S_vec_fixed2  + S_vec_stdnorm[j] );
       }
+      S[j] = invvec_to_corr(S_Lv[j], nt);
+
+      //Introduce predictor for S (time-varying)
+      Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
-      //    R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
       H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
     }
@@ -269,20 +269,15 @@ model {
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 50 );
-  //to_vector(theta) ~ std_normal();
-  //to_vector(phi) ~ std_normal();
   phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
   vec_phi_fixed ~ normal(0, 5);
-  //  to_vector(a_h) ~ normal(0, .5);
-  //to_vector(b_h) ~ normal(0, .5);
-  //S ~ lkj_corr( 1 );
-  S2 ~ lkj_corr( 1 );
   S_vec_fixed ~ std_normal();
+  S_vec_fixed2 ~ std_normal();  
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau[j] ~ gamma( .5, 1);
-    S_vec_stdnorm[j] ~ normal(0, 0.75);
+    //S_vec_tau[j] ~ inv_gamma( 3, 1);
+    S_vec_stdnorm[j] ~ normal(0, .75);
   
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
@@ -312,16 +307,18 @@ model {
 }
 
 generated quantities {
-  array[J,T] cov_matrix[nt] precision;
-  array[J,T] matrix[nt,nt] pcor;
+  //array[J,T] cov_matrix[nt] precision;
+  //array[J,T] matrix[nt,nt] pcor;
   matrix[nt,nt] Sfixed;
+  matrix[nt,nt] Sfixed2;
 #include /generated/retrodict.stan
-  for(j in 1:J){
-    for(t in 1:T){
-      precision[j,t] = inverse(H[j,t]);
-      pcor[j, t] = - cov2cor(precision[j,t]);
-    }
-  }
-  Sfixed= invvec_to_corr(S_vec_fixed, nt);
+  /* for(j in 1:J){ */
+  /*   for(t in 1:T){ */
+  /*     precision[j,t] = inverse(H[j,t]); */
+  /*     pcor[j, t] = - cov2cor(precision[j,t]); */
+  /*   } */
+  /* } */
+  Sfixed = invvec_to_corr( tanh(S_vec_fixed), nt);
+  Sfixed2= invvec_to_corr( tanh(S_vec_fixed2), nt);
 }
 

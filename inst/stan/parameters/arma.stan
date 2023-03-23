@@ -1,5 +1,7 @@
 // Fixed effect vector
-vector[nt] phi0_fixed; 
+vector[nt] phi0_fixed;
+vector[nt] phi0_fixed2; // In case of S_pred != NULL 
+
 cholesky_factor_corr[nt] phi0_L;
 vector<lower=0>[nt] phi0_tau; // ranef SD for phi0
 array[J] vector[nt] phi0_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
