@@ -54,16 +54,24 @@ L%*%t(L)
 devtools::load_all( )
 options(width = 200, crayon.enabled = FALSE)
 
+S <- list()
+for(j in 1:3) {
+  S[[j]] <- dcnet:::.ranS(4)
+}
+S[[1]]
+array(S, c(4,4,3) )
+
+
 ## Create data:
 N <- 50
 tl <- 30
-nts <- 3
+nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, l_b_q_r_sd = 0.0001,
                    phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 ## Fixed Corr
-simdat$S[2,3]
+simdat$S[[1]]
 simdat$DCC_R
 
 typeof(rtsgen )
@@ -83,13 +91,16 @@ getwd( )
 setwd("./tests")
 
 devtools::load_all( )
-fit <- dcnet( data =  rtsgen, parameterization = 'DCC' , J =  N,
-             group =  groupvec, standardize_data = FALSE, init = 0,
-             iterations = 500, threads_per_chain = 2, sampling_algorithm = 'hmc')
+fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
+             group =  groupvec, standardize_data = TRUE, init = 0.1,
+             iterations = 500,
+             threads = 1,
+             sampling_algorithm = 'variational')
 
 data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed',
                                                             'c_h_fixed', 'a_h_fixed', 'b_h_fixed',
                                                             'l_a_q', 'l_b_q', 'Sfixed') ))
+
 w <- ivv(
   data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$mean,
   3)
@@ -623,3 +634,16 @@ stanmodel
 
 options(width = 220 )
 #model_fit
+
+
+## Check corr transforms
+library(clusterGeneration )
+R <- rcorrmatrix(4 )
+
+D <- diag(rgamma(4, 5, 1))
+D
+H <- D%*%R%*%D
+C <- solve(H)
+Ds <- diag(sqrt(diag(C)))
+
+-Ds%*%solve(H)%*%Ds+2*diag(rep(1, 4 ))

@@ -23,6 +23,48 @@
     return( sigma )
 }
 
+##' Create Random correlations
+##' @param n_ts Number of time series
+##' @author Philippe Rast
+.ranS <- function(n_ts) {
+  lt <- choose(n_ts,2)
+  x <- tanh(rnorm(lt,0,1) + rgamma(lt, 0.05, 2) )
+  z <- diag(rep(0, n_ts))
+  index <- 0
+  for(j in 1:n_ts) {
+    for(i in 1:n_ts) {
+      if( i > j ) {
+	index = index + 1
+	z[i,j] = x[index] 
+      }
+      if (i < j) {
+	z[i,j] = 0
+      }
+    }
+  }
+  L <- diag(rep(0, n_ts))
+  for(i in 1:n_ts) {
+    for(j in 1:n_ts){
+      if(i < j){
+	L[i,j]=0.0;
+      }
+      if(i == j){
+	if(i == 1){
+	  L[i,j]=1.0;
+        }
+	if(i > 1){ 
+	  L[i,j]=sqrt( 1 - sum( L[i, 1:j]^2 ) );
+	}
+      }
+      if(i > j){
+	L[i,j]=z[i,j]*sqrt(1 - sum( L[i, 1:j]^2) );
+      }
+    }
+  }
+  R <- L%*%t(L)
+  return(R)
+}
+
 ##' @title Internal function to generate constrained a's and b's
 ##' @description Function to generate individual a_h and b_h of lenght n_ts that comply with a_h + b_h < 1 
 ##' @param n_ts Number of time series
@@ -105,17 +147,20 @@
   ## Distribution of random effects    
   ## Unconditional Corr;
   ## Fixed :
-  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
+  ## Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
   
   ## Add random effects with convex method
   ## Dropped random S
   ## S <- replicate(N, ( (1-alpha) * Sc + alpha * rcorrmatrix( d =  n_ts, alphad = 100) ) )
-  S <- Sc
+  S <- list( )
+  for(j in 1:N ){
+    S[[j]] <- .ranS(n_ts = n_ts)
+  }
   
   ## Q is symmetric
   Q <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
   Qs <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
-  R <-  array(Sc, c(n_ts,n_ts, tslength, N))
+  R <-  array(S[[1]], c(n_ts,n_ts, tslength, N))
 
   u <- array(NA, c(n_ts,tslength,N))
 
@@ -135,14 +180,15 @@
           solve( diag(h[,t-1,j]) ) %*% (y[,t-1,j] - DCC_mu[,t-1,j])
 
         Q[,,t,j] <-
-          (1 - a_q[[j]] - b_q[[j]]) * S + #[,,j] +
+          (1 - a_q[[j]] - b_q[[j]]) * S[[j]] +
           a_q[[j]] * (u[,t-1,j] %*% t(u[,t-1,j])) + 
           b_q[[j]] * Q[,,t-1,j] 
         
         R[,,t,j] <- cov2cor(Q[,,t,j])
         R[,,t,j]
         
-        DCC_H[,,t,j] <- diag(h[,t,j])%*%R[,,t,j] %*%diag(h[,t,j])
+        DCC_H[,,t,j] <-
+          diag(h[,t,j])%*%R[,,t,j]%*%diag(h[,t,j])
         DCC_H[,,t,j]
         ##
         y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
