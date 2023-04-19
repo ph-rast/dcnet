@@ -26,9 +26,9 @@
 ##' Create Random correlations
 ##' @param n_ts Number of time series
 ##' @author Philippe Rast
-.ranS <- function(n_ts) {
+.ranS <- function(n_ts, fixedS) {
   lt <- choose(n_ts,2)
-  x <- tanh(rnorm(lt,0,1) + rgamma(lt, 0.05, 2) )
+  x <- tanh( atanh(fixedS) + rgamma(lt, 0.05, 2) )
   z <- diag(rep(0, n_ts))
   index <- 0
   for(j in 1:n_ts) {
@@ -147,14 +147,12 @@
   ## Distribution of random effects    
   ## Unconditional Corr;
   ## Fixed :
-  ## Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
-  
-  ## Add random effects with convex method
-  ## Dropped random S
-  ## S <- replicate(N, ( (1-alpha) * Sc + alpha * rcorrmatrix( d =  n_ts, alphad = 100) ) )
+  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
+  Fixed_S <- Sc[lower.tri(Sc)]
+
   S <- list( )
   for(j in 1:N ){
-    S[[j]] <- .ranS(n_ts = n_ts)
+    S[[j]] <- .ranS(n_ts = n_ts, fixedS = Fixed_S)
   }
   
   ## Q is symmetric
@@ -169,11 +167,11 @@
       
       for(t in 2:tslength) {
         DCC_mu[,t,j] <- 
-          phi0[,j] + phi[[j]] %*% (y[,t-1,j] - DCC_mu[,t-1,j])
+          phi0[,j] + phi[[j]] %*% (y[,t-1,j] - phi0[,j]) #DCC_mu[,t-1,j])
 
         for(i in 1:n_ts) {
           h[i,t,j] <-
-            sqrt(c_h[j,i] + a_h[j,i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[j,i]*h[i,t-1,j])
+            sqrt(c_h[j,i] + a_h[j,i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[j,i]*h[i,t-1,j]^2)
         }
         
         u[,t-1,j] <-
@@ -199,5 +197,5 @@
       }
       DCC_y <- y
     }
-    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr))
+    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr, Fixed_S = Sc))
   }
