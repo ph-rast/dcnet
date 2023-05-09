@@ -70,7 +70,7 @@ parameters {
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
-  //  array[J] vector<lower=0>[Sdim] S_vec_tau; 
+  //array[J] vector<lower=0>[Sdim] S_vec_tau; 
   vector[Sdim] S_vec_fixed; // Vectorized fixed effect for S
   vector[Sdim] S_vec_fixed2; // Vectorized fixed effect for S
   array[J] vector[Sdim] S_vec_sd;
@@ -218,7 +218,7 @@ transformed parameters {
 
       //      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
       if (S_pred[j,t] == 0){
-	S_Lv[j] = tanh( S_vec_fixed  + S_vec_stdnorm[j] );
+	S_Lv[j] = tanh( S_vec_fixed  +  S_vec_stdnorm[j] );
       } else if (S_pred[j,t] == 1){
 	S_Lv[j] = tanh( S_vec_fixed2  + S_vec_stdnorm[j] );
       }
@@ -276,8 +276,8 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    //S_vec_tau[j] ~ inv_gamma( 3, 1);
-    S_vec_stdnorm[j] ~ normal(0, .75);
+    //S_vec_tau[j] ~ inv_gamma( 6, 2.5);
+    S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
@@ -305,6 +305,8 @@ model {
     }
   }
 }
+
+
 
 generated quantities {
   //array[J,T] cov_matrix[nt] precision;

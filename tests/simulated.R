@@ -44,7 +44,7 @@ ivv <- function(V,  nt ) {
 }
 
 
-L <- ivv(c(0.4, 0.2, 0.5, 0.3, 0.1, 0.6), 4)
+L <- ivv(tanh(c(0.3, -0.5, 1.1, 0, 0.3, -.2)), 4)
 
 
 L%*%t(L)
@@ -63,16 +63,22 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 50
+N <- 60
 tl <- 30
 nts <- 4
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,  ranef_sd_S = 0.1, l_b_q_r_sd = 0.0001,
-                   phi0_fixed =  c(0, 0, 0 , 0), alpha = .5)
+simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
+                   ranef_sd_S = 0.01,
+                   l_b_q_r_sd = 0.01,
+                   phi0_fixed =  c(0, 0, 0 , 0),
+                   ranS_sd = 0.01)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
+
+rtsgen[[1]][,1]
+
 ## Fixed Corr
-simdat$S[[1]]
-simdat$DCC_R
+simdat$S
+simdat$Fixed_S
 
 typeof(rtsgen )
 dim(rtsgen[[1]])
@@ -92,24 +98,97 @@ setwd("./tests")
 
 devtools::load_all( )
 fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-             group =  groupvec, standardize_data = TRUE, init = 0.1,
-             iterations = 500,
+             group =  groupvec, standardize_data = FALSE, init = 1,
+             #iterations = 2000,
              threads = 1,
              sampling_algorithm = 'variational')
 
+xfit
+
+svf <- posterior::as_draws_matrix( fit$model_fit$draws(variables = 'S_vec_fixed' ) )
+fit$model_fit$summary(variables = c('S_vec_fixed'))
+fit$model_fit$summary( )
+
+## Save out drawas and read them back in selectively
+fit$model_fit$save_output_files(dir = "../../../Documents/",  basename = "rands",  random = FALSE )
+
+rm("fit")
+gc()
+## use fread from data.table to handle big files
+dt <- fread( input = "../../../Documents/rands-202304061114-1-3bd87d.csv", select = "S_vec_fixed" )
+
+dt <- vroom::vroom( "../../../Documents/rands-202304061114-1-3bd87d.csv")
+dt$stan_version_major
+
+dt[1]
+
+
+varsel <- read_cmdstan_csv( "../../../Documents/rands-202304061114-1-3bd87d.csv" , variables = "S_vec_fixed")
+
+
 data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed',
                                                             'c_h_fixed', 'a_h_fixed', 'b_h_fixed',
-                                                            'l_a_q', 'l_b_q', 'Sfixed') ))
+                                                            'l_a_q', 'l_b_q')))#, 'Sfixed') ))
 
 w <- ivv(
-  data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$mean,
-  3)
+  tanh(data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$mean)
+, nts)
+w
 w%*%t(w)
-simdat$S
 
 
-fit$model_fit$draws( )[,'Sfixed']
-quantile(fit$model_fit$draws( )[,'Sfixed'], probs = c(.05, .50, .95))
+lo <- ivv( tanh(data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$q5), nts)
+lo%*%t(lo)
+
+
+hi <- ivv( tanh(data.table::data.table( fit$model_fit$summary(variables = c('S_vec_fixed') ))$q95), nts)
+hi%*%t(hi)
+
+vars <- paste0("S_vec_fixed[",  1:6,  "]" )
+apply(fit$model_fit$draws( )[, vars], 2, quantile, c(0.025, .975))
+hi <- ivv( tanh(apply(fit$model_fit$draws( )[, vars], 2, quantile, c(0.975))), nts)
+hi%*%t(hi)
+
+
+simdat$Fixed_S
+
+
+quantile(fit$model_fit$draws( )[,'Sfixed[1,2]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'Sfixed[1,3]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'Sfixed[1,4]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'Sfixed[2,3]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'Sfixed[2,4]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'Sfixed[3,4]'], probs = c(.025,  .975))
+
+
+quantile(fit$model_fit$draws( )[,'S[1,2]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'S[1,3]'], probs = c(.025,  .975))
+quantile(fit$model_fit$draws( )[,'S[1,4]'], probs = c(.025,  .975))
+
+colnames(fit$model_fit$draws( ))[grep( "fixed",  colnames(fit$model_fit$draws( )) )]
+
+#Coverage
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[1,2]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,2]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[1,3]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,3]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[1,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,4]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[2,3]'], probs = c(.025,  .975)) - simdat$Fixed_S[2,3]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[2,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[2,4]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'Sfixed[3,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[3,4]))== 0
+
+
+## Fixed S
+sum(sign(quantile(fit$model_fit$draws( )[,'S[1,2]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,2]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'S[1,3]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,3]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'S[1,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[1,4]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'S[2,3]'], probs = c(.025,  .975)) - simdat$Fixed_S[2,3]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'S[2,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[2,4]))== 0
+sum(sign(quantile(fit$model_fit$draws( )[,'S[3,4]'], probs = c(.025,  .975)) - simdat$Fixed_S[3,4]))== 0
+
+
+
+
+
+
 
 
 
