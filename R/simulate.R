@@ -26,9 +26,9 @@
 ##' Create Random correlations
 ##' @param n_ts Number of time series
 ##' @author Philippe Rast
-.ranS <- function(n_ts, fixedS) {
+.ranS <- function(n_ts, fixedS, ranS_sd) {
   lt <- choose(n_ts,2)
-  x <- tanh( atanh(fixedS) + rgamma(lt, 0.05, 2) )
+  x <- tanh( atanh(fixedS) + rnorm(lt, 0, sd = ranS_sd) )
   z <- diag(rep(0, n_ts))
   index <- 0
   for(j in 1:n_ts) {
@@ -98,7 +98,8 @@
                      l_a_q_r_sd = 0.1,
                      l_b_q_fixed = 0,
                      l_b_q_r_sd = 0.1,                     
-                     ranef_sd_S,  alpha =  0.5) {
+                     ranef_sd_S,  alpha =  0.5,
+                     ranS_sd = 1) {
 
   ## Define fixed diag for c_h on log scale
   log_c_fixed_diag <- log_c_fixed
@@ -152,7 +153,7 @@
 
   S <- list( )
   for(j in 1:N ){
-    S[[j]] <- .ranS(n_ts = n_ts, fixedS = Fixed_S)
+    S[[j]] <- .ranS(n_ts = n_ts, fixedS = Fixed_S, ranS_sd = ranS_sd)
   }
   
   ## Q is symmetric
