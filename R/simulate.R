@@ -77,6 +77,18 @@
     return(list(a_h, b_h ) )
 }
 
+##' @title Create phi matrix that ensures stationarity of VAR(1)
+##' The function returns a matrix with eigen values less than 1 in modulus
+##' @param fixed_phi A fixed effects square matrix
+.stat_var <- function(n_ts, fixed_phi, phi_ranef_sd, D) {
+  ##D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
+  vecfix <- c(fixed_phi ) ## columnwise
+  indfix <- vecfix + rnorm(n_ts^2, 0, phi_ranef_sd)
+  A <- matrix(indfix, nrow = n_ts)
+  A%*%D%*%solve(A)
+}
+
+
 ##' @title Simulate TS's for N individuals
 ##' @param tslength Length of time series, for all N (everyone has same TS length)
 ##' @param n_ts Number of simultaneous TS per person. Currently only supports 3 or less
@@ -98,8 +110,11 @@
                      l_a_q_r_sd = 0.1,
                      l_b_q_fixed = 0,
                      l_b_q_r_sd = 0.1,                     
-                     ranef_sd_S,  alpha =  0.5,
-                     ranS_sd = 1) {
+                     ranef_sd_S, 
+                     ranS_sd = 1,
+                     phi_mu = 0, # guides the strength of phi matrix
+                     phi_sd = 1,
+                     phi_ranef_sd = 1) {
 
   ## Define fixed diag for c_h on log scale
   log_c_fixed_diag <- log_c_fixed
@@ -125,10 +140,19 @@
   
   ## phi is bound by -1;1. n_tsXn_ts matrix
   ## Create N individual matrices
-  temp <- replicate(n = N, tanh( rnorm(n_ts^2, 0, .4) ) )
-  phi <- apply(temp, 2, matrix, ncol = n_ts, simplify = FALSE)
-  phi
+  ## watch out, this might create non-stationary series
+  ## To avoid this, create matrices who's eigenvalues are less than 1 in modulus.
+  ## This ensures stationary of the VAR(1) model: https://phdinds-aim.github.io/time_series_handbook/03_VectorAutoregressiveModels/03_VectorAutoregressiveMethods.html#stationarity-of-the-var-1-model
 
+  ## Create fixed phi
+  phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts )
+  D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
+  
+  ## add  random effect with .stat_var function
+  phi <- replicate(N, .stat_var(n_ts,
+                                fixed_phi = phi_fixed,
+                                phi_ranef_sd = phi_ranef_sd,
+                                D = D), simplify = FALSE)
   
   y <- array(NA, dim = c(n_ts, tslength, N))
   ## create named variables:
@@ -198,5 +222,5 @@
       }
       DCC_y <- y
     }
-    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr, Fixed_S = Sc))
+    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr, Fixed_S = Sc, fixed_phi = phi_fixed%*%D%*%solve(phi_fixed)))
   }
