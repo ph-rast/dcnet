@@ -76,7 +76,7 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi0_fixed =  c(0, 0, 0 , 0),
                    ranS_sd = 0.01,
                    phi_mu = 0,
-                   phi_sd = 1,
+                   phi_sd = .5,
                    phi_ranef_sd = 1)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
@@ -92,13 +92,14 @@ simdat$fixed_phi
 typeof(rtsgen )
 dim(rtsgen[[1]])
 
-person <- 5
+person <- 2
 plot(rtsgen[[person]][,1], type = 'l')#, ylim = c(-6, 6))
 lines(rtsgen[[person]][,2], lty = 2)
 lines(rtsgen[[person]][,3], lty = 3, col = 'red')
 lines(rtsgen[[person]][,4], lty = 4, col = 'blue')
 
-simdat$phi
+dev.off( )
+simdat$fixed_phi
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
 X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
@@ -113,16 +114,15 @@ getwd( )
 setwd("./tests")
 
 devtools::load_all( )
+
 fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
              group =  groupvec, standardize_data = FALSE, init = 1,
              #iterations = 2000,
              threads = 1,
              sampling_algorithm = 'variational')
 
-xfit
-
 svf <- posterior::as_draws_matrix( fit$model_fit$draws(variables = 'S_vec_fixed' ) )
-fit$model_fit$summary(variables = c('S_vec_fixed'))
+fit$model_fit$summary(variables = c('S_vec_fixed', 'vec_phi_fixed'))
 fit$model_fit$summary( )
 
 ## Save out drawas and read them back in selectively
