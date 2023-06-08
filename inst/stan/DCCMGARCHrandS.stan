@@ -310,16 +310,16 @@ model {
 
 generated quantities {
   //array[J,T] cov_matrix[nt] precision;
-  //array[J,T] matrix[nt,nt] pcor;
+  array[J,T] matrix[nt,nt] pcor;
   matrix[nt,nt] Sfixed;
   matrix[nt,nt] Sfixed2;
 #include /generated/retrodict.stan
-  /* for(j in 1:J){ */
-  /*   for(t in 1:T){ */
-  /*     precision[j,t] = inverse(H[j,t]); */
-  /*     pcor[j, t] = - cov2cor(precision[j,t]); */
-  /*   } */
-  /* } */
+  for(j in 1:J){
+    for(t in 1:T){
+      //precision[j,t] = inverse(H[j,t]);
+      pcor[j, t] = - cov2cor( inverse(H[j,t]) );
+    }
+  }
   Sfixed = invvec_to_corr( tanh(S_vec_fixed), nt);
   Sfixed2= invvec_to_corr( tanh(S_vec_fixed2), nt);
 }
