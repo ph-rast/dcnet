@@ -79,6 +79,16 @@ devtools::load_all( )
 st_period <- lapply(ids, function(x) dt[dt$subjno == x, st_period] )
 st_period[[1]][37]
 
+
+## Model with just constnat cor
+fit0 <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = st_period, parameterization = "CCC",
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 1)#, iterations = 10, threads = 1, init = 0)
+
+## Intervention not modeled
+fitN <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 1)#, iterations = 10, threads = 1, init = 0)
+
+## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = st_period, parameterization = "DCCr",
              standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 1)#, iterations = 10, threads = 1, init = 0)
 
@@ -205,22 +215,29 @@ tsl
 N
 fit$model_fit$draws( )[,'rts_out[46,68,4]']
 
-## extract lower, median, upper quantile
+person <- 6
+## extract lower, median, upper quantile and scal back to original scale
 yrep4 <- sapply(seq_len(tl), function(x) {
-  quantile(fit$model_fit$draws( )[, paste0('rts_out[1,',x,',1]')], c(.025, .5, .975)) +
-    dcnet:::stan_data( tsdat )$centered_data
+  quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',1]')], c(.025, .5, .975))
   })
 
 
 yrep4 <- data.frame(yrep = t(yrep4))
 yrep4$time <- seq_len(tl )
 names(yrep4)
-yrep4$obs <- unlist( tsdat[[1]][,1] )
+yrep4$obs <- unlist( tsdat[[person]][,1] )
 
 tsdat[[1]][,1]
 str(yrep4 )
 
 ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+
+## Sanity check to see if stan_model transform to original data
+yrep4$standat <- fit$RTS_full[[person]][,1]
+ggplot(yrep4,  aes(x = time, y = standat) ) + geom_point( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+
+
+
 
 fit$RTS_full
 
