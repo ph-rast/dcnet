@@ -97,9 +97,27 @@ zeroord <- matrix(data.table(fit$model_fit$summary( variables = c("Sfixed")))$me
 -cov2cor( solve(zeroord ) )
 data.table(fit$model_fit$summary( variables = c("phi0_fixed")))$mean
 
+## Model Selection
+## Extract log_lik
+log_lik_loc0 <- grep( "log_lik", colnames(fit0$model_fit$draws( )) )
+log_lik0 <- fit0$model_fit$draws( )[, log_lik_loc0]
+
+log_lik_locN <- grep( "log_lik", colnames(fitN$model_fit$draws( )) )
+log_likN <- fitN$model_fit$draws( )[, log_lik_locN]
+
+log_lik_loc <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
+log_lik <- fit$model_fit$draws( )[, log_lik_loc]
+
+f0 <- loo::loo( log_lik0)
+fN <- loo::loo( log_likN)
+fr <- loo::loo( log_lik)
+
+loo::loo_compare(f0, fN,  fr)
+
 ## Plots
 ## R[id, timepoint, variable, variable]
 ## Take median of posterior distribution
+
 ind <- seq_len(N)
 
 ## for HMC:
