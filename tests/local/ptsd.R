@@ -93,7 +93,7 @@ tsdat
 
 devtools::load_all( )
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL,
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL, parameterization = 'DCCr',
              standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 summary(fit)
@@ -135,6 +135,11 @@ waic(log_lik = log_lik)
 loo::waic( log_lik)
 f2 <- loo::loo( log_lik)
 f2
+
+log_lik_loc0 <- grep( "log_lik", colnames(fit0$model_fit$draws( )) )
+log_lik0 <- fit0$model_fit$draws( )[, log_lik_loc0]
+f1 <- loo::loo( log_lik0)
+
 f1
 loo::loo_compare(f1, f2 )
 
@@ -251,7 +256,7 @@ c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.leg
 
 nn <- ggplot( ) + theme_void()
 c12
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order1.pdf",  plot = c12,  width = 5, height = 3 )
+#ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order1.pdf",  plot = c12,  width = 5, height = 3 )
 
 
 ggplot(df3, aes(x = time,  y = cor34 , color = id)) + geom_line( )
@@ -262,7 +267,7 @@ library(patchwork )
 ( nn | c23 | c24 ) /
 ( nn | nn  | c34 )
 
-ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
+#ggsave(filename = "/home/philippe/UZH/Kongresse/Kongresse2023/International Conference on Health Policy Statistics/Talk/Figures/zero-order.pdf", width = 8, height = 5.5)
 
 
 
