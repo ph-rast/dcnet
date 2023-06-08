@@ -94,7 +94,7 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
     ## First convert integers to numeric, then standardize    
     for( i in 1:J ) {
       stdx[[i]] <- apply( data[[i]], MARGIN = 2, as.numeric ) ## make numeric
-      stdx[[i]] <- (stdx[[i]] - col_means) / sd_means  
+      stdx[[i]] <- ( stdx[[i]] - col_means[col(stdx[[i]])] ) / sd_means[col(stdx[[i]])]  ## Vector col_means needs to be subtracted row-wise and divided row_wise
     }
     
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J
@@ -124,7 +124,8 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
     ## First convert integers to numeric, then subtract grand col_means to center
      for( i in 1:J ) {
        ctrx[[i]] <- apply( data[[i]], MARGIN = 2, as.numeric ) #scale(data[[i]], center = FALSE, scale = FALSE)
-       ctrx[[i]] <- ctrx[[i]] - col_means 
+       ## No need to center: Stan uses first value of TS as prior for mean
+       ## ctrx[[i]] <- ctrx[[i]] - col_means[col(ctrx[[i]])]  ## Vector col_means needs to be subtracted row-wise 
      }
     
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J

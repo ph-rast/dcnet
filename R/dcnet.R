@@ -15,7 +15,7 @@
 ##' @param chains Integer (Default: 4). The number of Markov chains.
 ##' @param standardize_data Logical (Default: FALSE). Whether data should be standardized. 
 ##' @param distribution Character (Default: "Student_t"). Distribution of innovation: "Student_t"  or "Gaussian"
-##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant'  or 'ARMA'. Currently ARMA(1,1) only. OR 'VAR' (VAR1).
+##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant', 'VAR', or 'ARMA'. Currently ARMA(1,1) or 'VAR' (VAR1).
 ##' @param sampling_algorithm Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.
 ##' @param simplify_ch Random efx on ch 
 ##' @param simplify_ah Randon efx on ah
