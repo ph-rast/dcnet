@@ -129,8 +129,14 @@ dcnet <- function(data,
     }
     
     ## Model fit is based on standardized values.
-    mns <- stan_data$centered_data
-    sds <- stan_data$scaled_data
+    if(standardize_data ) {
+      mns <- stan_data$grand_mean
+      sds <- stan_data$grand_sd
+    } else {
+      mns <- stan_data$grand_mean
+      sds <- 1
+    }
+    
     ## Values could be converted to original scale using something like this on the estimates
     ## orig_sd = stan_data$rts %*% diag(sds)
     ## orig_scale = orig_sd + array(rep(mns, each = aussi[[1]]$T), dim = c(aussi[[1]]$T, aussi[[1]]$nt) )
@@ -145,7 +151,9 @@ dcnet <- function(data,
                        nt = stan_data$nt,
                        TS_length = stan_data$T,
                        TS_names = colnames(stan_data$rts[[1]]),
-                       #RTS_last = stan_data$rts[stan_data$T,],
+                       ##RTS_last = stan_data$rts[stan_data$T,],
+                       grand_mean = mns,
+                       grand_sd = sds,
                        RTS_full = stan_data$rts,
                        mgarchQ = stan_data$Q,
                        mgarchP = stan_data$P,
