@@ -233,7 +233,7 @@ tsl
 N
 fit$model_fit$draws( )[,'rts_out[46,68,4]']
 
-person <- 6
+person <- 45
 ## extract lower, median, upper quantile and scal back to original scale
 yrep4 <- sapply(seq_len(tl), function(x) {
   quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',1]')], c(.025, .5, .975))

@@ -30,11 +30,12 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   params <- switch(object$param,
                    CCC = paste0(ccc_params,'|', var_params, '|', common_params),
                    DCC = paste0(dcc_params,'|', var_params,'|', common_params),
+                   DCCr = paste0(dcc_params,'|', var_params,'|', common_params),
                    NULL
                    )
   if(is.null(params)) {
     stop("dcnet object 'param' does not match a supported model. ",
-         object$param, "is not one in ", paste0(supported_models, collapse = ", "), ".")
+         object$param, " is not one in ", paste0(supported_models, collapse = ", "), ".")
   }
 
 
