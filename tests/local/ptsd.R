@@ -94,7 +94,7 @@ tsdat
 devtools::load_all( )
 
 fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL, parameterization = 'DCCr',
-             standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 summary(fit)
 
@@ -279,7 +279,7 @@ y_rep_loc <- grep( "rts_out", colnames(fit$model_fit$draws( )) )
 y_rep <-fit$model_fit$draws( )[, y_rep_loc]
 str(y_rep)
 
-plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.6))
+plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.02))
 for(i in sample(nrow(y_rep), size = 20)){
     lines(density( as.numeric(y_rep[i,]) ) , col = '#33333375', lwd = 1)
 }
@@ -329,3 +329,32 @@ qgraph::qgraph(mS2, labels = varnames)
 
 ## needs to be list of full cormats
 qgraph::qgraph.animate( list())
+
+
+### Yrep => rts_out[N,ts_length,timesries]
+
+tl
+N
+fit$model_fit$draws( )[,'rts_out[19,95,4]']
+
+person <-19
+## extract lower, median, upper quantile and scal back to original scale
+yrep4 <- sapply(seq_len(tl), function(x) {
+  quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',1]')], c(.025, .5, .975))
+  })
+
+
+yrep4 <- data.frame(yrep = t(yrep4))
+yrep4$time <- seq_len(tl )
+names(yrep4)
+yrep4$obs <- unlist( tsdat[[person]][,1] )
+
+tsdat[[1]][,1]
+str(yrep4 )
+
+ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+
+## Sanity check to see if stan_model transform to original data
+yrep4$standat <- fit$RTS_full[[person]][,1]
+ggplot(yrep4,  aes(x = time, y = standat) ) + geom_point( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+
