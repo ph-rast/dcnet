@@ -22,6 +22,7 @@
 *.csv
 *.sav
 !/tests/local/ptsd.R
+!/tests/local/fitbit.R
 
 src/stanExports_DCCMGARCH.h
 *.h
