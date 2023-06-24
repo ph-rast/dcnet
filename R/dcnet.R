@@ -20,6 +20,8 @@
 ##' @param simplify_ch Random efx on ch 
 ##' @param simplify_ah Randon efx on ah
 ##' @param simplify_bh Random efx on bh
+##' @param lbound Lower bound on observed values (across data matrix) - defaults to min(data).
+##' @param ubound Upper bound on observed values (across data matrix) - defaults to max(data).
 ##' @param ... Additional arguments can be ‘chain_id’, ‘init_r’, ‘test_grad’, ‘append_samples’, ‘refresh’, ‘enable_random_init’ etc. 
 ##' @return \code{dcnet} object.
 ##' @author Philippe Rast
@@ -46,7 +48,9 @@ dcnet <- function(data,
                   sampling_algorithm = "variational",
                   simplify_ch = 1,
                   simplify_ah = 1,
-                  simplify_bh = 1, ...) {
+                  simplify_bh = 1,
+                  lbound =  FALSE,
+                  ubound =  FALSE, ...) {
     if ( tolower(distribution) == "gaussian" ) {
         num_dist <- 0
     } else if ( tolower(distribution) == "student_t" ) {
@@ -67,7 +71,9 @@ dcnet <- function(data,
                            meanstructure,
                            simplify_ch,
                            simplify_ah,
-                           simplify_bh)
+                           simplify_bh,
+                           lbound,
+                           ubound)
 
     ## Select stanmodel
     ## 

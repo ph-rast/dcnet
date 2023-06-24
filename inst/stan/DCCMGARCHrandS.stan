@@ -306,8 +306,6 @@ model {
   }
 }
 
-
-
 generated quantities {
   //array[J,T] cov_matrix[nt] precision;
   array[J,T] matrix[nt,nt] pcor;

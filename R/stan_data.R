@@ -14,10 +14,12 @@
 #' @param simplify_ch Numeric value indicating whether random effects correlations should be simplfied to just diagonal matrix: 1 = yes; 0 = no.
 #' @param simplify_ah Numeric value indicating whether random effects correlations should be simplfied to just diagonal matrix: 1 = yes; 0 = no.
 #' @param simplify_bh Numeric value indicating whether random effects correlations should be simplfied to just diagonal matrix: 1 = yes; 0 = no.
+#' @param lbound Lower bound on observed values (across data matrix) - defaults to min(data).
+#' @param ubound Upper bound on observed values (across data matrix) - defaults to max(data).
 #' @return dcnet stan data list. 
 #' @keywords internal
 stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data, distribution = 0, 
-                      meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1) {
+                      meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1, lbound, ubound) {
 
   ## Check for data type:
   ## dim data needs to return NULL as the list is a collection of individual matrices for each individual.
@@ -79,6 +81,13 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
   }
   if( var(varT) > 0) stop("Time-series lengths are not equal for all groups/subjects")
 
+  ## Lower and upper bound on observed data matrix: Min and max across all columns
+  if( !lbound ) {
+    lbound <- min( unlist(data) )
+  }
+  if( !ubound ) {
+    ubound <- max( unlist(data) )
+  }  
   ## Standardization and Centering: Maintain relative locations of time series across individuals/groups to
   ## obtain meaningful random intercept terms.
   ## Same for centering only (when not standardizing). Relative position needs to be maintained.
@@ -90,6 +99,10 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
     ##  Obtain column means across all J
     col_means <- colMeans( do.call(rbind,  stdx) )
     sd_means <- apply( do.call(rbind,  stdx), 2, sd )
+
+    ## Scale bounds
+    lbound <- (lbound - col_means) / sd_means
+    ubound <- (ubound - col_means) / sd_means
     
     ## First convert integers to numeric, then standardize    
     for( i in 1:J ) {
@@ -113,9 +126,10 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
                            group = group,
                            simplify_ch = simplify_ch,
                            simplify_ah = simplify_ah,
-                           simplify_bh = simplify_bh)
+                           simplify_bh = simplify_bh,
+                           lbound = lbound, ubound = ubound)
   } else {
-    ## Unstandardized, only centered
+    ## Unstandardized
     ctrx <- data
 
     ##  Obtain column means across all J
@@ -143,7 +157,8 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
                            group = group,
                            simplify_ch = simplify_ch,
                            simplify_ah = simplify_ah,
-                           simplify_bh = simplify_bh)
+                           simplify_bh = simplify_bh,
+                           lbound = lbound, ubound = ubound)
   }
   
   return(return_standat)
