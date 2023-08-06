@@ -12,7 +12,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 
   ccc_params <- c("c_h|a_h|b_h|R|beta|c_h_var")
   dcc_D_params <- c("c_h_fixed|a_h_fixed|b_h_fixed|c_h_tau|a_h_tau|b_h_tau")
-  dcc_Q_params <- c("l_a_q|l_b_q|S")
+  dcc_Q_params <- c("l_a_q|l_b_q|Sfixed")
   dcc_params <- paste0(dcc_D_params, '|', dcc_Q_params)
 
   ## Meta-data needed for printing
@@ -180,7 +180,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 print.summary.dcnet <- function(x,  ... ) {
   if(x$meta$param == "CCC") {
     .print.summary.ccc(x)
-  } else if(x$meta$param == "DCC") {
+  } else if(x$meta$param == "DCC" | x$meta$param == "DCCr" ) {
     .print.summary.dcc(x)
   } 
   .newline(2)
@@ -281,8 +281,9 @@ print.summary.dcnet <- function(x,  ... ) {
   garch_h_index <- grep("_h", rownames(ms))
   garch_q_index  <- grep("_q", rownames(ms) )
   cond_corr_index <- grep("R", rownames(ms))
-  S_index = grep("S", rownames(ms))
-  S2_index = grep("S2", rownames(ms))
+  S_index = grep("Sfixed", rownames(ms))  ## 
+  S2_index = grep("Sfixed2", rownames(ms))
+  S_index = S_index[!(S_index %in% S2_index)] ## S_index contains both S and S2. Select only those that are not in S2
 
   ## Settings
   nt <- bmsum$meta$nt
