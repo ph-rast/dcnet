@@ -10,13 +10,13 @@ dim(fitbit )
 head(fitbit)
 
 ## Select variables of interest
-variables <- c("excited", "upset", "enthusiastic", "sedentaryMinutes")
+variables <- c("excited", "upset", "enthusiastic", "stressed")
 fitcomp <- fitbit[complete.cases( fitbit[, ..variables] )]
 
 ## Select only individuals with 80+ entries
 tmp <- fitcomp[, .N, by = record_id]
 tmp
-sel <- tmp[N >= 98]$record_id
+sel <- tmp[N >= 95]$record_id
 length(sel)
 
 ## Subset selected
