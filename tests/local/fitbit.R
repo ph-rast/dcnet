@@ -11,7 +11,7 @@ head(fitbit)
 str(fitbit )
 
 ## Select variables of interest
-variables <- c("excited", "disinterested", "active", "totalDistance")
+variables <- c("active", "totalDistance","disinterested","excited")
 fitcomp <- fitbit[complete.cases( fitbit[, ..variables] )]
 
 ## Select only individuals with 80+ entries
@@ -72,14 +72,34 @@ devtools::load_all( )
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
-             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 1)
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 
 summary(fit )
 #fit <- read_cmdstan_csv( "/tmp/Rtmpv70rbe/DCCMGARCHrandS-202306221623-1-675102.csv", variables = "H")
 #fit$draws
                                         #posterior::summarise_draws(fit$draws )
+fitC <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "CCC",
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = .5)
 
+
+log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
+log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
+dim(log_lik_r )
+
+r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  978 ) )
+
+log_lik_c <- grep( "log_lik", colnames(fitC$model_fit$draws( )) )
+log_lik_c <- fitC$model_fit$draws( )[, log_lik_c]
+dim(log_lik_c )
+r_eff_c <- loo::relative_eff(exp(log_lik_c ),  chain_id = rep(1,  1000 ) )
+
+
+fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
+fc <- loo::loo(log_lik_c, r_eff = r_eff_c )
+fr;fc
+loo::loo_compare(fr,  fc )
+## random efx model is preferred
 
 fit$model_fit$draws(variables = "pcor[1,1,1,1]" )
 
