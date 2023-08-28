@@ -9,7 +9,7 @@ ptsd_comp <- ptsd#[complete.cases( ptsd ), ]
 head( ptsd_comp )
 
 ## Select some variables
-dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy',
+dat1 <- ptsd_comp[, c('id', 'enthus', 'fear', 'angry', 'happy', 'blameS', 'blameO',
                       'positive', 'horror', 'agg', 'shame',
                       'calm', 'morning','eve','night', 'sleepy', 'fatigue', 'mem')]
 head(dat1 )
@@ -30,7 +30,7 @@ for( i in 1:length(ids) ) {
 
 ## make wide to create NA's and equal length for all
 X0 <- reshape(dat1c, idvar = "id", timevar = "time", direction = "wide",
-              v.names = c('morning','eve', 'night','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm','sleepy', 'fatigue', 'mem'))
+              v.names = c('morning','eve', 'night','enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm','sleepy', 'fatigue', 'mem','blameS', 'blameO'))
 head(X0)
 ## Replace missings with 50
 #X0[is.na(X0 )] <- 50
@@ -71,7 +71,7 @@ nts <- 4 # Number of variables
 ## X2 needs to be a list of N matrices with dimension ntsXtl 
 ## Drop id and time variable
 c('enthus', 'fear', 'angry', 'happy', 'positive', 'horror', 'agg', 'shame', 'calm')
-varnames <- c('horror', 'fear', 'happy', 'calm')
+varnames <- c('blameS', 'angry', 'happy', 'blameO')
 names(X2 )
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, varnames])
 str(tsdat)
@@ -94,7 +94,7 @@ tsdat
 devtools::load_all( "~/Git/dcnet")
 
 fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL, parameterization = 'DCCr',
-             standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 summary(fit)
 
@@ -144,18 +144,20 @@ f1
 loo::loo_compare(f1, f2 )
 
 fit_const <- dcnet( data = tsdat, J =  N, group =  groupvec, parameterization = 'CCC',
-                   standardize_data = FALSE,
+                   standardize_data = FALSE, threads =  1, init = 1,
                    sampling_algorithm = 'variational')
 
 
-log_lik_loc <- grep( "log_lik", colnames(fit_const$model_fit$draws( )) )
-log_lik_const <- fit_const$model_fit$draws( )[, log_lik_loc]
-waic( log_lik = fit_const$model_fit$draws( )[, log_lik_loc] )
+log_lik_loc_c <- grep( "log_lik", colnames(fit_const$model_fit$draws( )) )
+log_lik_const <- fit_const$model_fit$draws( )[, log_lik_loc_c]
+waic( log_lik = fit_const$model_fit$draws( )[, log_lik_loc_c] )
+waic( log_lik = fit$model_fit$draws( )[, log_lik_loc] )
 
 loo::waic( log_lik_const )
 m1 <- loo::loo( log_lik )
 m2 <- loo::loo( x = log_lik_const)
-
+m1
+m2
 loo::loo_compare(m1,  m2 )
 
 rts_out_loc <- grep( "rts_out", colnames(fit$model_fit$draws( )) )
@@ -171,6 +173,7 @@ rts_out[, 18:25]
 ## Plots
 ## R[id, timepoint, variable, variable]
 ## Take median of posterior distribution
+nts <- length(varnames)
 
 out <- NULL
 for(i in 1:N) {
@@ -278,8 +281,9 @@ library(patchwork )
 y_rep_loc <- grep( "rts_out", colnames(fit$model_fit$draws( )) )
 y_rep <-fit$model_fit$draws( )[, y_rep_loc]
 str(y_rep)
+dim(y_rep)
 
-plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.6))
+plot(density(as.numeric( y_rep[1, ])), col = '#33333375', ylim = c(0, 0.02))
 for(i in sample(nrow(y_rep), size = 20)){
     lines(density( as.numeric(y_rep[i,]) ) , col = '#33333375', lwd = 1)
 }
@@ -290,10 +294,15 @@ dev.off()
 
 
 ## regexp variable 1
-sel <- grep( pattern = "rts_out\\[[0-9]+,[0-95]+,1" , x = colnames(y_rep), perl = TRUE)
-dim(y_rep[,sel])
+sel <- grep( pattern = "1]" , x = colnames(y_rep), perl = TRUE)
 
-y_rep_1 <- data.table( cbind(yrep = colMeans( y_rep[,sel] ), time = rep(1:95, N ), id = rep(1:N, each = 95 ) ))
+sel
+dim(y_rep[,sel])
+y_rep
+
+length(colMeans( y_rep[,sel] ))
+N*50
+y_rep_1 <- data.table( cbind(yrep = colMeans( y_rep[,sel] ), time = rep(1:tl, N ), id = rep(1:N, each = tl ) ))
 y_rep_1$id <- as.factor(y_rep_1$id )
 head(y_rep_1)
 
@@ -301,15 +310,16 @@ ggplot(y_rep_1,  aes(x = time, y = yrep, color = id)) + geom_line( )
 
 
 id <- 4
-df2 <- data.table(out = fit_const$RTS_full[[id]][, "horror"], time = seq(1:95))
+length(fit$RTS_full[[id]][, "blameO"])
+df2 <- data.table(out = fit$RTS_full[[id]][, "blameO"], time = seq(1:tl))
 head(df2 )
+
 ggplot(y_rep_1[y_rep_1$id == paste0(id),],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
-## CHECK hwo if RTS if manipulated in dcnet function
+## CHECK 
 
-df2 <- data.table(out = tsdat[[1]][, "horror"], time = seq(1:95))
+df2 <- data.table(out = tsdat[[1]][, "blameO"], time = seq(1:tl))
 ggplot(y_rep_1[y_rep_1$id == "1",],  aes(x = time, y = yrep)) + geom_line( ) + geom_line( data = df2, aes(y = out), color =  'red')
-## CHECK hwo if RTS if manipulated in dcnet function
-
+## CHECK 
 
 library(qgraph )
 
@@ -329,3 +339,32 @@ qgraph::qgraph(mS2, labels = varnames)
 
 ## needs to be list of full cormats
 qgraph::qgraph.animate( list())
+
+
+### Yrep => rts_out[N,ts_length,timesries]
+
+tl
+N
+fit$model_fit$draws( )[,'rts_out[19,95,4]']
+
+person <-6
+## extract lower, median, upper quantile and scal back to original scale
+yrep4 <- sapply(seq_len(tl), function(x) {
+  quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',1]')], c(.025, .5, .975))
+  })
+
+
+yrep4 <- data.frame(yrep = t(yrep4))
+yrep4$time <- seq_len(tl )
+names(yrep4)
+yrep4$obs <- unlist( tsdat[[person]][,1] )
+
+tsdat[[1]][,1]
+str(yrep4 )
+
+ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+
+## Sanity check to see if stan_model transform to original data
+yrep4$standat <- fit$RTS_full[[person]][,1]
+ggplot(yrep4,  aes(x = time, y = standat) ) + geom_point( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+

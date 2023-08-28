@@ -562,7 +562,7 @@ fit
 ## Real data: Nestler
 devtools::load_all( )
 
-dfs <- read.table("./local/dataFlip.txt", header = TRUE ) 
+dfs <- read.table("~/UZH/R/Packages/dcnet/tests/local/dataFlip.txt", header = TRUE ) 
 head( dfs )
 
 dat1 <- dfs[,c("id","day", "gm_sociable",  "gm_creative", "gm_friendly", "gm_organised")]
@@ -571,7 +571,9 @@ dat1 <- dfs[,c("id","day", "gm_sociable",  "gm_creative", "gm_friendly", "gm_org
 X0 <- reshape(dat1, idvar = "id", timevar = "day", direction = "wide",
         v.names = c("gm_sociable",  "gm_creative", "gm_friendly", "gm_organised"))
 
+varnames = c("gm_sociable",  "gm_creative", "gm_friendly", "gm_organised")
 X0
+rowSums(is.na(X0 ))
 ## Replace missings with 0
 X0[is.na(X0 )] <- 0
 
@@ -585,6 +587,8 @@ XL <- reshape(X0, direction = "long",
 ## sort by id, then time
 X2 <- XL[order( XL$id,  XL$time), ]
 head(X2 )
+max(rowSums( is.na(X2 ) ))
+X2
 unique(X2$id )
 X2$time
 X2 <- X2[X2$id <= 50,]
@@ -605,8 +609,15 @@ nts <- 4 # Number of variables
 tsdat <- lapply( seq_len(N), function(x) X2[X2$id == x, 3:6])
 str(tsdat)
 
+head(tsdat[[1]])
 
-fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = TRUE,
+plot(tsdat[[50]][,1] , type = 'l')
+lines(tsdat[[50]][,2] , col = 'red')
+
+setwd("./tests" )
+
+fit <- dcnet( data = tsdat, J =  N, group =  groupvec, standardize_data = FALSE,
+             parameterization = "DCCr", threads = 1, init = 1.5,
              sampling_algorithm = 'variational')
 
 summary(fit)
