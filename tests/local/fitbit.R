@@ -11,13 +11,13 @@ head(fitbit)
 str(fitbit )
 
 ## Select variables of interest
-variables <- c("excited", "disinterested", "active", "totalDistance")
+variables <- c("active", "totalDistance","disinterested","excited")
 fitcomp <- fitbit[complete.cases( fitbit[, ..variables] )]
 
 ## Select only individuals with 80+ entries
 tmp <- fitcomp[, .N, by = record_id]
 tmp
-sel <- tmp[N >= 95]$record_id
+sel <- tmp[N >= 99]$record_id
 length(sel)
 
 ## Subset selected
@@ -41,8 +41,14 @@ dt[, id := .GRP, by = record_id]
 
 
 library(ggplot2 )
-ggplot(dt,  aes(x = time,  y = excited, group = factor(id), color = factor(id)) ) +
+#ggplot(dt,  aes(x = time,  y = excited, group = factor(id), color = factor(id)) ) +
+#  geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2)
+head(dt )
+unique(dt$id )
+plt <- ggplot(dt[id <= 3],  aes(x = time,  y = excited, group = factor(id), color = factor(id)) ) +
   geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2)
+
+ggsave(filename = "~/Downloads/fitbit_raw.pdf" )
 
 dev.off( )
 
@@ -60,20 +66,40 @@ tsdat
 
 
 getwd( )
-setwd( "./tests/")
+setwd( "../")
 
 devtools::load_all( )
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
-             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 1)
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 
+summary(fit )
 #fit <- read_cmdstan_csv( "/tmp/Rtmpv70rbe/DCCMGARCHrandS-202306221623-1-675102.csv", variables = "H")
 #fit$draws
-#posterior::summarise_draws(fit$draws )
+                                        #posterior::summarise_draws(fit$draws )
+fitC <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "CCC",
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = .5)
 
 
+log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
+log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
+dim(log_lik_r )
+
+r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  978 ) )
+
+log_lik_c <- grep( "log_lik", colnames(fitC$model_fit$draws( )) )
+log_lik_c <- fitC$model_fit$draws( )[, log_lik_c]
+dim(log_lik_c )
+r_eff_c <- loo::relative_eff(exp(log_lik_c ),  chain_id = rep(1,  1000 ) )
+
+
+fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
+fc <- loo::loo(log_lik_c, r_eff = r_eff_c )
+fr;fc
+loo::loo_compare(fr,  fc )
+## random efx model is preferred
 
 fit$model_fit$draws(variables = "pcor[1,1,1,1]" )
 
@@ -109,7 +135,8 @@ head(df)
 
 
 library(ggplot2 )
-varnames <- variables
+abbreviate(variables)
+varnames <- abbreviate(variables)
 #'enthus', 'fear', 'angry', 'happy'
 c12 <-
   ggplot(df,  aes(x = time,  y = cor12 , color = id)) + geom_line(show.legend = FALSE )+ coord_cartesian(ylim = c(-1, 1 ) ) +
@@ -140,21 +167,47 @@ head(df3)
 c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous(paste0("PCor(", varnames[3], ", ", varnames[4], ")"))#+ geom_vline( xintercept = 36)
 
+ggsave(filename = "~/Downloads/singlecorr.pdf",  width = 6,  height = 3,  plot = c34 )
+
 nn <- ggplot( ) + theme_void()
 
 library(patchwork )
 
-(c12 | c13 | c14 ) /
+patched <- (c12 | c13 | c14 ) /
 ( nn | c23 | c24 ) /
 ( nn | nn  | c34 )
 
+ggsave(filename = "~/Downloads/pcor.pdf", width = 9, height = 4.5, plot = patched)
 
 ### Yrep => rts_out[N,ts_length,timesries]
 tsl
 N
-fit$model_fit$draws( )[,'rts_out[46,68,4]']
+fit$model_fit$draws( )[,'rts_out[34,68,4]']
 
-person <- 25
+person <- 6
+## extract lower, median, upper quantile and scal back to original scale
+yrep4 <- sapply(seq_len(tl), function(x) {
+  quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',4]')], c(.025, .5, .975))
+  })
+
+yrep4
+
+#yrep4 <- yrep4*fit$grand_sd[1] + fit$grand_mean[1]
+
+yrep4 <- data.frame(yrep = t(yrep4))
+
+
+yrep4$time <- seq_len(tl )
+names(yrep4)
+yrep4$obs <- unlist( tsdat[[person]][,4] )
+
+tsdat[[1]][,4]
+head(yrep4 )
+
+sc <- ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')+ylab(varnames[4])
+ggsave(filename = "~/Downloads/sancheck4.pdf",  plot = sc ,  width = 6, height = 4)
+
+
 ## extract lower, median, upper quantile and scal back to original scale
 yrep4 <- sapply(seq_len(tl), function(x) {
   quantile(fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',1]')], c(.025, .5, .975))
@@ -174,10 +227,28 @@ yrep4$obs <- unlist( tsdat[[person]][,1] )
 tsdat[[1]][,1]
 head(yrep4 )
 
-ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+sc <- ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')+ylab(varnames[1])
+ggsave(filename = "~/Downloads/sancheck1.pdf",  plot = sc ,  width = 6, height = 4)
 
 
 ## Sanity check to see if stan_model transform to original data
-yrep4$standat <- fit$RTS_full[[person]][,1] #*fit$grand_sd[1] + fit$grand_mean[1]
-ggplot(yrep4,  aes(x = time, y = standat) ) + geom_point( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
+#yrep4$standat <- fit$RTS_full[[person]][,4] #*fit$grand_sd[1] + fit$grand_mean[1]
+#ggplot(yrep4,  aes(x = time, y = standat) ) + geom_point( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')
 
+library(qgraph )
+
+grep('Sfixed', colnames(fit$model_fit$draws( )) )
+colMeans( fit$model_fit$draws( )[, 288664:288679] )
+
+
+mS <- matrix(colMeans( fit$model_fit$draws( )[, 288664:288679] ), ncol =  4, byrow =  TRUE)
+mS
+
+fit$model_fit$draws( )[, c( 'Sfixed[1,2]','Sfixed[1,3]','Sfixed[1,4]','Sfixed[2,3]','Sfixed[2,4]','Sfixed[3,4]')]
+
+pdf(file = "~/Downloads/qgraph.pdf")
+qgraph::qgraph(mS, labels = varnames)
+dev.off()
+
+288695## needs to be list of full cormats
+qgraph::qgraph.animate( list())
