@@ -78,17 +78,18 @@ dcnet <- function(data,
 
     ## select CmdStanModel created by cmdstan_model at time of compilation
     ## rstan
+    stan_path <- get_target_stan_path()
 
-    ccc_file <- file.path("../inst/stan/VAR.stan" )
-    dcc_file <- file.path("../inst/stan/DCCMGARCHrandQ.stan" )
-    dccr_file <- file.path("../inst/stan/DCCMGARCHrandS.stan" )
+    ccc_file <- file.path(stan_path, "VAR.stan" )
+    dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan" )
+    dccr_file <-file.path(stan_path, "DCCMGARCHrandS.stan" )
     
     stanmodel <- switch(parameterization,
-                        CCC = cmdstan_model(ccc_file, include_paths = "../inst/stan/",
+                        CCC = cmdstan_model(ccc_file, include_paths =  stan_path,
                                             cpp_options = list(stan_threads = TRUE)),
-                        DCC = cmdstan_model(dcc_file, include_paths = "../inst/stan/",
+                        DCC = cmdstan_model(dcc_file, include_paths =  stan_path,
                                             cpp_options = list(stan_threads = TRUE)),
-                        DCCr = cmdstan_model(dccr_file, include_paths = "../inst/stan/",
+                        DCCr = cmdstan_model(dccr_file, include_paths =  stan_path,
                                              cpp_options = list(stan_threads = TRUE)),
                         NULL)
         

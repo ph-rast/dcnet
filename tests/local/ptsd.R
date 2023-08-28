@@ -91,7 +91,7 @@ getwd( )
 setwd( "../")
 tsdat
 
-devtools::load_all( )
+devtools::load_all( "~/Git/dcnet")
 
 fit <- dcnet( data = tsdat, J =  N, group =  groupvec, S_pred = NULL, parameterization = 'DCCr',
              standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
