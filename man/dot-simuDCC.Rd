@@ -21,7 +21,10 @@
   l_b_q_fixed = 0,
   l_b_q_r_sd = 0.1,
   ranef_sd_S,
-  alpha = 0.5
+  ranS_sd = 1,
+  phi_mu = 0,
+  phi_sd = 1,
+  phi_ranef_sd = 1
 )
 }
 \arguments{

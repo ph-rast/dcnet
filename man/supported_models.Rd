@@ -5,7 +5,7 @@
 \alias{supported_models}
 \title{Models supported by dcnet}
 \format{
-An object of class \code{character} of length 2.
+An object of class \code{character} of length 3.
 }
 \usage{
 supported_models

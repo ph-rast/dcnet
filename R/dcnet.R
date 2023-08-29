@@ -84,7 +84,7 @@ dcnet <- function(data,
 
     ## select CmdStanModel created by cmdstan_model at time of compilation
     ## rstan
-    stan_path <- get_target_stan_path()
+    stan_path <- .get_target_stan_path()
 
     ccc_file <- file.path(stan_path, "VAR.stan" )
     dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan" )
