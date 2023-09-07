@@ -70,7 +70,7 @@ parameters {
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
-  //array[J] vector<lower=0>[Sdim] S_vec_tau; 
+  vector<lower=0>[Sdim] S_vec_tau; 
   vector[Sdim] S_vec_fixed; // Vectorized fixed effect for S
   vector[Sdim] S_vec_fixed2; // Vectorized fixed effect for S
   array[J] vector[Sdim] S_vec_sd;
@@ -216,11 +216,11 @@ transformed parameters {
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
 
-      //      S_Lv[j] = tanh( S_vec_fixed + S_vec_tau[j] .* S_vec_stdnorm[j] );
+      // Second S_lv stuff is just a placeholder: TODO, add S_Lv2[j] or drop completely
       if (S_pred[j,t] == 0){
-	S_Lv[j] = tanh( S_vec_fixed  +  S_vec_stdnorm[j] );
+	S_Lv[j] = tanh( S_vec_fixed  + S_vec_tau .*S_vec_stdnorm[j] );
       } else if (S_pred[j,t] == 1){
-	S_Lv[j] = tanh( S_vec_fixed2  + S_vec_stdnorm[j] );
+	S_Lv[j] = tanh( S_vec_fixed2 + S_vec_tau .*S_vec_stdnorm[j] );
       }
       S[j] = invvec_to_corr(S_Lv[j], nt);
 
@@ -276,7 +276,7 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    //S_vec_tau[j] ~ inv_gamma( 6, 2.5);
+    S_vec_tau ~ inv_gamma( 6, 2.5);
     S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
