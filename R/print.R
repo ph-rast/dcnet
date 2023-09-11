@@ -95,7 +95,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
     ## Stan model estimates l_a_q on logit scale -- transform to SD metric
     ## Compute fixed a_q and b_q
     draws$a_q_fixed <- 1 / (1 + exp( -draws[, "l_a_q"] ))
-    draws$b_q_fixed <- draws$a_q_fixed / (1 + exp( -draws[, "l_b_q"] ))
+    draws$b_q_fixed <- (1-draws$a_q_fixed) / (1 + exp( -draws[, "l_b_q"] ))
 
     ## Find (c/a/b)_h_fixed values for nt variables
     c_h_location <- which( grepl( "c_h_fixed",  names(draws) ) )
@@ -138,7 +138,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
     ## Stan model estimates l_a_q on logit scale -- transform to SD metric
     ## Compute fixed a_q and b_q
     draws$a_q_fixed <- 1 / (1 + exp( -draws[, "l_a_q"] ))
-    draws$b_q_fixed <- draws$a_q_fixed / (1 + exp( -draws[, "l_b_q"] ))
+    draws$b_q_fixed <- (1-draws$a_q_fixed) / (1 + exp( -draws[, "l_b_q"] ))
 
     ## Find (c/a/b)_h_fixed values for nt variables
     c_h_location <- which( grepl( "c_h_fixed",  names(draws) ) )
