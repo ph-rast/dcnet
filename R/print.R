@@ -118,7 +118,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
         
     b_vars <- length(b_h_location )
     b_label <- paste0(rep("b_h[",  b_vars),  seq_len(b_vars), "]" )
-    draws[, b_label] <- draws[, ..a_label] / ( 1 + exp( -draws[, ..b_h_location] ) )
+    draws[, b_label] <- (1-draws[, ..a_label]) / ( 1 + exp( -draws[, ..b_h_location] ) )
     
     ## Summarize draws
     model_summary <-  t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
@@ -160,7 +160,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
         
     b_vars <- length(b_h_location )
     b_label <- paste0(rep("b_h[",  b_vars),  seq_len(b_vars), "]" )
-    draws[, b_label] <- draws[, ..a_label] / ( 1 + exp( -draws[, ..b_h_location] ) )
+    draws[, b_label] <- (1-draws[, ..a_label]) / ( 1 + exp( -draws[, ..b_h_location] ) )
     
     ## Summarize draws
     model_summary <-  t( apply(draws,  2,  FUN = .summarize_draws, CrI ) )
