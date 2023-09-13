@@ -68,7 +68,7 @@ tsdat
 getwd( )
 setwd( "../")
 
-devtools::load_all( )
+devtools::load_all( path = "~/Git/dcnet/")
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",

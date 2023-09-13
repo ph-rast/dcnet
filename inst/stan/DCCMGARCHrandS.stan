@@ -280,7 +280,7 @@ model {
     S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
-    to_vector(D1_init[j]) ~ lognormal(-1, 1);
+    to_vector(D1_init[j]) ~ lognormal(c_h[j], 1);
     to_vector(u1_init[j]) ~ std_normal();
     Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
     // UL transform jacobian
