@@ -100,15 +100,15 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
     col_means <- colMeans( do.call(rbind,  stdx) )
     sd_means <- apply( do.call(rbind,  stdx), 2, sd )
 
-    ## Scale bounds
-    lbound <- (lbound - col_means) / sd_means
-    ubound <- (ubound - col_means) / sd_means
-    
     ## First convert integers to numeric, then standardize    
     for( i in 1:J ) {
       stdx[[i]] <- apply( data[[i]], MARGIN = 2, as.numeric ) ## make numeric
       stdx[[i]] <- ( stdx[[i]] - col_means[col(stdx[[i]])] ) / sd_means[col(stdx[[i]])]  ## Vector col_means needs to be subtracted row-wise and divided row_wise
     }
+
+    ## Scale bounds
+    lbound <- min( unlist(stdx) )
+    ubound <- max( unlist(stdx) )
     
     return_standat <- list(T = T, ## TODO: may need to allow different T's per J
                            rts = stdx,

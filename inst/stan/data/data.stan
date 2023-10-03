@@ -5,8 +5,8 @@ int<lower=2> T; // lengh of time series
 int<lower=2> nt;    // number of time series
 int<lower=1> Q; // MA component in MGARCH(P,Q), matrix A
 int<lower=1> P; // AR component in MGARCH(P,Q), matrix B
-int lbound; //lower bound of observed variables
-int ubound; //upper bound of observed variables
+real lbound; //lower bound of observed variables
+real ubound; //upper bound of observed variables
 array[J] matrix<lower=lbound,upper=ubound>[T,nt] rts;  // multivariate time-series; array of length J of Txnt matrix
 array[nobs] vector[nt] xC;  // TODO - match to rts if to be included // time-varying predictor for constant variance
 int<lower=0, upper=1> distribution; // 0 = Normal; 1 = student_t

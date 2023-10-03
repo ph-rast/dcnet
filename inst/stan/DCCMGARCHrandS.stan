@@ -9,7 +9,7 @@ data {
 #include /data/data.stan
 }
 
-transformed data {
+transformed data { 
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
   int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
