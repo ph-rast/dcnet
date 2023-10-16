@@ -63,16 +63,16 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 60
-tl <- 50
+N <- 30
+tl <- 300
 nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   a_h_fixed = rep(0.3, 4 ),
-                   b_h_fixed = rep(0.4, 4 ),
+                   a_h_fixed = rep(-0.3, 4 ),
+                   b_h_fixed = rep(0, 4 ),
                    l_a_q_fixed = 0.6,
                    l_b_q_fixed = 0.2,
-                   ranef_sd_S = 0.01,
-                   l_b_q_r_sd = 0.01,
+                   ranef_sd_S = 0.5,
+                   l_b_q_r_sd = 0.5,
                    phi0_fixed =  c(0, 0, 0 , 0),
                    ranS_sd = 0.01,
                    phi_mu = 0,
@@ -86,6 +86,7 @@ rtsgen[[1]][,1]
 ## Fixed Corr
 simdat$S
 simdat$Fixed_S
+simdat$phi0_fixed
 simdat$fixed_phi
 
 
@@ -115,17 +116,777 @@ setwd("./tests")
 
 devtools::load_all( )
 
-fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-             group =  groupvec, standardize_data = FALSE, init = 1,
-             #iterations = 2000,
-             threads = 1,
-             sampling_algorithm = 'variational')
+system.time( {
+  fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
+               group =  groupvec, standardize_data = TRUE, init = 0,
+               #iterations = 1000,
+               threads = 1,
+               sampling_algorithm = 'variational')
+})
+
+
+### 
+##########################################################################################3
+###########
+## Simulate from fitted stan object
+###########
+
+## generated quantities returns num_iteration samples.
+## Re-run the the models on the first 100 replications
+
+## Step 1:
+## Extract 100 random rows of generated data
+rows <- sample(1:1000,  100 )
+dt <- data.table(fit$model_fit$draws( variables = "rts_out")[rows,])
+dim(dt)
+
+## Position of relevant info:
+## [N, tl, nts]
+
+## Eg. first replication 
+dt[1, 1]
+
+## init objects:
+## list containing all replicaion datasets:
+replication_data <- list( )
+
+## objects used to extract the data and assign it to the right unit and variable
+tsl <- 1:tl
+nts <- 4
+cols <- 1:nts
+
+## init single replicate data object
+result_matrix <- list( )
+
+for(r in 1:100){
+  ## Construct a list of length N, containing the tl x nts matrices
+  for(i in seq_len(N) ) {
+    ## Generate the column names
+    column_names <- unlist(lapply(cols, function(col) {
+      paste0('rts_out[',i,',', tsl, ',', col, ']')
+    }))
+    ## Extract the values and transform them into a matrix
+    matrix_data <- dt[1, .SD, .SDcols = column_names]
+    result_matrix[[i]] <- matrix(unlist(matrix_data), nrow = tl, ncol = nts)
+  }
+  ## Fill a list that contains all the generated datasets
+  replication_data[[r]] = result_matrix 
+}
+
+## Sanity check
+replication_data[[1]]
+replication_data[[2]]
+
+
+
+## Init all objects:
+phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list( )
+
+
+## Function to prevent loop to stop when stan model encounters errors
+default_return <- FALSE
+safe_sample <- purrr::possibly( function(s) {
+  dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
+        group =  groupvec, standardize_data = FALSE, init = 0.5,
+        threads = 1, sampling_algorithm = 'variational')
+}, otherwise = default_return)
+
+## Function to compute coverage probability ranging from L to U in the original population distribution
+overlap <- function(population, L,  U,    iterations =  1000 ) {
+  O <- sum(population > L & population < U)/iterations
+  return(O)
+}
+  
+
+
+## Fit model to replication dataset(s)
+for(s in 2:10) {
+  
+  fit_r <- safe_sample(s)
+  fit_r$error
+  if(!is.null(fit_r$error)) {
+    next
+  }
+            
+  ## Sampled
+  SF <- fit_r$model_fit$summary(variables = 'phi0_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  phi0_fixed_cov[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'phi0_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  ##phi0_fixed >= SF[,3] & phi0_fixed <= SF[,4]
+  print(phi0_fixed_cov)
+  ##
+  SF <- fit_r$model_fit$summary(variables = 'phi0_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  phi0_sd_cov[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'phi0_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  }) ##phi0_sd >= SF[,3] & phi0_sd <= SF[,4]
+  print(phi0_sd_cov)
+  SF <- fit_r$model_fit$summary(variables = 'vec_phi_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  phi_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'vec_phi_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  }) ##fixed_phi >= SF[,3] & fixed_phi <= SF[,4]
+  print(phi_fixed_covr)
+  ##
+
+  ## Coverage: phi_ranef_sd
+  SF <- fit_r$model_fit$summary(variables = 'phi_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  phi_ranef_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'phi_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  }) ##phi_ranef_sd >= SF[,3] & phi_ranef_sd <= SF[,4]
+  print(phi_ranef_covr)
+  ##
+
+  ## Covr: Log C fixed: log_c_fixed = rep(0, n_ts), ## on log scale
+  SF <- fit_r$model_fit$summary(variables = 'c_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  log_c_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'c_h_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(log_c_fixed_covr)
+  ##
+  ## Covr: random effect on C
+  SF <- fit_r$model_fit$summary(variables = 'c_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  log_c_rand_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'c_h_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(log_c_rand_covr)
+  ##
+  ## Covr: Log A fixed: log_a_fixed = rep(0, n_ts), ## on log scale
+  SF <- fit_r$model_fit$summary(variables = 'a_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  log_a_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'a_h_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(log_a_fixed_covr)
+  ##
+  ## Covr: random effect on A
+  SF <- fit_r$model_fit$summary(variables = 'a_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  a_h_r_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'a_h_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(a_h_r_covr)
+  ##
+  ## Covr: Log B fixed: log_b_fixed 
+  SF <- fit_r$model_fit$summary(variables = 'b_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  log_b_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'b_h_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(log_b_fixed_covr)
+  ##
+  ## Covr: random effect on b
+  SF <- fit_r$model_fit$summary(variables = 'b_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  b_h_r_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'b_h_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(b_h_r_covr)
+  ##
+  ## Covr: l_a_q 
+  SF <- fit_r$model_fit$summary(variables = 'l_a_q',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  l_a_q_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'l_a_q' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(l_a_q_fixed_covr)
+  ##
+  ## Covr: random effect on l_a_q
+  SF <- fit_r$model_fit$summary(variables = 'l_a_q_sigma',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  l_a_q_r_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'l_a_q_sigma' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(l_a_q_r_covr)
+  ## Covr: l_b_q 
+  SF <- fit_r$model_fit$summary(variables = 'l_b_q',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  l_b_q_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'l_b_q' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(l_b_q_fixed_covr)
+  ## Covr: random effect on l_a_q
+  SF <- fit_r$model_fit$summary(variables = 'l_b_q_sigma',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  l_b_q_r_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'l_b_q_sigma' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(l_b_q_r_covr)
+  ## S
+  SF <- fit_r$model_fit$summary(variables = 'S_vec_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+    fix_S[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'S_vec_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(fix_S )
+  ## Random efx of S
+  SF <- fit_r$model_fit$summary(variables = 'S_vec_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  ran_S[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    overlap(fit$model_fit$draws(variables = 'S_vec_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+  })
+  print(ran_S )
+}
+
+s
+
+
+ran_S
+
+## Compute coverage
+coverage <- function(param) {
+  out <- sapply(1:length(param[[1]]), function(i) {
+    mean(sapply(param, function(x) x[i]))
+  })
+  return(out)
+}
+
+coverage(ran_S )
+
+covresults <- list()
+
+## 1:
+## 2: N = 100, tslength=50
+covresults[[1]] <- list(
+phi0_fixed_cov = coverage(phi0_fixed_cov),
+phi0_sd_cov = coverage(phi0_sd_cov),
+phi_fixed_covr =  coverage(phi_fixed_covr),
+phi_ranef_covr = coverage(phi_ranef_covr),
+log_c_fixed_covr = coverage(log_c_fixed_covr),
+log_c_rand_covr = coverage(log_c_rand_covr),
+log_a_fixed_covr = coverage(log_a_fixed_covr),
+a_h_r_covr = coverage(a_h_r_covr),
+log_b_fixed_covr = coverage(log_b_fixed_covr),
+b_h_r_covr = coverage(b_h_r_covr),
+l_a_q_fixed_covr = coverage(l_a_q_fixed_covr),
+l_a_q_r_covr = coverage(l_a_q_r_covr),
+l_b_q_fixed_covr = coverage(l_b_q_fixed_covr),
+l_b_q_r_covr = coverage(l_b_q_r_covr),
+fix_S = coverage(fix_S),
+ran_S = coverage(ran_S))
+
+covresults[[1]]
+
+
+
+######################################################################################
+######################################################################################
+
+
+
+###
+
+
+
+
 
 svf <- posterior::as_draws_matrix( fit$model_fit$draws(variables = 'S_vec_fixed' ) )
-fit$model_fit$summary(variables = c('S_vec_fixed', 'vec_phi_fixed'))
+dt <- data.table(fit$model_fit$summary(variables = c('phi0_fixed', 'S_vec_fixed', 'vec_phi_fixed')))[,c(1,2,6,7)]
+
+
+## Coverage: phi0_fixed
+SF <- fit$model_fit$summary(variables = 'phi0_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+
+phi0_fixed <- simdat$phi0_fixed
+phi0_fixed
+phi0_fixed_cov <- phi0_fixed >= SF[,3] & phi0_fixed <= SF[,4]
+print(phi0_fixed_cov)
+
+## Coverage: phi0_sd
+SF <- fit$model_fit$summary(variables = 'phi0_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+phi0_sd <- simdat$phi0_sd
+phi0_sd
+phi0_sd_cov <- phi0_sd >= SF[,3] & phi0_sd <= SF[,4]
+print(phi0_sd_cov)
+
+## Phi is transformed in simulation script to maintain stationarity: This might not
+## capture the actual coverage -- needs rethinking
+## Coverage: phi_fixed
+SF <- fit$model_fit$summary(variables = 'vec_phi_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+phi_fixed_covr <- c(simdat$fixed_phi) >= SF[,3] & c(simdat$fixed_phi) <= SF[,4]
+print(phi_fixed_covr)
+
+## Coverage: phi_ranef_sd
+SF <- fit$model_fit$summary(variables = 'phi_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+phi_ranef_sd = simdat$phi_ranef_sd
+phi_ranef_sd
+phi_ranef_covr <- phi_ranef_sd >= SF[,3] & phi_ranef_sd <= SF[,4]
+print(phi_ranef_covr)
+
+## Covr: Log C fixed: log_c_fixed = rep(0, n_ts), ## on log scale
+SF <- fit$model_fit$summary(variables = 'c_h_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+log_c_fixed = rep(0, 4)
+log_c_fixed_covr <- log_c_fixed >= SF[,3] & log_c_fixed <= SF[,4]
+print(log_c_fixed_covr)
+
+## Covr: random effect on C
+SF <- fit$model_fit$summary(variables = 'c_h_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+log_c_r_sd = simdat$log_c_r_sd
+log_c_r_sd
+log_c_rand_covr <- log_c_r_sd >= SF[,3] & log_c_r_sd <= SF[,4]
+print(log_c_rand_covr)
+
+## Covr: Log A fixed: log_a_fixed = rep(0, n_ts), ## on log scale
+SF <- fit$model_fit$summary(variables = 'a_h_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+a_h_fixed = simdat$a_h_fixed
+log_a_fixed_covr <- a_h_fixed >= SF[,3] & a_h_fixed <= SF[,4]
+print(log_a_fixed_covr)
+
+## Covr: random effect on A
+SF <- fit$model_fit$summary(variables = 'a_h_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+a_h_r_sd = simdat$a_h_r_sd
+a_h_r_covr <- a_h_r_sd >= SF[,3] & a_h_r_sd <= SF[,4]
+print(a_h_r_covr)
+
+## Covr: Log B fixed: log_b_fixed 
+SF <- fit$model_fit$summary(variables = 'b_h_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+b_h_fixed = simdat$b_h_fixed
+log_b_fixed_covr <- b_h_fixed >= SF[,3] & b_h_fixed <= SF[,4]
+print(log_b_fixed_covr)
+
+## Covr: random effect on b
+SF <- fit$model_fit$summary(variables = 'b_h_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+b_h_r_sd = simdat$b_h_r_sd
+b_h_r_covr <- b_h_r_sd >= SF[,3] & b_h_r_sd <= SF[,4]
+print(b_h_r_covr)
+
+
+## Covr: l_a_q 
+SF <- fit$model_fit$summary(variables = 'l_a_q',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+l_a_q_fixed = simdat$l_a_q_fixed
+l_a_q_fixed_covr <- l_a_q_fixed >= SF[,3] & l_a_q_fixed <= SF[,4]
+print(l_a_q_fixed_covr)
+
+## Covr: random effect on l_a_q
+SF <- fit$model_fit$summary(variables = 'l_a_q_sigma',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+l_a_q_r_sd = simdat$l_a_q_r_sd
+l_a_q_r_covr <- l_a_q_r_sd >= SF[,3] & l_a_q_r_sd <= SF[,4]
+print(l_a_q_r_covr)
+
+## Covr: l_b_q 
+SF <- fit$model_fit$summary(variables = 'l_b_q',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+l_b_q_fixed = simdat$l_b_q_fixed
+l_b_q_fixed_covr <- l_b_q_fixed >= SF[,3] & l_b_q_fixed <= SF[,4]
+print(l_b_q_fixed_covr)
+
+## Covr: random effect on l_a_q
+SF <- fit$model_fit$summary(variables = 'l_b_q_sigma',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+l_b_q_r_sd = simdat$l_b_q_r_sd
+l_b_q_r_covr <- l_b_q_r_sd >= SF[,3] & l_b_q_r_sd <= SF[,4]
+print(l_b_q_r_covr)
+
+## S
+SF <- fit$model_fit$summary(variables = 'S_vec_fixed',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+cors <- simdat$Fixed_S[lower.tri(simdat$Fixed_S)]
+fix_S <- cors >= SF[,3] & cors <= SF[,4]
+print(fix_S )
+
+# Random efx of S
+SF <- fit$model_fit$summary(variables = 'S_vec_tau',
+                      "mean",
+                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+SF
+ranS_sd = simdat$ranS_sd
+ran_S <- ranS_sd >= SF[,3] & ranS_sd <= SF[,4]
+print(ran_S )
+
+
+###########
+## Simulate from fitted stan object
+###########
+
+## generated quantities returns num_iteration samples.
+## Re-run the the models on the first 100 replications
+
+## Step 1:
+## Extract 100 random rows of generated data
+rows <- sample(1:1000,  100 )
+dt <- data.table(fit$model_fit$draws( variables = "rts_out")[rows,])
+dim(dt)
+
+## Position of relevant info:
+## [N, tl, nts]
+
+## Eg. first replication 
+dt[1, 1]
+
+## init objects:
+## list containing all replicaion datasets:
+replication_data <- list( )
+
+## objects used to extract the data and assign it to the right unit and variable
+tsl <- 1:tl
+cols <- 1:nts
+
+## init single replicate data object
+result_matrix <- list( )
+
+for(r in 1:100){
+  ## Construct a list of length N, containing the tl x nts matrices
+  for(i in seq_len(N) ) {
+    ## Generate the column names
+    column_names <- unlist(lapply(cols, function(col) {
+      paste0('rts_out[',i,',', tsl, ',', col, ']')
+    }))
+    ## Extract the values and transform them into a matrix
+    matrix_data <- dt[1, .SD, .SDcols = column_names]
+    result_matrix[[i]] <- matrix(unlist(matrix_data), nrow = tl, ncol = nts)
+  }
+  ## Fill a list that contains all the generated datasets
+  replication_data[[r]] = result_matrix 
+}
+
+## Sanity check
+replication_data[[1]]
+replication_data[[2]]
+
+
+
+## Init all objects:
+phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list( )
+
+
+## Function to prevent loop to stop when stan model encounters errors
+default_return <- NULL
+safe_sample <- purrr::possibly( function(s) {
+  dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
+        group =  groupvec, standardize_data = FALSE, init = 1,
+        threads = 1, sampling_algorithm = 'variational')
+}, otherwise = default_return)
+
+
+## Fit model to replication dataset(s)
+for(s in 1:100 ) {
+  
+  fit_r <- safe_sample(s)
+  if(!is.null(fit_r$error)) {
+    next
+  }
+
+ # fit_r = dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
+ #               group =  groupvec, standardize_data = FALSE, init = 1,
+ #               threads = 1, sampling_algorithm = 'variational'))
+
+              
+  ## Coverage: phi0_fixed
+  ## Population value(s)
+ pop <- fit$model_fit$summary(variables = 'phi0_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  ## Sampled
+  SF <- fit_r$model_fit$summary(variables = 'phi0_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  ##
+  phi0_fixed <- pop$mean
+  phi0_fixed
+  phi0_fixed_cov[[s]] <- phi0_fixed >= SF[,3] & phi0_fixed <= SF[,4]
+  print(phi0_fixed_cov)
+  ##
+  ## Coverage: phi0_sd
+  pop <- fit$model_fit$summary(variables = 'phi0_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  SF <- fit_r$model_fit$summary(variables = 'phi0_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  phi0_sd <- pop$mean
+  phi0_sd
+  phi0_sd_cov[[s]] <- phi0_sd >= SF[,3] & phi0_sd <= SF[,4]
+  print(phi0_sd_cov)
+  ## Coverage: phi_fixed
+  pop <- fit$model_fit$summary(variables = 'vec_phi_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  SF <- fit_r$model_fit$summary(variables = 'vec_phi_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  fixed_phi <- pop$mean
+  phi_fixed_covr[[s]] <- fixed_phi >= SF[,3] & fixed_phi <= SF[,4]
+  print(phi_fixed_covr)
+  ##
+  ## Coverage: phi_ranef_sd
+  pop <- fit$model_fit$summary(variables = 'phi_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'phi_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  phi_ranef_sd = pop$mean
+  phi_ranef_sd
+  phi_ranef_covr[[s]] <- phi_ranef_sd >= SF[,3] & phi_ranef_sd <= SF[,4]
+  print(phi_ranef_covr)
+  ##
+  ## Covr: Log C fixed: log_c_fixed = rep(0, n_ts), ## on log scale
+  pop <- fit$model_fit$summary(variables = 'c_h_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  SF <- fit_r$model_fit$summary(variables = 'c_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  log_c_fixed = pop$mean
+  log_c_fixed_covr[[s]] <- log_c_fixed >= SF[,3] & log_c_fixed <= SF[,4]
+  print(log_c_fixed_covr)
+  ##
+  ## Covr: random effect on C
+  pop <- fit$model_fit$summary(variables = 'c_h_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  SF <- fit_r$model_fit$summary(variables = 'c_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  log_c_r_sd = pop$mean
+  log_c_r_sd
+  log_c_rand_covr[[s]] <- log_c_r_sd >= SF[,3] & log_c_r_sd <= SF[,4]
+  print(log_c_rand_covr)
+  ##
+  ## Covr: Log A fixed: log_a_fixed = rep(0, n_ts), ## on log scale
+  pop <- fit$model_fit$summary(variables = 'a_h_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  pop
+  SF <- fit_r$model_fit$summary(variables = 'a_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  a_h_fixed = pop$mean
+  log_a_fixed_covr[[s]] <- a_h_fixed >= SF[,3] & a_h_fixed <= SF[,4]
+  print(log_a_fixed_covr)
+  ##
+  ## Covr: random effect on A
+  pop <- fit$model_fit$summary(variables = 'a_h_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'a_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  a_h_r_sd = pop$mean
+  a_h_r_covr[[s]] <- a_h_r_sd >= SF[,3] & a_h_r_sd <= SF[,4]
+  print(a_h_r_covr)
+  ##
+  ## Covr: Log B fixed: log_b_fixed 
+  pop <- fit$model_fit$summary(variables = 'b_h_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'b_h_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  b_h_fixed = pop$mean
+  log_b_fixed_covr[[s]] <- b_h_fixed >= SF[,3] & b_h_fixed <= SF[,4]
+  print(log_b_fixed_covr)
+  ##
+  ## Covr: random effect on b
+  pop <- fit$model_fit$summary(variables = 'b_h_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'b_h_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  b_h_r_sd = pop$mean
+  b_h_r_covr[[s]] <- b_h_r_sd >= SF[,3] & b_h_r_sd <= SF[,4]
+  print(b_h_r_covr)
+  ##
+  ## Covr: l_a_q 
+  pop <- fit$model_fit$summary(variables = 'l_a_q',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'l_a_q',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  l_a_q_fixed = pop$mean
+  l_a_q_fixed_covr[[s]] <- l_a_q_fixed >= SF[,3] & l_a_q_fixed <= SF[,4]
+  print(l_a_q_fixed_covr)
+  ##
+  ## Covr: random effect on l_a_q
+  pop <- fit$model_fit$summary(variables = 'l_a_q_sigma',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'l_a_q_sigma',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  l_a_q_r_sd = pop$mean
+  l_a_q_r_covr[[s]] <- l_a_q_r_sd >= SF[,3] & l_a_q_r_sd <= SF[,4]
+  print(l_a_q_r_covr)
+  ## Covr: l_b_q 
+  pop <- fit$model_fit$summary(variables = 'l_b_q',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  ##
+  SF <- fit_r$model_fit$summary(variables = 'l_b_q',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  l_b_q_fixed = pop$mean
+  l_b_q_fixed_covr[[s]] <- l_b_q_fixed >= SF[,3] & l_b_q_fixed <= SF[,4]
+  print(l_b_q_fixed_covr)
+  ## Covr: random effect on l_a_q
+  pop <- fit$model_fit$summary(variables = 'l_b_q_sigma',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'l_b_q_sigma',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  l_b_q_r_sd = pop$mean
+  l_b_q_r_covr[[s]] <- l_b_q_r_sd >= SF[,3] & l_b_q_r_sd <= SF[,4]
+  print(l_b_q_r_covr)
+  ## S
+  pop <- fit$model_fit$summary(variables = 'S_vec_fixed',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'S_vec_fixed',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  cors <- pop$mean
+  cors
+  fix_S[[s]] <- cors >= SF[,3] & cors <= SF[,4]
+  print(fix_S )
+  ## Random efx of S
+  pop <- fit$model_fit$summary(variables = 'S_vec_tau',
+                               "mean",
+                               extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF <- fit_r$model_fit$summary(variables = 'S_vec_tau',
+                                "mean",
+                                extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  ranS_sd = pop$mean
+  ##
+  ran_S[[s]] <- ranS_sd >= SF[,3] & ranS_sd <= SF[,4]
+  print(ran_S )
+}
+
+s
+
+
+l_a_q_r_covr
+
+## Compute coverage
+coverage <- function(param) {
+  out <- sapply(1:length(param[[1]]), function(i) {
+    mean(sapply(param, function(x) x[i]))
+  })
+  return(out)
+}
+
+covresults <- list()
+## 1:
+## 2: N = 100, tslength=50
+covresults[[2]] <- list(
+coverage(phi0_fixed_cov),
+coverage(phi0_sd_cov),
+coverage(phi_fixed_covr),
+coverage(phi_ranef_covr),
+coverage(log_c_fixed_covr),
+coverage(log_c_rand_covr),
+coverage(log_a_fixed_covr),
+coverage(a_h_r_covr),
+coverage(log_b_fixed_covr),
+coverage(b_h_r_covr),
+coverage(l_a_q_fixed_covr),
+coverage(l_a_q_r_covr),
+coverage(l_b_q_fixed_covr),
+coverage(l_b_q_r_covr),
+coverage(fix_S),
+coverage(ran_S))
+
+
+
+
+############################################################
+############################################################
+
+
 fit$model_fit$summary( )
 
-## Save out drawas and read them back in selectively
+
+
+simdat$fixed_phi
+
+
+## Save out draws and read them back in selectively
 fit$model_fit$save_output_files(dir = "../../../Documents/",  basename = "rands",  random = FALSE )
 
 rm("fit")

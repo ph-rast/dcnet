@@ -98,7 +98,7 @@
 ##' @importFrom clusterGeneration rcorrmatrix
 
 .simuDCC <- function(tslength, n_ts, N,
-                     phi0_fixed = rep(0, n_ts),
+                     phi0_fixed = rep(0, n_ts), 
                      phi0_sd = .5,
                      log_c_fixed = rep(0, n_ts), ## on log scale
                      log_c_r_sd = 0.1,
@@ -222,5 +222,24 @@
       }
       DCC_y <- y
     }
-    return(list(DCC_y, DCC_R = DCC_R, S = S, RawCorr =  RawCorr, Fixed_S = Sc, fixed_phi = phi_fixed%*%D%*%solve(phi_fixed)))
+  return(list(DCC_y,
+              DCC_R = DCC_R,
+              S = S,
+              RawCorr =  RawCorr,
+              Fixed_S = Sc,
+              fixed_phi = phi_fixed%*%D%*%solve(phi_fixed),
+              ranS_sd = ranS_sd,
+              l_b_q_r_sd = l_b_q_r_sd,
+              l_b_q_fixed = l_b_q_fixed,
+              l_a_q_r_sd = l_a_q_r_sd,
+              l_a_q_fixed = l_a_q_fixed,
+              b_h_r_sd = b_h_r_sd,
+              b_h_fixed = b_h_fixed,
+              a_h_r_sd = a_h_r_sd,
+              a_h_fixed = a_h_fixed,
+              log_c_r_sd = log_c_r_sd,
+              log_c_fixed = log_c_fixed,
+              phi_ranef_sd = phi_ranef_sd,
+              phi0_sd = phi0_sd,
+              phi0_fixed = phi0_fixed))
   }
