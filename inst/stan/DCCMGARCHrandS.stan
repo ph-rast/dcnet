@@ -238,9 +238,9 @@ model {
   // priors
   l_a_q ~ normal(-1, 1);
   l_b_q ~ normal(1.7, 1);
-  l_a_q_sigma ~ cauchy(0, 0.1);
+  l_a_q_sigma ~ student_t(3, 0, 1);
   to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
-  l_b_q_sigma ~ cauchy(0, 0.1);
+  l_b_q_sigma ~ student_t(3, 0, 1);
   to_vector(l_b_q_r) ~ normal(0, l_b_q_sigma);
 
   // VAR
@@ -252,11 +252,11 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ cauchy(0, 1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
-  a_h_tau ~ cauchy(0, .5); // SD for c_h ranefs
-  b_h_tau ~ cauchy(0, .5);
+  phi0_tau ~ inv_gamma(6, 2.5); // SD for multiplication with cholesky phi0_L
+  phi_tau ~ inv_gamma(6, 2.5); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ inv_gamma(6, 2.5); // SD for c_h ranefs
+  a_h_tau ~ inv_gamma(6, 2.5); // SD for c_h ranefs
+  b_h_tau ~ inv_gamma(6, 2.5);
 
   
   // C
@@ -321,4 +321,3 @@ generated quantities {
   Sfixed = invvec_to_corr( tanh(S_vec_fixed), nt);
   Sfixed2= invvec_to_corr( tanh(S_vec_fixed2), nt);
 }
-
