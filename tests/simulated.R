@@ -64,20 +64,26 @@ array(S, c(4,4,3) )
 
 ## Create data:
 N <- 30
-tl <- 300
+tl <- 100
 nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   a_h_fixed = rep(-0.3, 4 ),
-                   b_h_fixed = rep(0, 4 ),
-                   l_a_q_fixed = 0.6,
-                   l_b_q_fixed = 0.2,
+                   phi0_sd = 0.1,
+                   log_c_fixed = rep(-1.4, 4),
+                   log_c_r_sd = 0.5,
+                   a_h_fixed = rep(-1.4, 4 ),
+                   b_h_fixed = rep(-1.1, 4 ),
+                   l_a_q_fixed = -1.4,
+                   l_b_q_fixed = -1.1,
                    ranef_sd_S = 0.5,
-                   l_b_q_r_sd = 0.5,
+                   l_a_q_r_sd = 0.2,
+                   l_b_q_r_sd = 0.2,
                    phi0_fixed =  c(0, 0, 0 , 0),
-                   ranS_sd = 0.01,
-                   phi_mu = 0,
-                   phi_sd = .5,
-                   phi_ranef_sd = 1)
+                   ranS_sd = 0.3,
+                   phi_mu = 0, ## populate phi
+                   phi_sd = 0, ## create non-zero values (if non-0)
+                   phi_ranef_sd = 0.1,
+                   stationarity_phi = FALSE)
+
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
 
@@ -118,7 +124,7 @@ devtools::load_all( )
 
 system.time( {
   fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-               group =  groupvec, standardize_data = TRUE, init = 0,
+               group =  groupvec, standardize_data = TRUE, init = 1,
                #iterations = 1000,
                threads = 1,
                sampling_algorithm = 'variational')
@@ -178,6 +184,22 @@ replication_data[[1]]
 replication_data[[2]]
 
 
+phi0_fixed
+phi0_sd
+phi_fixed
+phi_ranef
+log_c_fixed
+log_c_rand
+log_a_fixed
+a_h_r
+log_b_fixed
+b_h_r
+l_a_q_fixed
+l_a_q_r
+l_b_q_fixed
+l_b_q_r
+fix_S
+ran_S
 
 ## Init all objects:
 phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list( )
@@ -197,10 +219,58 @@ overlap <- function(population, L,  U,    iterations =  1000 ) {
   return(O)
 }
   
+rmse <- function(model, population) {
+  rmse <- sqrt(mean(( model - population )^2 ) )
+  return(rmse )
+}
+
+bias <- function(model, population) {
+  bias <- mean( model - population ) 
+  return(bias )
+}
+
+
+
+variables <- c('phi0_fixed', 'phi0_tau', 'phi_fixed', 'phi_ranef', 'log_c_fixed', 
+               'log_c_rand', 'log_a_fixed', 'a_h_r', 'log_b_fixed', 'b_h_r', 
+               'l_a_q_fixed', 'l_a_q_r', 'l_b_q_fixed', 'l_b_q_r', 'fix_S', 'ran_S')
+
+# Initialize empty lists to store the results for each variable
+cov_list <- list()
+rmse_list <- list()
+bias_list <- list()
+
+for (s in 1:2) {  
+  fit_r <- safe_sample(s)
+  fit_r$error  
+  if (!is.null(fit_r$error)) {
+    next
+  }
+  
+  for (var in variables) {    
+    SF <- fit_r$model_fit$summary(variables = var, "mean",
+                                  extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)))
+
+    cov_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+      overlap(fit$model_fit$draws(variables = var)[,i], L = SF$q2.5[i], U = SF$q97.5[i])
+    })
+    
+    rmse_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+      rmse(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
+    })
+    
+    bias_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+      bias(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
+    })    
+  }
+}
+
+
+
 
 
 ## Fit model to replication dataset(s)
-for(s in 2:10) {
+for(s in 1:100) {
   
   fit_r <- safe_sample(s)
   fit_r$error
@@ -209,22 +279,29 @@ for(s in 2:10) {
   }
             
   ## Sampled
-  SF <- fit_r$model_fit$summary(variables = 'phi0_fixed',
-                                "mean",
+  SF <- fit_r$model_fit$summary(variables = 'phi0_fixed', "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
   phi0_fixed_cov[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'phi0_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
+  phi0_fixed_rmse[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    rmse(fit_r$model_fit$draws(variables = 'phi0_fixed' )[,i], fit$model_fit$draws(variables = 'phi0_fixed' )[,i])
+  })
+  phi0_fixed_bias[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+    bias(fit_r$model_fit$draws(variables = 'phi0_fixed' )[,i], fit$model_fit$draws(variables = 'phi0_fixed' )[,i])
+  }) 
   ##phi0_fixed >= SF[,3] & phi0_fixed <= SF[,4]
   print(phi0_fixed_cov)
+  ##  
   ##
-  SF <- fit_r$model_fit$summary(variables = 'phi0_tau',
-                                "mean",
+  SF <- fit_r$model_fit$summary(variables = 'phi0_tau', "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
   phi0_sd_cov[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'phi0_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
-  }) ##phi0_sd >= SF[,3] & phi0_sd <= SF[,4]
+  }) 
   print(phi0_sd_cov)
+  ##
+  ##
   SF <- fit_r$model_fit$summary(variables = 'vec_phi_fixed',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
@@ -299,8 +376,7 @@ for(s in 2:10) {
   print(b_h_r_covr)
   ##
   ## Covr: l_a_q 
-  SF <- fit_r$model_fit$summary(variables = 'l_a_q',
-                                "mean",
+  SF <- fit_r$model_fit$summary(variables = 'l_a_q', "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
   l_a_q_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'l_a_q' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
@@ -352,7 +428,26 @@ for(s in 2:10) {
 s
 
 
-ran_S
+
+## Algorithm 1 from: Validating Bayesian Inference Algorithms with Simulation-Based Calibration (2020)
+bin <- list()
+binl <- 0
+col <- 1
+for(start in seq(1, 951, by=50)) {
+  binl <- binl+1
+  end <- start + 49
+  current_sequence <- start:end
+  bin[binl] <- sum(fit_r$model_fit$draws( variables = 'l_a_q' )[start:end,col] < fit$model_fit$draws(variables = 'l_a_q' )[start:end,col])
+}
+
+rmse( fit_r$model_fit$draws( variables = 'l_a_q' )[,1], fit$model_fit$draws(variables = 'l_a_q' )[, 1])
+
+unlist(bin)
+chisq.test(unlist(bin))
+hist(unlist(bin), breaks = length(unlist(bin) ), xlim = c(0, 50 ))
+
+dev.off( )
+
 
 ## Compute coverage
 coverage <- function(param) {
@@ -366,27 +461,30 @@ coverage(ran_S )
 
 covresults <- list()
 
-## 1:
-## 2: N = 100, tslength=50
-covresults[[1]] <- list(
-phi0_fixed_cov = coverage(phi0_fixed_cov),
-phi0_sd_cov = coverage(phi0_sd_cov),
-phi_fixed_covr =  coverage(phi_fixed_covr),
-phi_ranef_covr = coverage(phi_ranef_covr),
-log_c_fixed_covr = coverage(log_c_fixed_covr),
-log_c_rand_covr = coverage(log_c_rand_covr),
-log_a_fixed_covr = coverage(log_a_fixed_covr),
-a_h_r_covr = coverage(a_h_r_covr),
-log_b_fixed_covr = coverage(log_b_fixed_covr),
-b_h_r_covr = coverage(b_h_r_covr),
-l_a_q_fixed_covr = coverage(l_a_q_fixed_covr),
-l_a_q_r_covr = coverage(l_a_q_r_covr),
-l_b_q_fixed_covr = coverage(l_b_q_fixed_covr),
-l_b_q_r_covr = coverage(l_b_q_r_covr),
-fix_S = coverage(fix_S),
-ran_S = coverage(ran_S))
 
-covresults[[1]]
+N
+tl
+## 1: N = 30, ts = 100
+## 2: N = 60, ts = 100
+covresults[[1]] <- list(
+phi0_fixed = mean(coverage(phi0_fixed_cov)),
+phi0_sd = mean(coverage(phi0_sd_cov)),
+phi_fixed = mean(coverage(phi_fixed_covr)),
+phi_ranef = mean(coverage(phi_ranef_covr)),
+log_c_fixed = mean(coverage(log_c_fixed_covr)),
+log_c_rand = mean(coverage(log_c_rand_covr)),
+log_a_fixed = mean(coverage(log_a_fixed_covr)),
+a_h_r = mean(coverage(a_h_r_covr)),
+log_b_fixed = mean(coverage(log_b_fixed_covr)),
+b_h_r = mean(coverage(b_h_r_covr)),
+l_a_q_fixed = mean(coverage(l_a_q_fixed_covr)),
+l_a_q_r = mean(coverage(l_a_q_r_covr)),
+l_b_q_fixed = mean(coverage(l_b_q_fixed_covr)),
+l_b_q_r = mean(coverage(l_b_q_r_covr)),
+fix_S = mean(coverage(fix_S)),
+ran_S = mean(coverage(ran_S)))
+
+unlist(covresults[[1]])
 
 
 
@@ -406,8 +504,7 @@ dt <- data.table(fit$model_fit$summary(variables = c('phi0_fixed', 'S_vec_fixed'
 
 
 ## Coverage: phi0_fixed
-SF <- fit$model_fit$summary(variables = 'phi0_fixed',
-                      "mean",
+SF <- fit$model_fit$summary(variables = 'phi0_fixed', "mean",
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 
@@ -424,7 +521,7 @@ SF
 phi0_sd <- simdat$phi0_sd
 phi0_sd
 phi0_sd_cov <- phi0_sd >= SF[,3] & phi0_sd <= SF[,4]
-print(phi0_sd_cov)
+phi0_sd_cov
 
 ## Phi is transformed in simulation script to maintain stationarity: This might not
 ## capture the actual coverage -- needs rethinking
@@ -433,8 +530,11 @@ SF <- fit$model_fit$summary(variables = 'vec_phi_fixed',
                       "mean",
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
+simdat$fixed_phi
 phi_fixed_covr <- c(simdat$fixed_phi) >= SF[,3] & c(simdat$fixed_phi) <= SF[,4]
 print(phi_fixed_covr)
+mean(phi_fixed_covr)
+
 
 ## Coverage: phi_ranef_sd
 SF <- fit$model_fit$summary(variables = 'phi_tau',
@@ -443,7 +543,7 @@ SF <- fit$model_fit$summary(variables = 'phi_tau',
 SF
 phi_ranef_sd = simdat$phi_ranef_sd
 phi_ranef_sd
-phi_ranef_covr <- phi_ranef_sd >= SF[,3] & phi_ranef_sd <= SF[,4]
+phi_ranef_covr <-  phi_ranef_sd >=  SF[,3] & phi_ranef_sd <= SF[,4]
 print(phi_ranef_covr)
 
 ## Covr: Log C fixed: log_c_fixed = rep(0, n_ts), ## on log scale
@@ -451,7 +551,8 @@ SF <- fit$model_fit$summary(variables = 'c_h_fixed',
                       "mean",
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
-log_c_fixed = rep(0, 4)
+log_c_fixed = simdat$log_c_fixed
+log_c_fixed
 log_c_fixed_covr <- log_c_fixed >= SF[,3] & log_c_fixed <= SF[,4]
 print(log_c_fixed_covr)
 
@@ -471,6 +572,7 @@ SF <- fit$model_fit$summary(variables = 'a_h_fixed',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 a_h_fixed = simdat$a_h_fixed
+a_h_fixed
 log_a_fixed_covr <- a_h_fixed >= SF[,3] & a_h_fixed <= SF[,4]
 print(log_a_fixed_covr)
 
@@ -480,6 +582,7 @@ SF <- fit$model_fit$summary(variables = 'a_h_tau',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 a_h_r_sd = simdat$a_h_r_sd
+a_h_r_sd
 a_h_r_covr <- a_h_r_sd >= SF[,3] & a_h_r_sd <= SF[,4]
 print(a_h_r_covr)
 
@@ -489,6 +592,7 @@ SF <- fit$model_fit$summary(variables = 'b_h_fixed',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 b_h_fixed = simdat$b_h_fixed
+b_h_fixed
 log_b_fixed_covr <- b_h_fixed >= SF[,3] & b_h_fixed <= SF[,4]
 print(log_b_fixed_covr)
 
@@ -498,6 +602,7 @@ SF <- fit$model_fit$summary(variables = 'b_h_tau',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 b_h_r_sd = simdat$b_h_r_sd
+b_h_r_sd
 b_h_r_covr <- b_h_r_sd >= SF[,3] & b_h_r_sd <= SF[,4]
 print(b_h_r_covr)
 
@@ -508,6 +613,7 @@ SF <- fit$model_fit$summary(variables = 'l_a_q',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 l_a_q_fixed = simdat$l_a_q_fixed
+l_a_q_fixed
 l_a_q_fixed_covr <- l_a_q_fixed >= SF[,3] & l_a_q_fixed <= SF[,4]
 print(l_a_q_fixed_covr)
 
@@ -517,6 +623,7 @@ SF <- fit$model_fit$summary(variables = 'l_a_q_sigma',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 l_a_q_r_sd = simdat$l_a_q_r_sd
+l_a_q_r_sd
 l_a_q_r_covr <- l_a_q_r_sd >= SF[,3] & l_a_q_r_sd <= SF[,4]
 print(l_a_q_r_covr)
 
@@ -526,6 +633,7 @@ SF <- fit$model_fit$summary(variables = 'l_b_q',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 l_b_q_fixed = simdat$l_b_q_fixed
+l_b_q_fixed
 l_b_q_fixed_covr <- l_b_q_fixed >= SF[,3] & l_b_q_fixed <= SF[,4]
 print(l_b_q_fixed_covr)
 
@@ -535,6 +643,7 @@ SF <- fit$model_fit$summary(variables = 'l_b_q_sigma',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 l_b_q_r_sd = simdat$l_b_q_r_sd
+l_b_q_r_sd
 l_b_q_r_covr <- l_b_q_r_sd >= SF[,3] & l_b_q_r_sd <= SF[,4]
 print(l_b_q_r_covr)
 
@@ -544,6 +653,7 @@ SF <- fit$model_fit$summary(variables = 'S_vec_fixed',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 cors <- simdat$Fixed_S[lower.tri(simdat$Fixed_S)]
+cors
 fix_S <- cors >= SF[,3] & cors <= SF[,4]
 print(fix_S )
 
@@ -553,6 +663,7 @@ SF <- fit$model_fit$summary(variables = 'S_vec_tau',
                       extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
 SF
 ranS_sd = simdat$ranS_sd
+ranS_sd
 ran_S <- ranS_sd >= SF[,3] & ranS_sd <= SF[,4]
 print(ran_S )
 
