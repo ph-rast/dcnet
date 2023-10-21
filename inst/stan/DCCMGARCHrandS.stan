@@ -236,8 +236,8 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // priors
-  l_a_q ~ normal(-1, 1);
-  l_b_q ~ normal(1.7, 1);
+  l_a_q ~ student_t(3, -1.5, 3);
+  l_b_q ~ student_t(3, -1.5, 3);
   l_a_q_sigma ~ student_t(3, 0, 1);
   to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
   l_b_q_sigma ~ student_t(3, 0, 1);
@@ -261,9 +261,9 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ std_normal();
-  to_vector(a_h_fixed) ~ std_normal();
-  to_vector(b_h_fixed) ~ std_normal();
+  to_vector(c_h_fixed) ~ student_t(3, -1, 10);
+  to_vector(a_h_fixed) ~ student_t(3, -1, 10);
+  to_vector(b_h_fixed) ~ student_t(3, -1, 10);
   // Prior for initial state
   
   // Prior on nu for student_t
