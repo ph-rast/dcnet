@@ -12,6 +12,8 @@ data {
 transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
+  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
+
   //int<lower=nt> Sdim = (nt + nt*nt) %/% 2 ; // Dimension of vec(S).  
   // S = S_L*S_L | S_L is a cholesky factor
   // S_L = invec(S_Lv) | S_Lv is vec(S_L)
@@ -77,14 +79,17 @@ parameters {
   array[J] real l_b_q_r;
   real<lower=0> l_b_q_sigma; //random effect variance
   
-  cholesky_factor_corr[nt] S;
-  corr_matrix[nt] S2;
-
+  //corr_matrix[nt] S;
+  array[J] vector[Sdim] S_vec_stdnorm; 
+  vector<lower=0>[Sdim] S_vec_tau; 
+  vector[Sdim] S_vec_fixed; // Vectorized fixed effect for S
+  array[J] vector[Sdim] S_vec_sd;
+  
   // R1 init
   array[J] corr_matrix[nt] R1_init;
   
   // Qr1 init
-  //  array[J] cov_matrix[nt] Qr1_init;
+  array[J] cov_matrix[nt] Qr1_init;
   // D1 init
   array[J] vector<lower = 0>[nt] D1_init;
   // u1 init
@@ -118,8 +123,8 @@ transformed parameters {
   array[J,T-1] vector[nt] rr;
   array[J,T] vector[nt] mu;
   array[J,T] vector<lower = 0>[nt] D;
-  //  array[J,T] cov_matrix[nt] Qr;
-  //  array[J,T] vector[nt] Qr_sdi;
+  array[J,T] cov_matrix[nt] Qr;
+  array[J,T] vector[nt] Qr_sdi;
   array[J,T] vector[nt] u;
   
   array[J] vector<lower = 0>[nt] vd;
@@ -129,6 +134,10 @@ transformed parameters {
   array[J,T] matrix[nt,nt] IR;
   // VAR phi parameter
 
+  // fixed + ranef vector for vec(S) part
+  array[J] vector[Sdim] S_Lv;
+  array[J] corr_matrix[nt] S;
+  
   // Initialize t=1
   for( j in 1:J){
     
@@ -137,11 +146,11 @@ transformed parameters {
     D[j,1] = D1_init[j];
     //u[j,1] = ( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
     u[j,1] = u1_init;    
-    //    Qr[j,1] = Qr1_init[j];//
+    Qr[j,1] = Qr1_init[j];//
 
-    //    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
+    Qr_sdi[j,1] = 1 ./ sqrt(diagonal(Qr[j,1])); //
     
-    R[j,1] = identity_matrix(nt);//quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
+    R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
     H[j,1] = identity_matrix(nt);//quad_form_diag(R[j,1],  D[j,1]);
 
     R0[j,1] = identity_matrix(nt); // Fill first matrix
@@ -220,16 +229,17 @@ transformed parameters {
 
       
       // Extract SD of H matrix as in H = SD*R*SD
-      u[j,t,] = diag_matrix( 1 ./ sqrt(diagonal(H[j,t])) ) \ (rts[j,t]' - mu[j,t]);
+      u[j,t,] =  diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ;
       // cf. comment about taking inverses in stan functions ref, sec 5.13.2
-      // 
+      //Random effects on S
+      S_Lv[j] = tanh( S_vec_fixed  + S_vec_tau .*S_vec_stdnorm[j] );
+      S[j] = invvec_to_corr(S_Lv[j], nt);
+      
       //manual p. 482 re:Inverses - inv(D)*a = D \ a
       //Introduce predictor for S (time-varying)
-      if (S_pred[j,t] == 0){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S  + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
-      } else if (S_pred[j,t] == 1){
-	Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S2 + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1];
-      }
+      Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j]  + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') +
+	b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
+      
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       //R[t,] = quad_form_diag(Qr[t,], inv(sqrt(diagonal(Qr[t,]))) ); // Qr_sdi[t,] * Qr[t,] * Qr_sdi[t,];
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); //Partial Correlatin Matrix
@@ -246,7 +256,7 @@ model {
   // priors
   l_a_q ~ normal(-10, 1);
   l_b_q ~ normal(-10, 1);
-  l_a_q_sigma ~ normal(0,1);//cauchy(0, 0.1);
+  l_a_q_sigma ~ std_normal();//cauchy(0, 0.1);
   to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
   l_b_q_sigma ~ normal(0,1);//cauchy(0, 0.1);
   to_vector(l_b_q_r) ~ normal(0, l_b_q_sigma);
@@ -282,21 +292,17 @@ model {
   //to_vector(phi) ~ std_normal();
   phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
   vec_phi_fixed ~ normal(0, 5);
-  //  to_vector(a_h) ~ normal(0, .5);
-  //to_vector(b_h) ~ normal(0, .5);
-  S ~ lkj_corr_cholesky(1);
-  S2 ~ lkj_corr( 1 );
+  S_vec_fixed ~ std_normal();
 
   // likelihood
   for( j in 1:J) {
+    S_vec_tau ~ inv_gamma( 6, 2.5);
+    S_vec_stdnorm[j] ~ std_normal();
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(-1, 1);
-    //    Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
-    // UL transform jacobian
-    /* for(k in 1:nt) { */
-    /*   ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed. */
-    /*   target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]); */
-    /* } */
+    //to_vector(u1_init[j]) ~ std_normal();
+    Qr1_init[j] ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
+    
     phi0_stdnorm[J] ~ std_normal();
     phi_stdnorm[J] ~ std_normal();
     c_h_stdnorm[J] ~ std_normal();
