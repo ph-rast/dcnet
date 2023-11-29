@@ -1,6 +1,6 @@
 // DCC-Parameterization with random D components, random S fixed q's
 functions {
-#include /functions/jacobian.stan
+  //#include /functions/jacobian.stan
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
 }
@@ -60,13 +60,14 @@ parameters {
   // GARCH q parameters
   //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
   real l_a_q; // Define on log scale so that it can go below 0
-  array[J] real l_a_q_r;
+  
   real<lower=0> l_a_q_sigma; //random effect variance
+  array[J] real l_a_q_stdnorm;
   
   //real<lower=0, upper = (1 - a_q) > b_q; //
   real l_b_q; //
-  array[J] real l_b_q_r;
   real<lower=0> l_b_q_sigma; //random effect variance
+  array[J] real l_b_q_stdnorm;
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
@@ -124,6 +125,9 @@ transformed parameters {
   // fixed + ranef vector for vec(S) part
   array[J] vector[Sdim] S_Lv;
   array[J] corr_matrix[nt] S;
+
+  array[J] real l_a_q_r;
+  array[J] real l_b_q_r;
   
   // VAR phi parameter
 
@@ -148,6 +152,8 @@ transformed parameters {
     ////////////
     
     // R part
+    l_a_q_r[j] = l_a_q_sigma * l_a_q_stdnorm[j];
+    l_b_q_r[j] = l_b_q_sigma * l_b_q_stdnorm[j];
     a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
 
@@ -158,7 +164,7 @@ transformed parameters {
     if(simplify_ch==0){
       c_h_random[j] = (diag_pre_multiply(c_h_tau, c_h_L)*c_h_stdnorm[j]);
     } else if(simplify_ch == 1) {
-      c_h_random[j] = (diag_pre_multiply(c_h_tau, diag_matrix(rep_vector(1.0, nt)))*c_h_stdnorm[j]);
+      c_h_random[j] = c_h_tau .* c_h_stdnorm[j];
     }
     c_h[j] = c_h_fixed + c_h_random[j];
 
@@ -166,7 +172,7 @@ transformed parameters {
     if(simplify_ah==0){
       a_h_random[j] = diag_pre_multiply(a_h_tau, a_h_L)*a_h_stdnorm[j];
     } else if(simplify_ah == 1) {
-      a_h_random[j] = diag_pre_multiply(a_h_tau, diag_matrix(rep_vector(1.0, nt)))*a_h_stdnorm[j];
+      a_h_random[j] = a_h_tau .* a_h_stdnorm[j];
     }
     
     // Bound sum of fixed and ranef between 0 and 1 with logistic function
@@ -176,7 +182,7 @@ transformed parameters {
     if(simplify_bh==0){      
       b_h_random[j] = (diag_pre_multiply(b_h_tau, b_h_L)*b_h_stdnorm[j]);
     } else if(simplify_bh == 1) {
-      b_h_random[j] = (diag_pre_multiply(b_h_tau, diag_matrix(rep_vector(1.0, nt)))*b_h_stdnorm[j]);
+      b_h_random[j] = b_h_tau .* b_h_stdnorm[j];
     }
     // Bound sum of fixed and ranef between 0 and 1
     b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
@@ -238,10 +244,10 @@ model {
   // priors
   l_a_q ~ student_t(3, -1.5, 3);
   l_b_q ~ student_t(3, -1.5, 3);
-  l_a_q_sigma ~ student_t(3, 0, 1);
-  to_vector(l_a_q_r) ~ normal(0, l_a_q_sigma);
+  l_a_q_sigma ~ student_t(3, 0, 1);  // rewrite to non-centered
+  to_vector(l_a_q_stdnorm) ~ std_normal();
   l_b_q_sigma ~ student_t(3, 0, 1);
-  to_vector(l_b_q_r) ~ normal(0, l_b_q_sigma);
+  to_vector(l_b_q_stdnorm) ~ std_normal();
 
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
@@ -253,24 +259,24 @@ model {
   // R part in DRD
 
   phi0_tau ~ inv_gamma(6, 2.5); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ inv_gamma(6, 2.5); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ inv_gamma(6, 2.5); // SD for c_h ranefs
+  phi_tau ~ student_t(3, 0, 1); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ student_t(3, 0, 3); // SD for c_h ranefs
   a_h_tau ~ inv_gamma(6, 2.5); // SD for c_h ranefs
   b_h_tau ~ inv_gamma(6, 2.5);
 
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ student_t(3, -1, 10);
-  to_vector(a_h_fixed) ~ student_t(3, -1, 10);
-  to_vector(b_h_fixed) ~ student_t(3, -1, 10);
+  to_vector(c_h_fixed) ~ student_t(3, -2, 10);
+  to_vector(a_h_fixed) ~ student_t(3, -2, 10);
+  to_vector(b_h_fixed) ~ student_t(3, -2, 10);
   // Prior for initial state
   
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 50 );
-  phi0_fixed ~ multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
-  vec_phi_fixed ~ normal(0, 5);
+  to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
+  vec_phi_fixed ~ student_t(3, 0, 1);
   S_vec_fixed ~ std_normal();
   S_vec_fixed2 ~ std_normal();  
   
@@ -321,3 +327,4 @@ generated quantities {
   Sfixed = invvec_to_corr( tanh(S_vec_fixed), nt);
   Sfixed2= invvec_to_corr( tanh(S_vec_fixed2), nt);
 }
+

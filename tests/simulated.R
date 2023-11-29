@@ -64,12 +64,12 @@ array(S, c(4,4,3) )
 
 ## Create data:
 N <- 30
-tl <- 100
+tl <- 30
 nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   phi0_sd = 0.1,
-                   log_c_fixed = rep(-1.4, 4),
-                   log_c_r_sd = 0.5,
+                   phi0_sd = 0.2,
+                   log_c_fixed = rep(-1, 4),
+                   log_c_r_sd = 0.8,
                    a_h_fixed = rep(-1.4, 4 ),
                    b_h_fixed = rep(-1.1, 4 ),
                    l_a_q_fixed = -1.4,
@@ -82,7 +82,7 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi_mu = 0, ## populate phi
                    phi_sd = 0, ## create non-zero values (if non-0)
                    phi_ranef_sd = 0.1,
-                   stationarity_phi = FALSE)
+                   stationarity_phi = TRUE)
 
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
@@ -95,9 +95,6 @@ simdat$Fixed_S
 simdat$phi0_fixed
 simdat$fixed_phi
 
-
-typeof(rtsgen )
-dim(rtsgen[[1]])
 
 person <- 2
 plot(rtsgen[[person]][,1], type = 'l')#, ylim = c(-6, 6))
@@ -116,20 +113,20 @@ X <- array(0,  dim = c(N*tl, nts ) )
 groupvec <- rep(c(1:N),  each = tl )
 
 
-getwd( )
-
-setwd("./tests")
+#getwd( )
+#setwd("./tests")
 
 devtools::load_all( )
 
 system.time( {
   fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-               group =  groupvec, standardize_data = TRUE, init = 1,
-               #iterations = 1000,
-               threads = 1,
-               sampling_algorithm = 'variational')
+               group =  groupvec, standardize_data = TRUE, init = .5,
+               iterations = 1000,
+               threads = 1, #tol_rel_obj =  0.001,
+               sampling_algorithm = 'HMC')
 })
 
+fit
 
 ### 
 ##########################################################################################3
@@ -184,23 +181,6 @@ replication_data[[1]]
 replication_data[[2]]
 
 
-phi0_fixed
-phi0_sd
-phi_fixed
-phi_ranef
-log_c_fixed
-log_c_rand
-log_a_fixed
-a_h_r
-log_b_fixed
-b_h_r
-l_a_q_fixed
-l_a_q_r
-l_b_q_fixed
-l_b_q_r
-fix_S
-ran_S
-
 ## Init all objects:
 phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list( )
 
@@ -209,7 +189,7 @@ phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_cov
 default_return <- FALSE
 safe_sample <- purrr::possibly( function(s) {
   dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
-        group =  groupvec, standardize_data = FALSE, init = 0.5,
+        group =  groupvec, standardize_data = FALSE, init = 0,
         threads = 1, sampling_algorithm = 'variational')
 }, otherwise = default_return)
 
@@ -229,18 +209,40 @@ bias <- function(model, population) {
   return(bias )
 }
 
+#variables
+
+sbc <- function(model, population, column) {
+  ## Algorithm 1 from: Validating Bayesian Inference Algorithms with Simulation-Based Calibration (2020)
+  bin <- list()
+  binl <- 0
+  ## Assuming 1000 draws in the fit objects (standard)
+  ## This creates 20 bins 
+  for(start in seq(1, 951, by=50)) {
+    binl <- binl+1
+    end <- start + 49
+    current_sequence <- start:end
+    bin[binl] <- sum(model[start:end,column] < population[start:end,column])
+  }
+  return(bin)
+}
 
 
-variables <- c('phi0_fixed', 'phi0_tau', 'phi_fixed', 'phi_ranef', 'log_c_fixed', 
-               'log_c_rand', 'log_a_fixed', 'a_h_r', 'log_b_fixed', 'b_h_r', 
-               'l_a_q_fixed', 'l_a_q_r', 'l_b_q_fixed', 'l_b_q_r', 'fix_S', 'ran_S')
+#sbc(fit_r$model_fit$draws(variables = 'phi0_fixed'), fit$model_fit$draws(variables = 'phi0_fixed'),  column = 1 )
+
+
+variables <- c('phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'phi_tau', 'c_h_fixed', 
+               'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau', 
+               'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
 # Initialize empty lists to store the results for each variable
 cov_list <- list()
 rmse_list <- list()
 bias_list <- list()
+bins_list <- list()
 
-for (s in 1:2) {  
+
+for (s in 7:10) {  
+
   fit_r <- safe_sample(s)
   fit_r$error  
   if (!is.null(fit_r$error)) {
@@ -250,25 +252,79 @@ for (s in 1:2) {
   for (var in variables) {    
     SF <- fit_r$model_fit$summary(variables = var, "mean",
                                   extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)))
-
     cov_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
       overlap(fit$model_fit$draws(variables = var)[,i], L = SF$q2.5[i], U = SF$q97.5[i])
-    })
-    
+    })    
     rmse_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
       rmse(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
-    })
-    
+    })    
     bias_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
       bias(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
-    })    
+    })
+    bins_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+      sbc(fit_r$model_fit$draws(variables = var), fit$model_fit$draws(variables = var), column = i)
+    })
   }
+  gc( )  
+  s
+
 }
 
+## Try reducing the convergence criterion to 0.005
+cov_list
+rmse_list
+bias_list
+bins_list
+
+cov_list
+
+
+var_averages <- list()
+for (i in 1:length(cov_list)) {
+  nested_average <- c()                                                
+  for (j in 1:length(cov_list[[i]])) {                                     
+    nested_average <- c(nested_average, mean(cov_list[[i]][[j]], na.rm = TRUE))
+  }                                                                    
+  var_averages[[i]] <- nested_average                                        
+}
+names(var_averages ) <- names(cov_list )
+var_averages
+
+
+var_av <- sapply(var_averages, function(x ) mean(x ) )
+
+## n30tl50 <- round(var_av, 2)
+n30tl50
+## n30tl75 <- round(var_av, 2)
+n30tl75
+## n75tl100 <- round(var_av, 2)
+## n30tl150 <- round(var_av, 2)
+
+
+cbind(n30tl50, n30tl75)
+
+bin <- list()
+binl <- 0
+## Assuming 1000 draws in the fit objects (standard) 
+for(start in seq(1, 951, by=50)) {
+  binl <- binl+1
+  end <- start + 49
+  current_sequence <- start:end
+  bin[binl] <- sum(fit_r$model_fit$draws( variables = variables[1] )[start:end,col] < fit$model_fit$draws(variables = variables[1] )[start:end,col])
+}
+bin
+
+
+unlist(bin)
+chisq.test(unlist(bin))
+hist(unlist(bin), breaks = length(unlist(bin) ), xlim = c(0, 50 ))
+
+dev.off( )
 
 
 
 
+## Unfactored version of loop above
 ## Fit model to replication dataset(s)
 for(s in 1:100) {
   
@@ -325,6 +381,8 @@ for(s in 1:100) {
   SF <- fit_r$model_fit$summary(variables = 'c_h_fixed',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
+  mean(fit$model_fit$draws(variables = 'c_h_fixed' ))
   log_c_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'c_h_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
@@ -334,6 +392,7 @@ for(s in 1:100) {
   SF <- fit_r$model_fit$summary(variables = 'c_h_tau',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
   log_c_rand_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'c_h_tau' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
@@ -343,6 +402,7 @@ for(s in 1:100) {
   SF <- fit_r$model_fit$summary(variables = 'a_h_fixed',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
   log_a_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'a_h_fixed' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
@@ -378,6 +438,7 @@ for(s in 1:100) {
   ## Covr: l_a_q 
   SF <- fit_r$model_fit$summary(variables = 'l_a_q', "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
   l_a_q_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'l_a_q' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
@@ -387,7 +448,8 @@ for(s in 1:100) {
   SF <- fit_r$model_fit$summary(variables = 'l_a_q_sigma',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
-  l_a_q_r_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+  l_a_q_r_covr[[s]] <-
+    sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'l_a_q_sigma' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
   print(l_a_q_r_covr)
@@ -395,6 +457,7 @@ for(s in 1:100) {
   SF <- fit_r$model_fit$summary(variables = 'l_b_q',
                                 "mean",
                                 extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)) )
+  SF
   l_b_q_fixed_covr[[s]] <- sapply(seq_len(nrow(SF)), function(i) {
     overlap(fit$model_fit$draws(variables = 'l_b_q' )[,i], L = SF$q2.5[i], U = SF$q97.5[i])
   })
@@ -429,24 +492,6 @@ s
 
 
 
-## Algorithm 1 from: Validating Bayesian Inference Algorithms with Simulation-Based Calibration (2020)
-bin <- list()
-binl <- 0
-col <- 1
-for(start in seq(1, 951, by=50)) {
-  binl <- binl+1
-  end <- start + 49
-  current_sequence <- start:end
-  bin[binl] <- sum(fit_r$model_fit$draws( variables = 'l_a_q' )[start:end,col] < fit$model_fit$draws(variables = 'l_a_q' )[start:end,col])
-}
-
-rmse( fit_r$model_fit$draws( variables = 'l_a_q' )[,1], fit$model_fit$draws(variables = 'l_a_q' )[, 1])
-
-unlist(bin)
-chisq.test(unlist(bin))
-hist(unlist(bin), breaks = length(unlist(bin) ), xlim = c(0, 50 ))
-
-dev.off( )
 
 
 ## Compute coverage

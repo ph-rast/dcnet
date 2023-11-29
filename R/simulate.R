@@ -80,12 +80,16 @@
 ##' @title Create phi matrix that ensures stationarity of VAR(1)
 ##' The function returns a matrix with eigen values less than 1 in modulus
 ##' @param fixed_phi A fixed effects square matrix
-.stat_var <- function(n_ts, fixed_phi, phi_ranef_sd, D) {
-  ##D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
+.stat_var <- function(n_ts, fixed_phi, phi_ranef_sd, D, stationarity = TRUE) {
+  #D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
   vecfix <- c(fixed_phi ) ## columnwise
   indfix <- vecfix + rnorm(n_ts^2, 0, phi_ranef_sd)
   A <- matrix(indfix, nrow = n_ts)
-  A%*%D%*%solve(A)
+  stationary <- A%*%D%*%solve(A)
+  nonstationary <- A
+  if(stationarity == TRUE) {
+    return(stationary )
+  } else return(nonstationary )
 }
 
 
@@ -100,6 +104,10 @@
 .simuDCC <- function(tslength, n_ts, N,
                      phi0_fixed = rep(0, n_ts), 
                      phi0_sd = .5,
+                     phi_mu = 0, ## Values of phi
+                     phi_sd = 0, ## This is to generate a phi matrix with different values
+                     phi_ranef_sd = 0.01, ## This is the random effect of phi
+                     stationarity_phi = FALSE, ## Should the phi values ensure that ts is stationary?
                      log_c_fixed = rep(0, n_ts), ## on log scale
                      log_c_r_sd = 0.1,
                      a_h_fixed = rep(0, n_ts),
@@ -111,10 +119,7 @@
                      l_b_q_fixed = 0,
                      l_b_q_r_sd = 0.1,                     
                      ranef_sd_S, 
-                     ranS_sd = 1,
-                     phi_mu = 0, # guides the strength of phi matrix
-                     phi_sd = 1,
-                     phi_ranef_sd = 1) {
+                     ranS_sd = 1) {
 
   ## Define fixed diag for c_h on log scale
   log_c_fixed_diag <- log_c_fixed
@@ -151,8 +156,8 @@
   ## add  random effect with .stat_var function
   phi <- replicate(N, .stat_var(n_ts,
                                 fixed_phi = phi_fixed,
-                                phi_ranef_sd = phi_ranef_sd,
-                                D = D), simplify = FALSE)
+                                phi_ranef_sd = phi_ranef_sd, D, stationarity = stationarity_phi),
+                   simplify = FALSE)
   
   y <- array(NA, dim = c(n_ts, tslength, N))
   ## create named variables:
@@ -222,12 +227,17 @@
       }
       DCC_y <- y
     }
+  if(stationarity_phi == TRUE ) {
+    fixed_phi <- phi_fixed # %*%D%*%solve(phi_fixed)
+  } else {
+    fixed_phi <- phi_fixed
+  }
   return(list(DCC_y,
               DCC_R = DCC_R,
               S = S,
               RawCorr =  RawCorr,
               Fixed_S = Sc,
-              fixed_phi = phi_fixed%*%D%*%solve(phi_fixed),
+              fixed_phi = fixed_phi,
               ranS_sd = ranS_sd,
               l_b_q_r_sd = l_b_q_r_sd,
               l_b_q_fixed = l_b_q_fixed,
