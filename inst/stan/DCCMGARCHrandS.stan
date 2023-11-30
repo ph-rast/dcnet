@@ -242,8 +242,8 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // priors
-  l_a_q ~ student_t(3, -1.5, 3);
-  l_b_q ~ student_t(3, -1.5, 3);
+  l_a_q ~ student_t(3, -1.5, 1);
+  l_b_q ~ student_t(3, -1.5, 1);
   l_a_q_sigma ~ student_t(3, 0, 1);  // rewrite to non-centered
   to_vector(l_a_q_stdnorm) ~ std_normal();
   l_b_q_sigma ~ student_t(3, 0, 1);
@@ -258,23 +258,23 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau ~ inv_gamma(6, 2.5); // SD for multiplication with cholesky phi0_L
+  phi0_tau ~ student_t(3,0, 1); // SD for multiplication with cholesky phi0_L
   phi_tau ~ student_t(3, 0, 1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ student_t(3, 0, 3); // SD for c_h ranefs
-  a_h_tau ~ inv_gamma(6, 2.5); // SD for c_h ranefs
-  b_h_tau ~ inv_gamma(6, 2.5);
+  c_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
+  a_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
+  b_h_tau ~ student_t(3, 0, 1);
 
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ student_t(3, -2, 10);
-  to_vector(a_h_fixed) ~ student_t(3, -2, 10);
-  to_vector(b_h_fixed) ~ student_t(3, -2, 10);
+  to_vector(c_h_fixed) ~ student_t(3, -2, 1);
+  to_vector(a_h_fixed) ~ student_t(3, -2, 1);
+  to_vector(b_h_fixed) ~ student_t(3, -2, 1);
   // Prior for initial state
   
   // Prior on nu for student_t
   //if ( distribution == 1 )
-  nu ~ normal( nt, 50 );
+  nu ~ normal( nt, 5 );
   to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
   vec_phi_fixed ~ student_t(3, 0, 1);
   S_vec_fixed ~ std_normal();
@@ -282,7 +282,7 @@ model {
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau ~ inv_gamma( 6, 2.5);
+    S_vec_tau ~ student_t(3, 0, 1);
     S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
