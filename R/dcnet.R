@@ -16,7 +16,7 @@
 ##' @param standardize_data Logical (Default: FALSE). Whether data should be standardized. 
 ##' @param distribution Character (Default: "Student_t"). Distribution of innovation: "Student_t"  or "Gaussian"
 ##' @param meanstructure Character (Default: "constant"). Defines model for means. Either 'constant', 'VAR', or 'ARMA'. Currently ARMA(1,1) or 'VAR' (VAR1).
-##' @param sampling_algorithm Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.
+##' @param sampling_algorithm Character (Default" "variational"). Define sampling algorithm: One of Hamilton Monte-Carlo 'HMC', variational Bayes 'variational' or 'pathfinder'.
 ##' @param simplify_ch Random efx on ch 
 ##' @param simplify_ah Randon efx on ah
 ##' @param simplify_bh Random efx on bh
@@ -131,8 +131,15 @@ dcnet <- function(data,
       if( is.null( iterations ) ) iterations <- 30000
       model_fit <- stanmodel$variational(data = stan_data,
                                          iter = iterations, ...)
+    } else if (tolower(sampling_algorithm) == 'pathfinder' ) {
+      ## Sampling via Pathfinder Method
+      if( is.null( iterations ) ) iterations <- 30000
+      model_fit <- stanmodel$pathfinder(data = stan_data,
+                                        #iter = iterations,
+                                        #jacobian =  TRUE,
+                                        ...)
     } else {
-      stop( "\n\n Provide sampling algorithm: 'HMC' or 'variational'\n\n" )
+      stop( "\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n" )
     }
     
     ## Model fit is based on standardized values.
