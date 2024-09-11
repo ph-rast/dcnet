@@ -154,9 +154,11 @@ transformed parameters {
     // R part
     l_a_q_r[j] = l_a_q_sigma * l_a_q_stdnorm[j];
     l_b_q_r[j] = l_b_q_sigma * l_b_q_stdnorm[j];
-    a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
-    b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
-
+    //a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
+    // Replaced by stans inv_logit function:
+    a_q[j] =          inv_logit( l_a_q + l_a_q_r[j] );
+    //b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
+    b_q[j] = (1 - a_q[j]) * inv_logit(l_b_q + l_b_q_r[j]);
     // D part
     // Should random effect corrleations be estimated:
     // Full estimation of corrmat with simplify_ch == 0
@@ -176,8 +178,8 @@ transformed parameters {
     }
     
     // Bound sum of fixed and ranef between 0 and 1 with logistic function
-    a_h_sum[j] = 1 ./ (1 + exp(-( a_h_fixed + a_h_random[j] )) );
-
+    //a_h_sum[j] = 1 ./ (1 + exp(-( a_h_fixed + a_h_random[j] )) );
+    a_h_sum[j] = inv_logit(a_h_fixed + a_h_random[j]);
     
     if(simplify_bh==0){      
       b_h_random[j] = (diag_pre_multiply(b_h_tau, b_h_L)*b_h_stdnorm[j]);
@@ -185,8 +187,8 @@ transformed parameters {
       b_h_random[j] = b_h_tau .* b_h_stdnorm[j];
     }
     // Bound sum of fixed and ranef between 0 and 1
-    b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
-    
+     b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
+    //b_h_sum[j] = (1 - a_h_sum[j]) .* inv_logit(b_h_fixed + b_h_random[j]);
     /////////////////////
     // Model Structure //
     /////////////////////
@@ -221,6 +223,7 @@ transformed parameters {
 	D[j, t, d] = sqrt( vd[j,d] );
       }
       u[j,t,] = diag_matrix(D[j,t]) \ (rts[j,t]'- mu[j,t]) ; // cf. comment about taking inverses in stan manual p. 482 re:Inverses - inv(D)*y = D \ a
+      //u[j, t, ] = (rts[j, t]' - mu[j, t]) ./ D[j, t];
 
       // Second S_lv stuff is just a placeholder: TODO, add S_Lv2[j] or drop completely
       if (S_pred[j,t] == 0){

@@ -1,7 +1,7 @@
 #####################
 ## Siwei's fitbit  ##
 ####################
-options(width = 210)
+options(width = 190)
 library(data.table )
 
 fitbit <- data.table( read.csv(file = '~/Dropbox/Projekte/M_GARCH/WORK/-DATASETS/SOURCE/fit_bit_dat.csv') )
@@ -68,11 +68,11 @@ tsdat
 getwd( )
 setwd( "../")
 
-devtools::load_all( path = "~/Git/dcnet/")
+devtools::load_all( path = "./dcnet/")
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
-             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0)
+             standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
 
 
 summary(fit )
@@ -87,7 +87,7 @@ log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
 log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
 dim(log_lik_r )
 
-r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  978 ) )
+r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  1000 ) )
 
 log_lik_c <- grep( "log_lik", colnames(fitC$model_fit$draws( )) )
 log_lik_c <- fitC$model_fit$draws( )[, log_lik_c]
@@ -167,7 +167,7 @@ head(df3)
 c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous(paste0("PCor(", varnames[3], ", ", varnames[4], ")"))#+ geom_vline( xintercept = 36)
 
-ggsave(filename = "~/Downloads/singlecorr.pdf",  width = 6,  height = 3,  plot = c34 )
+ggsave(filename = "~/Dropbox/Public/singlecorr.pdf",  width = 6,  height = 3,  plot = c34 )
 
 nn <- ggplot( ) + theme_void()
 
@@ -177,7 +177,8 @@ patched <- (c12 | c13 | c14 ) /
 ( nn | c23 | c24 ) /
 ( nn | nn  | c34 )
 
-ggsave(filename = "~/Downloads/pcor.pdf", width = 9, height = 4.5, plot = patched)
+ggsave(filename = "~/Dropbox/Public/pcor.pdf", width = 9, height = 4.5, plot = patched)
+
 
 ### Yrep => rts_out[N,ts_length,timesries]
 tsl
@@ -205,7 +206,7 @@ tsdat[[1]][,4]
 head(yrep4 )
 
 sc <- ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')+ylab(varnames[4])
-ggsave(filename = "~/Downloads/sancheck4.pdf",  plot = sc ,  width = 6, height = 4)
+ggsave(filename = "~/Dropbox/Public/sancheck4.pdf",  plot = sc ,  width = 6, height = 4)
 
 
 ## extract lower, median, upper quantile and scal back to original scale
@@ -228,7 +229,7 @@ tsdat[[1]][,1]
 head(yrep4 )
 
 sc <- ggplot(yrep4,  aes(x = time, y = yrep.50.) ) + geom_line( ) + geom_ribbon(aes(ymin =  yrep.2.5.,  ymax = yrep.97.5.),  alpha = .2) + geom_line( aes(y = obs ), color = 'red')+ylab(varnames[1])
-ggsave(filename = "~/Downloads/sancheck1.pdf",  plot = sc ,  width = 6, height = 4)
+ggsave(filename = "~/Dropbox/Public/sancheck1.pdf",  plot = sc ,  width = 6, height = 4)
 
 
 ## Sanity check to see if stan_model transform to original data
@@ -237,18 +238,26 @@ ggsave(filename = "~/Downloads/sancheck1.pdf",  plot = sc ,  width = 6, height =
 
 library(qgraph )
 
-grep('Sfixed', colnames(fit$model_fit$draws( )) )
-colMeans( fit$model_fit$draws( )[, 288664:288679] )
+(grep('Sfixed', colnames(fit$model_fit$draws( )) ))
+names(fit$model_fit$draws( ) )[,288742]
+
+colMeans( fit$model_fit$draws( )[, 288738:288753] )
 
 
-mS <- matrix(colMeans( fit$model_fit$draws( )[, 288664:288679] ), ncol =  4, byrow =  TRUE)
+mS <- matrix(colMeans( fit$model_fit$draws( )[, 288738:288753] ), ncol =  4, byrow =  TRUE)
 mS
 
 fit$model_fit$draws( )[, c( 'Sfixed[1,2]','Sfixed[1,3]','Sfixed[1,4]','Sfixed[2,3]','Sfixed[2,4]','Sfixed[3,4]')]
 
-pdf(file = "~/Downloads/qgraph.pdf")
+pdf(file = "~/Dropbox/Public/qgraph.pdf")
 qgraph::qgraph(mS, labels = varnames)
 dev.off()
+
+
+
+(grep('VAR', colnames(fit$model_fit$draws( )) ))
+
+
 
 288695## needs to be list of full cormats
 qgraph::qgraph.animate( list())
