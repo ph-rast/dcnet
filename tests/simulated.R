@@ -63,8 +63,8 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 30
-tl <- 30
+N <- 75
+tl <- 100
 nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi0_sd = 0.2,
@@ -120,11 +120,16 @@ devtools::load_all( )
 
 system.time( {
   fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-               group =  groupvec, standardize_data = TRUE, init = .5,
-               iterations = 1000,
-               threads = 1, #tol_rel_obj =  0.001,
-               sampling_algorithm = 'HMC')
+               group =  groupvec, standardize_data = FALSE, init = .0,
+               meanstructure =  "VAR",
+               iterations = 2000,
+#               threads = 1, #tol_rel_obj =  0.001,
+               sampling_algorithm = 'pathfinder',
+               num_threads =  1)
 })
+
+fit$model_fit$output()
+
 
 fit
 
@@ -189,6 +194,7 @@ phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_cov
 default_return <- FALSE
 safe_sample <- purrr::possibly( function(s) {
   dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
+        meanstructure =  "constant",
         group =  groupvec, standardize_data = FALSE, init = 0,
         threads = 1, sampling_algorithm = 'variational')
 }, otherwise = default_return)
@@ -241,7 +247,7 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 7:10) {  
+for (s in 10:20) {  
 
   fit_r <- safe_sample(s)
   fit_r$error  
@@ -291,17 +297,26 @@ names(var_averages ) <- names(cov_list )
 var_averages
 
 
-var_av <- sapply(var_averages, function(x ) mean(x ) )
-
-## n30tl50 <- round(var_av, 2)
+var_av <- sapply(var_averages, function(x ) mean(x, na.rm = TRUE))
+var_av
+##n30tl50 <- round(var_av, 2)
 n30tl50
-## n30tl75 <- round(var_av, 2)
-n30tl75
+##n50tl50 <- round(var_av, 2)
+n50tl50
+## n50tl75 <- round(var_av, 2)
+n50tl75
+## n75tl75 <- round(var_av, 2)
+n75tl75
 ## n75tl100 <- round(var_av, 2)
-## n30tl150 <- round(var_av, 2)
+n75tl100
+## n100tl100 <- round(var_av, 2)
+n100tl100
 
 
-cbind(n30tl50, n30tl75)
+
+rbind(n30tl50, n50tl50, n50tl75, n75tl75, n75tl100)
+
+write.csv( rbind(n30tl50, n50tl50, n50tl75, n75tl75, n75tl100), file = "VB_SimulationResults.csv")
 
 bin <- list()
 binl <- 0
