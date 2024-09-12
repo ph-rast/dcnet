@@ -266,7 +266,6 @@ model {
   c_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
   a_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
   b_h_tau ~ student_t(3, 0, 1);
-
   
   // C
   to_vector(beta) ~ std_normal();

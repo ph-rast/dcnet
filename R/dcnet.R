@@ -95,9 +95,13 @@ dcnet <- function(data,
                                             cpp_options = list(stan_threads = TRUE)),
                         DCC = cmdstan_model(dcc_file, include_paths =  stan_path,
                                             cpp_options = list(stan_threads = TRUE)),
-                        DCCr = cmdstan_model(dccr_file, include_paths =  stan_path,
-                                             cpp_options = list(stan_threads = TRUE)),
-                        NULL)
+                        DCCr = if(sampling_algorithm == 'pathfinder') { ## pathfinder fails with cpp_option TRUE
+                                 cmdstan_model(dccr_file, include_paths =  stan_path,
+                                               cpp_options = list(stan_threads = FALSE))}
+                               else {
+                                 cmdstan_model(dccr_file, include_paths =  stan_path,
+                                               cpp_options = list(stan_threads = TRUE))
+                                 }, NULL)
         
     if(is.null(stanmodel)) {
         stop("Not a valid model specification. ",

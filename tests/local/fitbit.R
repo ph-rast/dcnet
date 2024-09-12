@@ -10,9 +10,13 @@ dim(fitbit )
 head(fitbit)
 str(fitbit )
 
+
+fitbit$nd <- -fitbit$disinterested
 ## Select variables of interest
 variables <- c("active", "totalDistance","disinterested","excited")
 fitcomp <- fitbit[complete.cases( fitbit[, ..variables] )]
+
+fitcomp
 
 ## Select only individuals with 80+ entries
 tmp <- fitcomp[, .N, by = record_id]
@@ -22,7 +26,13 @@ length(sel)
 
 ## Subset selected
 dt <- fitcomp[record_id %in% sel]
+dt
 
+#dt[, (variables[c(1, 3:4)]) := lapply(.SD, function(x) {x = (x-50)/50.5; atanh(x)}), .SDcols = variables[c(1, 3:4)]]
+
+## STandardize the four variables
+dt[, (variables) := lapply(.SD, scale), .SDcols = variables]
+dt[, ..variables]
 ## remove data to fre up memory
 rm( list = c("fitbit", "fitcomp"))
 
@@ -30,7 +40,7 @@ rm( list = c("fitbit", "fitcomp"))
 tsl <- min(dt[, .N, by = record_id]$N)
 
 ## Truncate the data table to exactly tsl observations per person
-## The .SD refers to the current group of rows being processed.
+## The .SD (SubsetData) refers to the current group of rows being processed.
 dt <- dt[, head(.SD, tsl), by = record_id]
 
 ## Re-Create observation index
@@ -47,9 +57,7 @@ head(dt )
 unique(dt$id )
 plt <- ggplot(dt[id <= 3],  aes(x = time,  y = excited, group = factor(id), color = factor(id)) ) +
   geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2)
-
-ggsave(filename = "~/Downloads/fitbit_raw.pdf" )
-
+ggsave(filename = "~/Dropbox/Public/fitbit_raw.pdf" )
 dev.off( )
 
 N <- length(unique(dt$id ) )
@@ -72,7 +80,10 @@ devtools::load_all( path = "./dcnet/")
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
-             standardize_data = TRUE, sampling_algorithm = 'variational', threads = 1, init = 0)
+             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = 0.5, tol_rel_obj = 0.005)
+
+fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
+             standardize_data = FALSE, sampling_algorithm = 'pathfinder', threads = 1)
 
 
 summary(fit )
@@ -82,6 +93,7 @@ summary(fit )
 fitC <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "CCC",
              standardize_data = FALSE, sampling_algorithm = 'variational', threads = 1, init = .5)
 
+summary(fitC)
 
 log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
 log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
@@ -97,7 +109,8 @@ r_eff_c <- loo::relative_eff(exp(log_lik_c ),  chain_id = rep(1,  1000 ) )
 
 fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
 fc <- loo::loo(log_lik_c, r_eff = r_eff_c )
-fr;fc
+fr
+fc
 loo::loo_compare(fr,  fc )
 ## random efx model is preferred
 
@@ -239,7 +252,6 @@ ggsave(filename = "~/Dropbox/Public/sancheck1.pdf",  plot = sc ,  width = 6, hei
 library(qgraph )
 
 (grep('Sfixed', colnames(fit$model_fit$draws( )) ))
-names(fit$model_fit$draws( ) )[,288742]
 
 colMeans( fit$model_fit$draws( )[, 288738:288753] )
 
@@ -254,10 +266,24 @@ qgraph::qgraph(mS, labels = varnames)
 dev.off()
 
 
+## Temporal graph for VAR-DCC
+(grep('phi_fixed', colnames(fit$model_fit$draws( )) ))
+colMeans( fit$model_fit$draws( )[, 167:182] )
 
-(grep('VAR', colnames(fit$model_fit$draws( )) ))
+temporal_m <- matrix(colMeans( fit$model_fit$draws( )[, 167:182] ), ncol =  4, byrow =  FALSE)
+temporal_m
 
+pdf(file = "~/Dropbox/Public/temporal.pdf")
+qgraph::qgraph(temporal_m, labels = varnames)
+dev.off()
 
+## Temporal graph for VAR only
+(grep('phi_fixed', colnames(fitC$model_fit$draws( )) ))
+colMeans( fitC$model_fit$draws( )[, 167:182] )
 
-288695## needs to be list of full cormats
-qgraph::qgraph.animate( list())
+temporal_mc <- matrix(colMeans( fitC$model_fit$draws( )[, 167:182] ), ncol =  4, byrow =  FALSE)
+temporal_mc
+
+pdf(file = "~/Dropbox/Public/temporal_var.pdf")
+qgraph::qgraph(temporal_mc, labels = varnames)
+dev.off()
