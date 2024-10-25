@@ -21,7 +21,10 @@ Imports:
     MASS,
     ks,
     clusterGeneration,
-    data.table
+    data.table,
+    Rdpack
+RdMacros:
+    Rdpack
 LinkingTo: 
     BH (>= 1.66.0)
 SystemRequirements: GNU make

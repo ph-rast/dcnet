@@ -18,7 +18,7 @@ length(unique(bmcomp$subjno))
 ## Select only individuals with 80+ entries
 tmp <- bmcomp[, .N, by = subjno]
 tmp
-sel <- tmp[N >= 80]$subjno
+sel <- tmp[N >= 90]$subjno
 length(sel)
 
 dt <- bmcomp[subjno %in% sel]
@@ -55,6 +55,8 @@ dt[, obs := 1:.N, by = subjno]
 library(ggplot2 )
 ggplot(dt,  aes(x = obs,  y = opgewkt_, group = factor(subjno), color = factor(subjno)) ) + geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2) + geom_vline(xintercept =  36 )
 dev.off( )
+
+ggsave(filename = "~/Nextcloud/Documents/fitbit_raw.pdf", width = 15, height = 15 )
 
 head(dt )
 

@@ -13,23 +13,23 @@ transformed data {
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
   int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
-   
+  
 #include /transformed_data/xh_marker.stan
  
-  if( meanstructure == 0 ){
-    for ( j in 1:J ){
-      for ( i in 1:nt ){
-	rts_m[j] = rep_vector(mean(rts[j,i]),nt);
-	rts_sd[j] =  rep_vector(sd(rts[j,i]),nt);
-      }
-    }
-  } else if (meanstructure == 1 || meanstructure == 2 ){
-    // set rts_m to first element in ts
-    for ( j in 1:J ){
-      rts_m[j] = rts[j,1]';
-      rts_sd[j] = rep_vector(sd(rts[1,1]),nt);
-    }
-  }
+  /* if( meanstructure == 0 ){ */
+  /*   for ( j in 1:J ){ */
+  /*     for ( i in 1:nt ){ */
+  /* 	rts_m[j] = rep_vector(mean(rts[j,i]),nt); */
+  /* 	rts_sd[j] =  rep_vector(sd(rts[j,i]),nt); */
+  /*     } */
+  /*   } */
+  /* } else if (meanstructure == 1 || meanstructure == 2 ){ */
+  /*   // set rts_m to first element in ts */
+  /*   for ( j in 1:J ){ */
+  /*     rts_m[j] = rts[j,1]'; */
+  /*     rts_sd[j] = rep_vector(sd(rts[1,1]),nt); */
+  /*   } */
+  /* } */
 }
 parameters {
   // VAR parameters
@@ -134,9 +134,9 @@ transformed parameters {
   // Initialize t=1
   for( j in 1:J){
     
-    mu[j,1] = rts[j, 1]'; //phi0_fixed;
+    mu[j,1] = rts[j, 1]'; //mu[,1] is not used, just copy rts1 as starting value 
     D[j,1] = D1_init[j];//sqrt( diagonal((rts[j]' * rts[j]) / (nt - 1)) );//D1_init[j];//
-    u[j,1] = u1_init[j];//( rts[j,1]' - mu[j,1] ) ./ D[j,1] ;//u1_init;
+    u[j,1] = u1_init[j];
     Qr[j,1] = Qr1_init[j];//
 
     //Qr[j,1] = ((rts[j]' * rts[j]) / (nt - 1));// Werden alle flach
@@ -245,11 +245,11 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // priors
-  l_a_q ~ student_t(3, -1.5, 1);
-  l_b_q ~ student_t(3, -1.5, 1);
-  l_a_q_sigma ~ student_t(3, 0, 1);  // rewrite to non-centered
+  l_a_q ~ student_t(3, -1.5, 2);
+  l_b_q ~ student_t(3, -1.5, 2);
+  l_a_q_sigma ~ student_t(3, 0, 2);
   to_vector(l_a_q_stdnorm) ~ std_normal();
-  l_b_q_sigma ~ student_t(3, 0, 1);
+  l_b_q_sigma ~ student_t(3, 0, 2);
   to_vector(l_b_q_stdnorm) ~ std_normal();
 
   // VAR
@@ -277,14 +277,15 @@ model {
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 5 );
-  to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
+  //to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
+  phi0_fixed ~ student_t(3, 0, 5);
   vec_phi_fixed ~ student_t(3, 0, 1);
   S_vec_fixed ~ std_normal();
   S_vec_fixed2 ~ std_normal();  
   
   // likelihood
   for( j in 1:J) {
-    S_vec_tau ~ student_t(3, 0, 1);
+    S_vec_tau ~ student_t(3, 0, 3);
     S_vec_stdnorm[j] ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );

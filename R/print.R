@@ -19,7 +19,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
   ## TODO: Revisit this; some can be removed. Kitchen sink for now.
   metaNames <- c("param", "distribution", "num_dist", "iter", "chains",
                  "elapsed_time", "date", "nt", "TS_names", "mgarchQ",
-                 "mgarchP", "meanstructure", "sampling_algorithm")
+                 "mgarchP", "meanstructure", "sampling_algorithm", "S_pred")
   meta <- with(object, mget(metaNames))
   meta$xC <- !all(object$xC == 0)
   out <- list()
@@ -279,7 +279,9 @@ print.summary.dcnet <- function(x,  ... ) {
   ms <-  ms[!grepl("l_a_q\\b", rownames(ms) ),] # Remove log scale random effects
   ms <-  ms[!grepl("l_b_q\\b", rownames(ms) ),] # Remove log scale random effects  
   garch_h_index <- grep("_h", rownames(ms))
-  garch_q_index  <- grep("_q", rownames(ms) )
+  garch_q_index  <-  grep("_q", rownames(ms) ) # This also contains the _stdnorm
+  garch_q_index_stdnorm  <-  grep("_q_stdnorm", rownames(ms) ) # find the _stdnorm
+  garch_q_index <- garch_q_index[!(garch_q_index %in% garch_q_index_stdnorm)]
   cond_corr_index <- grep("R", rownames(ms))
   S_index = grep("Sfixed", rownames(ms))  ## 
   S2_index = grep("Sfixed2", rownames(ms))
@@ -356,21 +358,21 @@ print.summary.dcnet <- function(x,  ... ) {
 
   print(round(S_out, digits = digits))
 
-
-  cat("Unconditional correlation 'S2' in Q:")
-  .newline(2)
-  S2_out <- ms[S2_index[corr_only],]
-  if (nt == 2) {
-    tmp <- matrix( S2_out, nrow = 1 )
-    rownames(tmp) <- paste( paste0("R_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
-    colnames(tmp) <- names(S2_out)
-    S2_out <- tmp 
-  } else {
-    rownames(S2_out) <- paste( paste0("S2_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
+  ## This only needs to be printed if S_pred is present
+  if(!is.null(bmsum$meta$S_pred)) {
+    cat("Unconditional correlation 'S2' in Q:")
+    .newline(2)
+    S2_out <- ms[S2_index[corr_only],]
+    if (nt == 2) {
+      tmp <- matrix( S2_out, nrow = 1 )
+      rownames(tmp) <- paste( paste0("R_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
+      colnames(tmp) <- names(S2_out)
+      S2_out <- tmp 
+    } else {
+      rownames(S2_out) <- paste( paste0("S2_", substr(od_varnames[ ,1], 1, 2) ), substr(od_varnames[ ,2], 1, 2) , sep = '-')
+    }
+    print(round(S2_out, digits = digits))
   }
-
-  print(round(S2_out, digits = digits))
-  
 }
 
 
@@ -386,7 +388,8 @@ print.summary.dcnet <- function(x,  ... ) {
   ms <- bmsum$model_summary
   nt <- bmsum$meta$nt
   TS_names <- bmsum$meta$TS_names
-
+  S_pred <- bmsum$meta$S_pred
+  
   ## Shortened TS names, if needed.
   short_names <- abbreviate(bmsum$meta$TS_names, minlength = 2)
 
@@ -395,14 +398,18 @@ print.summary.dcnet <- function(x,  ... ) {
 
   ## VAR intercept portion
   intercept_index <-  grep("phi0_(?!L)", rownames(ms), perl = TRUE)
+  ## intercept index includes fixed2 variables, only needed if S_pred is present
+  if(is.null(S_pred)) {
+    intercept_index <- intercept_index[-grep("fixed2", rownames(ms[intercept_index,]), perl = TRUE)]
+  }
+  
   intercept_rownames <- paste0(gsub("[|[0-9]+]", "_", rownames(ms[intercept_index,]), perl = TRUE),
                                rep(short_names, 2))
-
+  rownames(ms[intercept_index,])
+  
   intercept_table <- ms[intercept_index,]
   rownames(intercept_table) <- intercept_rownames
-  intercept_table
-
-  
+    
   ## VAR parameter matrix: Returned vectorized 
   ar_fixed_index <- grep("phi_(?!L)+fix", rownames(ms), perl = TRUE)
   ar_tau_index <-   grep("phi_(?!L)+tau", rownames(ms), perl = TRUE)
@@ -413,16 +420,13 @@ print.summary.dcnet <- function(x,  ... ) {
   
   ar_fixed_rownames <-gsub("vec_",  "", 
                            paste0(gsub("[|[0-9]+]", "_", rownames(ms[ar_fixed_index,]), perl = TRUE ), phi_varnames ))
-  ar_fixed_rownames
+
   ar_fixed_table <- ms[ar_fixed_index,]
   rownames(ar_fixed_table ) <- ar_fixed_rownames
-  ar_fixed_table
   
   ar_tau_rownames <- paste0(gsub("[|[0-9]+]", "_", rownames(ms[ar_tau_index,]), perl = TRUE ), phi_varnames )
-  ar_tau_rownames
   ar_tau_table <- ms[ar_tau_index,]
   rownames(ar_tau_table ) <- ar_tau_rownames
-  ar_tau_table
 
   
     if(bmsum$meta$meanstructure == 0) {

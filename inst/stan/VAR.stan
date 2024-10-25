@@ -10,20 +10,20 @@ transformed data {
  
 #include /transformed_data/xh_marker.stan
   
-  if( meanstructure == 0 ){
-    for ( j in 1:J ){
-      for ( i in 1:nt ){
-	rts_m[j] = rep_vector(mean(rts[j,i]),nt);
-	rts_sd[j] =  rep_vector(sd(rts[j,i]),nt);
-      }
-    }
-  } else if (meanstructure == 1 || meanstructure == 2 ){
-    // set rts_m to first element in ts
-    for ( j in 1:J ){
-      rts_m[j] = rts[j,1]';
-      rts_sd[j] = rep_vector(sd(rts[1,1]),nt);
-    }
-  }
+  /* if( meanstructure == 0 ){ */
+  /*   for ( j in 1:J ){ */
+  /*     for ( i in 1:nt ){ */
+  /* 	rts_m[j] = rep_vector(mean(rts[j,i]),nt); */
+  /* 	rts_sd[j] =  rep_vector(sd(rts[j,i]),nt); */
+  /*     } */
+  /*   } */
+  /* } else if (meanstructure == 1 || meanstructure == 2 ){ */
+  /*   // set rts_m to first element in ts */
+  /*   for ( j in 1:J ){ */
+  /*     rts_m[j] = rts[j,1]'; */
+  /*     rts_sd[j] = rep_vector(sd(rts[1,1]),nt); */
+  /*   } */
+  /* } */
 }
 
 parameters {
@@ -68,11 +68,11 @@ model {
   }
   // Prior for initial state
   rescov ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
-  // Prior on nu for student_t
+  // Prior on nu for student_t 
   nu ~ normal( nt, 50 );
   //  phi0_fixed ~ multi_normal(rts_m[1,1], diag_matrix( rep_vector(1.0, nt) ) ); //REVISIT rts[1,1]
-  phi0_fixed ~ normal(0, 10 );
-  vec_phi_fixed ~ normal(0, 0.5);
+  phi0_fixed ~ student_t(3, 0, 5);
+  vec_phi_fixed ~ student_t(3, 0, 1);
   
   // likelihood 
   for( j in 1:J) { 
@@ -92,6 +92,8 @@ generated quantities {
   
 array[J] matrix[T, nt] rts_out;
 array[J] vector[T] log_lik;
+array[J] matrix[T,nt] rtscheck=rts;  // multivariate time-series; array of length J of Txnt matrix
+
 
 if ( distribution == 0 ){
   for( j in 1:J ) {

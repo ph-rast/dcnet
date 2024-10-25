@@ -154,6 +154,9 @@ dcnet <- function(data,
       mns <- stan_data$grand_mean
       sds <- 1
     }
+
+    ## Pass out information on whether S_pred is not null. This is for print.R
+    if(!is.null(S_pred)) {S_pred <- "present"}
     
     ## Values could be converted to original scale using something like this on the estimates
     ## orig_sd = stan_data$rts %*% diag(sds)
@@ -178,7 +181,8 @@ dcnet <- function(data,
                        xC = stan_data$xC,
                        meanstructure = stan_data$meanstructure,
                        std_data = standardize_data,
-                       sampling_algorithm = sampling_algorithm)
+                       sampling_algorithm = sampling_algorithm,
+                       S_pred = S_pred)
 
     class(return_fit) <- "dcnet"
     return(return_fit)
