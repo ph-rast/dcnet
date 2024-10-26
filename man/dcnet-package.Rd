@@ -15,3 +15,7 @@ inference (cf. \link{http://mc-stan.org}). either via variational Bayes or Hamil
 \references{
 Stan Development Team (2020). RStan: the R interface to Stan. R package version 2.21.2. https://mc-stan.org
 }
+\author{
+\strong{Maintainer}: Philippe Rast \email{rast.ph@gmail.com} (\href{https://orcid.org/0000-0003-3630-6629}{ORCID})
+
+}

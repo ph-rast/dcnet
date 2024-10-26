@@ -18,8 +18,9 @@
 #' @param ubound Upper bound on observed values (across data matrix) - defaults to max(data).
 #' @return dcnet stan data list. 
 #' @keywords internal
-stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data, distribution = 0, 
-                      meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1, lbound, ubound) {
+stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data, distribution = 0,
+                      meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1,
+                      lbound, ubound) {
 
   ## Check for data type:
   ## dim data needs to return NULL as the list is a collection of individual matrices for each individual.
@@ -49,16 +50,17 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
   nt <- ncol(data[[1]])
   
   ## Pass in a 0 matrix, so that stan does not complain
+  
   if ( is.null(xC) ) {
-    xC <- matrix(0, ncol = nt, nrow = J * tl)
+    xC <- matrix(0, ncol = nt, nrow = J * nrow(data[[1]]))
   } else if ( !is.null(xC) ) {
       ## Test dimension of XC
       if( ncol(xC) != nt )  stop("xC must have same dimension as data (same number of columns)")
-      if( nrow(xC) != J*tl) stop("xC must have same dimension as data (same number of rows)")
+    if( nrow(xC) != J*nrow(data[[1]])) stop("xC must have same dimension as data (same number of rows)")
   }
 
   if ( is.null(S_pred) ) {
-    S_pred <- lapply(1:J, FUN =  function(x) rep(0, tl))
+    S_pred <- lapply(1:J, FUN =  function(x) rep(0, nrow(data[[1]])))
   }
   
   ## Match dimension of predictor to TS. If only one vector is given, it's assumed that it is the same for all TS's

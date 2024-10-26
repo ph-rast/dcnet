@@ -6,8 +6,8 @@
 \usage{
 dcnet(
   data,
-  J,
-  group,
+  J = NULL,
+  group = NULL,
   xC = NULL,
   S_pred = NULL,
   parameterization = "DCC",
@@ -30,9 +30,9 @@ dcnet(
 \arguments{
 \item{data}{Time-series or matrix object. A time-series or matrix object containing observations at the same interval.}
 
-\item{J}{...}
+\item{J}{Number of clusters. If \code{NULL}, derived from data, otherwise user provided.}
 
-\item{group}{Vector with group id}
+\item{group}{Vector with group id. If \code{NULL}, derived from data, otherwise user provided.}
 
 \item{xC}{Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).}
 
@@ -54,7 +54,7 @@ dcnet(
 
 \item{meanstructure}{Character (Default: "constant"). Defines model for means. Either 'constant', 'VAR', or 'ARMA'. Currently ARMA(1,1) or 'VAR' (VAR1).}
 
-\item{sampling_algorithm}{Character (Default" "variational"). Define sampling algorithm. Either 'HMC' or variational Bayes 'variational'.}
+\item{sampling_algorithm}{Character (Default" "variational"). Define sampling algorithm: One of Hamilton Monte-Carlo 'HMC', variational Bayes 'variational' or 'pathfinder'.}
 
 \item{simplify_ch}{Random efx on ch}
 

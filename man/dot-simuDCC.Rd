@@ -10,6 +10,10 @@
   N,
   phi0_fixed = rep(0, n_ts),
   phi0_sd = 0.5,
+  phi_mu = 0,
+  phi_sd = 0,
+  phi_ranef_sd = 0.01,
+  stationarity_phi = FALSE,
   log_c_fixed = rep(0, n_ts),
   log_c_r_sd = 0.1,
   a_h_fixed = rep(0, n_ts),
@@ -21,10 +25,7 @@
   l_b_q_fixed = 0,
   l_b_q_r_sd = 0.1,
   ranef_sd_S,
-  ranS_sd = 1,
-  phi_mu = 0,
-  phi_sd = 1,
-  phi_ranef_sd = 1
+  ranS_sd = 1
 )
 }
 \arguments{

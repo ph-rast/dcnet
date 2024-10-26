@@ -124,7 +124,8 @@ dev.off( )
 
 ids <- unique(dt$id)
 tl <- tsl
-groupvec <- rep(seq_len(N),  each = tl)
+groupvec <-
+  rep(seq_len(N),  each = tl)
 
 variables
 
@@ -140,11 +141,11 @@ jtr <- function(x) {
   })
 }
 
-ema <- lapply(seq_len(N),  function(i) {
+ema_fitbit <- lapply(seq_len(N),  function(i) {
   jtr(tsdat[[i]])
 })
 
-save(ema,  file = "data/ema-fitbit.rda")
+#save(ema_fitbit,  file = "data/ema-fitbit.rda")
 
 
 
@@ -157,8 +158,6 @@ devtools::load_all( path = "./")
 fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
              standardize_data = FALSE, sampling_algorithm = 'variational', threads = 4, init = 0.5, tol_rel_obj = 0.0025)
 
-## Back to original variablas but with 98 ts length and kicked some ppl out to make it N=33
-## No rescaling of variabls. 
 summary(fit )
 
 grep('mu', colnames(fit$model_fit$draws( )) )
@@ -524,3 +523,16 @@ temporal_mc
 pdf(file = "~/Nextcloud/Documents/temporal_var.pdf")
 qgraph::qgraph(temporal_mc, labels = varnames)
 dev.off()
+
+
+
+## Precompile models:
+library(cmdstanr )
+stan_path <- "~/Dropbox/Git/dcnet/inst/stan/"
+dcc_file <- file.path(stan_path,  "DCCMGARCHrandQ.stan")
+cc_file <- file.path(stan_path, "VAR.stan")
+dccr_file <- file.path(stan_path, "DCCMGARCHrandS.stan")
+
+cmdstan_model(dcc_file, dir = stan_path, force_recompile = TRUE)$save_model_file(file = file.path(stan_path, "DCCMGARCHrandQ"))
+cmdstan_model(cc_file, dir = stan_path, force_recompile = TRUE)$save_model_file(file = file.path(stan_path, "VAR"))
+cmdstan_model(dccr_file, dir = stan_path, force_recompile = TRUE)$save_model_file(file = file.path(stan_path, "DCCMGARCHrandS"))

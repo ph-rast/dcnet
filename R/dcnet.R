@@ -51,76 +51,64 @@ dcnet <- function(data,
                   simplify_bh = 1,
                   lbound =  FALSE,
                   ubound =  FALSE, ...) {
-    if ( tolower(distribution) == "gaussian" ) {
-        num_dist <- 0
-    } else if ( tolower(distribution) == "student_t" ) {
-        num_dist <- 1
-    } else {
-        stop( "\n\n Specify distribution: Gaussian or Student_t \n\n")
-    }
+  
+  ## Identify distribution type
+  num_dist <- switch(tolower(distribution),
+                     "gaussian" = 0,
+                     "student_t" = 1,
+                     stop("Specify distribution: Gaussian or Student_t"))
 
-    if(is.null(J)) {
-      J <- N <- length(data)
-    }
+  ## Set number of participants if not provided
+  if(is.null(J)) J <- N <- length(data)
 
-    if(is.null(group)) {
-      tl <- ncol(data[[1]])
-      group <- rep(seq_len(N),  each = tl)
-    }
+  ## Create group if not provided
+  if(is.null(group)) group <- rep(seq_len(N),  each = nrow(data[[1]]))
 
-    stan_data <- stan_data(data,
-                           J,
-                           group,
-                           xC,
-                           S_pred,
-                           P,
-                           Q,
-                           standardize_data,
-                           distribution = num_dist,
-                           meanstructure,
-                           simplify_ch,
-                           simplify_ah,
-                           simplify_bh,
-                           lbound,
-                           ubound)
+  ## Prepare Stan data
+  stan_data <- stan_data(data, J, group, xC, S_pred, P, Q,
+                         standardize_data, distribution = num_dist,
+                         meanstructure, simplify_ch, simplify_ah,
+                         simplify_bh, lbound, ubound)
 
-    ## Select stanmodel
-    ## 
-    ## stanmodel <- switch(parameterization,
-    ##                     CCC = stanmodels$CCCMGARCH,
-    ##                     DCC = stanmodels$DCCMGARCH,
-    ##                     NULL)
+  ## Select stanmodel
+  
+  ## select CmdStanModel created by cmdstan_model at time of compilation
+  ## 
+  ## stan_path <- .get_target_stan_path()
 
-    ## select CmdStanModel created by cmdstan_model at time of compilation
-    ## rstan
-    stan_path <- .get_target_stan_path()
+  ##   ccc_file <- file.path(stan_path, "VAR.stan" )
+  ##   dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan" )
+  ##   dccr_file <-file.path(stan_path, "DCCMGARCHrandS.stan" )
+  
+  ##   stanmodel <- switch(parameterization,
+  ##                       CCC = cmdstan_model(ccc_file, include_paths =  stan_path,
+  ##                                           cpp_options = list(stan_threads = TRUE)),
+  ##                       DCC = cmdstan_model(dcc_file, include_paths =  stan_path,
+  ##                                           cpp_options = list(stan_threads = TRUE)),
+  ##                       DCCr = if(sampling_algorithm == 'pathfinder') { ## pathfinder fails with cpp_option TRUE
+  ##                                cmdstan_model(dccr_file, include_paths =  stan_path,
+  ##                                              cpp_options = list(stan_threads = FALSE))}
+  ##                              else {
+  ##                                cmdstan_model(dccr_file, include_paths =  stan_path,
+  ##                                              cpp_options = list(stan_threads = TRUE))
+  ##                                }, NULL)
 
-    ccc_file <- file.path(stan_path, "VAR.stan" )
-    dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan" )
-    dccr_file <-file.path(stan_path, "DCCMGARCHrandS.stan" )
-    
-    stanmodel <- switch(parameterization,
-                        CCC = cmdstan_model(ccc_file, include_paths =  stan_path,
-                                            cpp_options = list(stan_threads = TRUE)),
-                        DCC = cmdstan_model(dcc_file, include_paths =  stan_path,
-                                            cpp_options = list(stan_threads = TRUE)),
-                        DCCr = if(sampling_algorithm == 'pathfinder') { ## pathfinder fails with cpp_option TRUE
-                                 cmdstan_model(dccr_file, include_paths =  stan_path,
-                                               cpp_options = list(stan_threads = FALSE))}
-                               else {
-                                 cmdstan_model(dccr_file, include_paths =  stan_path,
-                                               cpp_options = list(stan_threads = TRUE))
-                                 }, NULL)
-        
-    if(is.null(stanmodel)) {
-        stop("Not a valid model specification. ",
-             parameterization,
-             "must be one of: ",
-             paste0(supported_models, collapse = ", "),
-             ".")
-    }
+  ## Select the correct pre-compiled model from the global environment
+  stanmodel <- switch(parameterization,
+                      CCC = ccc_model,
+                      DCC = dcc_model,
+                      DCCr = dccr_model,
+                      stop("Invalid parameterization"))
+  
+  ## if(is.null(stanmodel)) {
+  ##     stop("Not a valid model specification. ",
+  ##          parameterization,
+  ##          "must be one of: ",
+  ##          paste0(supported_models, collapse = ", "),
+  ##          ".")
+  ## }
 
-    ## HMC Sampling
+  ## HMC Sampling
     if( tolower( sampling_algorithm ) == 'hmc') {
       if( is.null( iterations ) ) {
         iter_warmup <- 1000
