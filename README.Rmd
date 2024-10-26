@@ -46,7 +46,7 @@ Illustrate first person's data. Given that `ema_fitbit` is a list, we first need
 ```{r}
 library(ggplot2)
 
-ema_fitbit
+head(ema_fitbit)
 df1 <- data.frame(ema_fitbit[[1]], time = 1:98)
 
 ## Manually reshape the data to long format using base R
