@@ -16,9 +16,90 @@ knitr::opts_chunk$set(
 )
 ```
 
-<!-- badges: start -->
-  [![R-CMD-check](https://github.com/ph-rast/dcnet/workflows/R-CMD-check/badge.svg)](https://github.com/ph-rast/dcnet/actions)
-[![R-CMD-check](https://github.com/ph-rast/dcnet/workflows/R-CMD-check/badge.svg)](https://github.com/ph-rast/dcnet/actions)
-<!-- badges: end -->
+<!-- <\!-- badges: start -\-> -->
+<!--   [![R-CMD-check](https://github.com/ph-rast/dcnet/workflows/R-CMD-check/badge.svg)](https://github.com/ph-rast/dcnet/actions) -->
+<!-- [![R-CMD-check](https://github.com/ph-rast/dcnet/workflows/R-CMD-check/badge.svg)](https://github.com/ph-rast/dcnet/actions) -->
+<!-- <\!-- badges: end -\-> -->
 
-# dcnet
+## Installation
+This package is in development. The current version can be insalled with
+```{r}
+if (!requireNamespace("remotes")) { 
+  install.packages("remotes")   
+}   
+remotes::install_github("ph-rast/dcnet")
+```
+
+## Example: Dynamic Conditional Networks with EMA Data
+This section illustrates the use with a dataset that contains synthetic data from an ecological momentary assessment. The data is derived from a 100 Day study conducted at UC Davis (O'Laughlin et al. 2020, Willams et al. 2020).
+
+
+After loading the package, the `ema_fitbit` data is available as a list of 38 matrices. Each matrix contains the four variables of interest: `active`, `excited`, `totalDistance`, and `interested`. The rows represent 98 daily observations, and the columns correspond to these four variables. Each matrix is for one person (N=38).
+```{r}
+library(dcnet)
+
+## Head of the data matrix for the first person:
+head(ema_fitbit[[1]])
+```
+
+Illustrate first person's data. Given that `ema_fitbit` is a list, we first need to extract person 1 and add a time index for `ggplot`:
+```{r}
+library(ggplot2)
+
+ema_fitbit
+df1 <- data.frame(ema_fitbit[[1]], time = 1:98)
+
+## Manually reshape the data to long format using base R
+df1_long <- do.call(rbind, lapply(names(df1)[-5], \(var) {
+  data.frame(time = df1$time, variable = var, value = df1[[var]])
+}))
+
+## Convert the 'variable' column to a factor for consistent ordering in facets
+df1_long <- df1_long |>
+  within({ variable <- factor(variable, levels = names(df1)[-5]) })
+
+## Plot with ggplot2
+plt <- ggplot(df1_long, aes(x = time, y = value)) +
+  geom_smooth(show.legend = FALSE, se = FALSE) +
+  geom_point(alpha = 0.4) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(x = "Time", y = "Value", title = "Time Series for Variables for Person 1") +
+  theme_minimal()
+
+plt
+```
+
+## Fit Dynamic Conditional Correlation (DCC) Network Model
+Next we will fit the multilevel DCC model for the shocks, the residual conditional covariances, and a multilevel VAR structure for means structure.
+
+The function `dcnet` reads the data in the structure given in `ema_fitbit`. The `parameterization = "DCCr"` selects the DCC with random effects on all components, the garch parameters for the standard deviations as well as all garch parameters for the conditional correlations.
+In order to shorten computation time, we will use `sampling_algorithm = 'variational'`. `variational` employs Stan's variational inference algorithm that approximates the posterior via the "meanfield" algorithm. For full sampling, one could use `hmc`, but this option will need to run hours and days to converge. The `init = 0.5` argument is optional, but works well to create good starting values that don't stray too far.  
+
+## Fitting the Multilevel DCC Model
+
+Next, we will fit the **multilevel DCC model** to estimate the shocks, the residual conditional covariances, and a **multilevel VAR structure** for the mean.
+
+The `dcnet()` function reads the data provided in the structure of `ema_fitbit`. Setting the argument `parameterization = "DCCr"` selects the **DCC model with random effects** on all components. This includes random effects for both the **GARCH parameters** governing the standard deviations and the **GARCH parameters** for the conditional correlations.
+
+To shorten computation time, we will use `sampling_algorithm = "variational"`. The `variational` algorithm employs **Stan's variational inference** to approximate the posterior distribution using the **meanfield** approximation. For full Bayesian sampling, one could set `sampling_algorithm = "hmc"`. However, this option is computationally expensive and may take several hours or even days to converge.
+
+The argument `init = 0.5` is optional but often useful, as it provides reasonable starting values that help the algorithm converge faster without straying too far from the posterior space.
+```{r}
+fit <- dcnet(data = ema_fitbit, parameterization = "DCCr",
+             sampling_algorithm = 'variational', init = 0.5)
+```
+
+Once the model is fit, we can request a summary (check your RAM -- this step might kill R if you are close to maxing out your memory):
+```{r}
+summary(fit)
+```
+
+
+## References
+- O'Laughlin, K. D., Liu, S., & Ferrer, E. (2020). Use of Composites in Analysis of Individual
+Time Series: Implications for Person-Specific Dynamic Parameters. Multivariate
+Behavioral Research, 1–18. https://doi.org/10.1080/00273171.2020.1716673
+- Williams, D. R., Martin, S. R., Liu, S., & Rast, P. (2020). Bayesian Multivariate
+Mixed-Effects Location Scale Modeling of Longitudinal Relations Among Affective
+Traits, States, and Physical Activity. European Journal of Psychological
+Assessment, 36 (6), 981–997. https://doi.org/10.1027/1015-5759/a000624
