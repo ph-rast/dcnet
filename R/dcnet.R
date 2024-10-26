@@ -4,8 +4,8 @@
 ##' 
 ##' @title Estimate a Bayesian Dynamic Correlation Network
 ##' @param data Time-series or matrix object. A time-series or matrix object containing observations at the same interval.
-##' @param J ...
-##' @param group Vector with group id
+##' @param J Number of clusters. If `NULL`, derived from data, otherwise user provided. 
+##' @param group Vector with group id. If `NULL`, derived from data, otherwise user provided. 
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
 ##' @param S_pred Dummy for S, for each time-point (same dimension as data)
 ##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC'. 
@@ -33,8 +33,8 @@
 ##' ##
 ##' }
 dcnet <- function(data,
-                  J,
-                  group,
+                  J = NULL,
+                  group = NULL,
                   xC = NULL,
                   S_pred =  NULL,
                   parameterization = "DCC",
@@ -57,6 +57,15 @@ dcnet <- function(data,
         num_dist <- 1
     } else {
         stop( "\n\n Specify distribution: Gaussian or Student_t \n\n")
+    }
+
+    if(is.null(J)) {
+      J <- N <- length(data)
+    }
+
+    if(is.null(group)) {
+      tl <- ncol(data[[1]])
+      group <- rep(seq_len(N),  each = tl)
     }
 
     stan_data <- stan_data(data,
