@@ -8,7 +8,7 @@
 ##' @param group Vector with group id. If `NULL`, derived from data, otherwise user provided. 
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
 ##' @param S_pred Dummy for S, for each time-point (same dimension as data)
-##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC'. 
+##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC', or 'DCCrs' for multithread. 
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
 ##' @param iterations Integer (Default: 2000). Number of iterations for each chain (including warmup).
@@ -50,7 +50,8 @@ dcnet <- function(data,
                   simplify_ah = 1,
                   simplify_bh = 1,
                   lbound =  FALSE,
-                  ubound =  FALSE, ...) {
+                  ubound =  FALSE,
+                  threads_per_chain = 4, ...) {
   
   ## Identify distribution type
   num_dist <- switch(tolower(distribution),
@@ -70,36 +71,14 @@ dcnet <- function(data,
                          meanstructure, simplify_ch, simplify_ah,
                          simplify_bh, lbound, ubound)
 
-  ## Select stanmodel
-  
-  ## select CmdStanModel created by cmdstan_model at time of compilation
-  ## 
-  ## stan_path <- .get_target_stan_path()
-
-  ##   ccc_file <- file.path(stan_path, "VAR.stan" )
-  ##   dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan" )
-  ##   dccr_file <-file.path(stan_path, "DCCMGARCHrandS.stan" )
-  
-  ##   stanmodel <- switch(parameterization,
-  ##                       CCC = cmdstan_model(ccc_file, include_paths =  stan_path,
-  ##                                           cpp_options = list(stan_threads = TRUE)),
-  ##                       DCC = cmdstan_model(dcc_file, include_paths =  stan_path,
-  ##                                           cpp_options = list(stan_threads = TRUE)),
-  ##                       DCCr = if(sampling_algorithm == 'pathfinder') { ## pathfinder fails with cpp_option TRUE
-  ##                                cmdstan_model(dccr_file, include_paths =  stan_path,
-  ##                                              cpp_options = list(stan_threads = FALSE))}
-  ##                              else {
-  ##                                cmdstan_model(dccr_file, include_paths =  stan_path,
-  ##                                              cpp_options = list(stan_threads = TRUE))
-  ##                                }, NULL)
-
   ## Select the correct pre-compiled model from the global environment
   stanmodel <- switch(parameterization,
                       CCC = ccc_model,
                       DCC = dcc_model,
                       DCCr = dccr_model,
+                      DCCrs = dccrs_model,
                       stop("Invalid parameterization"))
-  
+
   ## if(is.null(stanmodel)) {
   ##     stop("Not a valid model specification. ",
   ##          parameterization,
@@ -109,80 +88,84 @@ dcnet <- function(data,
   ## }
 
   ## HMC Sampling
-    if( tolower( sampling_algorithm ) == 'hmc') {
-      if( is.null( iterations ) ) {
-        iter_warmup <- 1000
-        iter_sampling <- 1000
-      } else if ( !is.null( iterations ) ) {
-        iter_warmup <- round(iterations/2 )
-        iter_sampling <- iterations - iter_warmup
-      }
-
-      ## 
-      max_cores <- parallel::detectCores()
-      model_fit <- stanmodel$sample(data = stan_data,
-                                    iter_warmup = iter_warmup,
-                                    iter_sampling =  iter_sampling,
-                                    adapt_delta = .95,
-                                    chains = chains,
-                                    parallel_chains = min( max_cores,  chains ), 
-                                    ...)
-    } else if ( tolower(sampling_algorithm) == 'variational' ) {
-      ## Sampling via Variational Bayes
-      if( is.null( iterations ) ) iterations <- 30000
-      model_fit <- stanmodel$variational(data = stan_data,
-                                         iter = iterations, ...)
-    } else if (tolower(sampling_algorithm) == 'pathfinder' ) {
-      ## Sampling via Pathfinder Method
-      if( is.null( iterations ) ) iterations <- 30000
-      model_fit <- stanmodel$pathfinder(data = stan_data,
-                                        #iter = iterations,
-                                        #jacobian =  TRUE,
-                                        ...)
-    } else {
-      stop( "\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n" )
-    }
-    
-    ## Model fit is based on standardized values.
-    if(standardize_data ) {
-      mns <- stan_data$grand_mean
-      sds <- stan_data$grand_sd
-    } else {
-      mns <- stan_data$grand_mean
-      sds <- 1
+  if (tolower(sampling_algorithm) == "hmc") {
+    if (is.null(iterations)) {
+      iter_warmup <- 1000
+      iter_sampling <- 1000
+    } else if (!is.null(iterations)) {
+      iter_warmup <- round(iterations/2)
+      iter_sampling <- iterations - iter_warmup
     }
 
-    ## Pass out information on whether S_pred is not null. This is for print.R
-    if(!is.null(S_pred)) {S_pred <- "present"}
-    
-    ## Values could be converted to original scale using something like this on the estimates
-    ## orig_sd = stan_data$rts %*% diag(sds)
-    ## orig_scale = orig_sd + array(rep(mns, each = aussi[[1]]$T), dim = c(aussi[[1]]$T, aussi[[1]]$nt) )
-    return_fit <- list(model_fit = model_fit,
-                       param = parameterization,
-                       distribution = distribution,
-                       num_dist = num_dist,
-                       iter = iterations,
-                       chains = chains,
-                       elapsed_time = model_fit$time()$total,
-                       date = date(),
-                       nt = stan_data$nt,
-                       TS_length = stan_data$T,
-                       TS_names = colnames(stan_data$rts[[1]]),
-                       ##RTS_last = stan_data$rts[stan_data$T,],
-                       grand_mean = mns,
-                       grand_sd = sds,
-                       RTS_full = stan_data$rts,
-                       mgarchQ = stan_data$Q,
-                       mgarchP = stan_data$P,
-                       xC = stan_data$xC,
-                       meanstructure = stan_data$meanstructure,
-                       std_data = standardize_data,
-                       sampling_algorithm = sampling_algorithm,
-                       S_pred = S_pred)
+    ##
+    max_cores <- parallel::detectCores()
+    Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
+    model_fit <- stanmodel$sample(data = stan_data,
+                                  iter_warmup = iter_warmup,
+                                  iter_sampling = iter_sampling,
+                                  adapt_delta = .95,
+                                  chains = chains,
+                                  parallel_chains = min(max_cores, chains),
+                                  threads_per_chain = threads_per_chain,
+                                  ...)
+  } else if (tolower(sampling_algorithm) == "variational") {
+    ## Sampling via Variational Bayes
+    if (is.null(iterations)) iterations <- 30000
+    model_fit <- stanmodel$variational(data = stan_data,
+                                       iter = iterations, ...)
+  } else if (tolower(sampling_algorithm) == "pathfinder") {
+    ## Sampling via Pathfinder Method
+    if (is.null(iterations)) iterations <- 30000
+    model_fit <- stanmodel$pathfinder(data = stan_data,
+                                      #iter = iterations,
+                                      #jacobian =  TRUE,
+                                      ...)
+  } else {
+    stop("\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n")
+  }
 
-    class(return_fit) <- "dcnet"
-    return(return_fit)
+  ## Model fit is based on standardized values.
+  if (standardize_data) {
+    mns <- stan_data$grand_mean
+    sds <- stan_data$grand_sd
+  } else {
+    mns <- stan_data$grand_mean
+    sds <- 1
+  }
+
+  ## Pass out information on whether S_pred is not null. This is for print.R
+  if (!is.null(S_pred)) {
+    S_pred <- "present"
+  }
+
+  ## Values could be converted to original scale using something like this on the estimates
+  ## orig_sd = stan_data$rts %*% diag(sds)
+  ## orig_scale = orig_sd + array(rep(mns, each = aussi[[1]]$T), dim = c(aussi[[1]]$T, aussi[[1]]$nt) )
+  return_fit <- list(model_fit = model_fit,
+                     param = parameterization,
+                     distribution = distribution,
+                     num_dist = num_dist,
+                     iter = iterations,
+                     chains = chains,
+                     elapsed_time = model_fit$time()$total,
+                     date = date(),
+                     nt = stan_data$nt,
+                     TS_length = stan_data$T,
+                     TS_names = colnames(stan_data$rts[[1]]),
+                     ##RTS_last = stan_data$rts[stan_data$T,],
+                     grand_mean = mns,
+                     grand_sd = sds,
+                     RTS_full = stan_data$rts,
+                     mgarchQ = stan_data$Q,
+                     mgarchP = stan_data$P,
+                     xC = stan_data$xC,
+                     meanstructure = stan_data$meanstructure,
+                     std_data = standardize_data,
+                     sampling_algorithm = sampling_algorithm,
+                     S_pred = S_pred)
+
+  class(return_fit) <- "dcnet"
+  return(return_fit)
 }
 
 

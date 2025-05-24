@@ -3,30 +3,30 @@
 ####################
 
 options(width = 190)
-library(data.table )
+library(data.table)
 
-fitbit <- data.table( read.csv(file = '~/Dropbox/Projekte/M_GARCH/WORK/-DATASETS/SOURCE/fit_bit_dat.csv') )
-dim(fitbit )
+fitbit <- data.table(read.csv(file = "~/Dropbox/Projekte/M_GARCH/WORK/-DATASETS/SOURCE/fit_bit_dat.csv"))
+dim(fitbit)
 
-fitbit_summary <- summary(fitbit )
+fitbit_summary <- summary(fitbit)
 print(fitbit_summary)
 
 head(fitbit)
-str(fitbit )
+str(fitbit)
 
 
 fitbit$sedentaryHours <- fitbit$sedentaryMinutes/60
 
 
 ## Select variables of interest
-variables <- c("active", "totalDistance","interested","excited", "attentive", "inspired", "proud", "enthusiastic", "strong", "sedentaryMinutes")
+variables <- c("active", "totalDistance", "interested", "excited", "attentive", "inspired", "proud", "enthusiastic", "strong", "sedentaryMinutes")
 variables <- c("active", "attentive", "sedentaryHours", "totalDistance")
 
 
 ##  Overwrite disinterested with reversing "inerested"
 
 variables <- c("active", "excited", "totalDistance", "interested")
-fitcomp <- fitbit[complete.cases( fitbit[, ..variables] )]
+fitcomp <- fitbit[complete.cases(fitbit[, ..variables])]
 
 fitcomp
 
@@ -70,7 +70,7 @@ range(dt[, totalDistance])
 dt[, ..variables]
 
 ## remove data to fre up memory
-rm( list = c("fitbit", "fitcomp"))
+rm(list = c("fitbit", "fitcomp"))
 
 ## Obtain minimal length of time-series (ts)
 tsl <- min(dt[, .N, by = record_id]$N)
@@ -118,7 +118,7 @@ plt <- ggplot(dt[id <= N],  aes(x = time,  y = active, group = factor(id), color
 plt + facet_wrap(~ id)
 
 
-ggsave(filename = "~/Nextcloud/Documents/fitbit_raw.pdf", width = 15, height = 15 )
+#ggsave(filename = "~/Nextcloud/Documents/fitbit_raw.pdf", width = 15, height = 15 )
 dev.off( )
 
 
@@ -149,25 +149,25 @@ ema_fitbit <- lapply(seq_len(N),  function(i) {
 
 
 
-getwd( )
+getwd()
 #setwd( "../")
 
-devtools::load_all( path = "./")
+devtools::load_all(path = "./")
 
 ## Model with two S matrices pre/post intervention
-fit <- dcnet( data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCr",
-             standardize_data = FALSE, sampling_algorithm = 'variational', threads = 4, init = 0.5, tol_rel_obj = 0.0025)
+fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
+             standardize_data = FALSE, sampling_algorithm = "HMC", threads = 4)#, init = 0.5, tol_rel_obj = 0.0025)
 
-summary(fit )
+summary(fit)
 
-grep('mu', colnames(fit$model_fit$draws( )) )
-colMeans(fit$model_fit$draws( )[, 139346:139350])
+grep("mu", colnames(fit$model_fit$draws()))
+colMeans(fit$model_fit$draws()[, 139346:139350])
 
-grep('phi0_fixed', colnames(fit$model_fit$draws( )) )
-colMeans(fit$model_fit$draws( )[, 3:6])
+grep("phi0_fixed", colnames(fit$model_fit$draws()))
+colMeans(fit$model_fit$draws()[, 3:6])
 
-grep('phi0_fixed', colnames(fit$model_fit$draws( )) )
-int <- matrix(colMeans(fit$model_fit$draws( )[, 3:6]), ncol = 1)
+grep("phi0_fixed", colnames(fit$model_fit$draws()))
+int <- matrix(colMeans(fit$model_fit$draws()[, 3:6]), ncol = 1)
 int
 
 grep('vec_phi_fixed', colnames(fit$model_fit$draws( )) )

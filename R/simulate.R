@@ -99,6 +99,7 @@
 ##' @param N Subjects
 ##' @param ranef_sd_S Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number
 ##' @param phi0_fixed Vector of population values of length n_ts
+##' @param empirical Sample from the emprirical multivariate normal distribution. Defaults to `FALSE`
 ##' @importFrom clusterGeneration rcorrmatrix
 
 .simuDCC <- function(tslength, n_ts, N,
@@ -119,7 +120,8 @@
                      l_b_q_fixed = 0,
                      l_b_q_r_sd = 0.1,                     
                      ranef_sd_S, 
-                     ranS_sd = 1) {
+                     ranS_sd = 1,
+                     empirical = FALSE) {
 
   ## Define fixed diag for c_h on log scale
   log_c_fixed_diag <- log_c_fixed
@@ -219,7 +221,7 @@
           diag(h[,t,j])%*%R[,,t,j]%*%diag(h[,t,j])
         DCC_H[,,t,j]
         ##
-        y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j])
+        y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j], empirical =  empirical)
         ## compute partial corr from DCC_H
         DCC_R[,,t,j] <- cov2cor( solve(DCC_H[,,t,j]) ) * ( diag(n_ts) - 1)
         ## Obtain simple corr

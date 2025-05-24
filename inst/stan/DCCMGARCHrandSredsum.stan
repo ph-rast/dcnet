@@ -3,16 +3,38 @@ functions {
   //#include /functions/jacobian.stan
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
+   real partial_log_lik(array[] int slice_j, int start, int end,
+                       array[] matrix rts,
+                       array[,] vector mu,
+                       array[,] matrix H,
+                       int T,
+                       int distribution,
+                       real nu) {
+    real lp = 0;
+    for (idx in 1:size(slice_j)) {
+      int j = slice_j[idx];
+      for (t in 1:T) {
+        vector[num_elements(rts[j][1])] rts_t = to_vector(rts[j][t, ]);
+        if (distribution == 0)
+          lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
+        else if (distribution == 1)
+          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t], H[j, t]);
+      }
+    }
+    return lp;
+  }
 }
 
 data {
 #include /data/data.stan
+//  int<lower=1> grainsize;  // e.g., 1, 2, or larger depending on your hardware
 }
 
 transformed data { 
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
   int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
+  int grainsize = 1;
   
 #include /transformed_data/xh_marker.stan
  
@@ -303,14 +325,11 @@ model {
     a_h_stdnorm[J] ~ std_normal();
     b_h_stdnorm[J] ~ std_normal();
       // Likelihood
-    if ( distribution == 0 ) {
-      for(t in 1:T){
-	rts[j,t] ~ multi_normal(mu[j,t], H[j,t]);
-      }
-    } else if ( distribution == 1 ) {
-      for(t in 1:T){
-	rts[j,t] ~ multi_student_t(nu, mu[j,t], H[j,t]);
-      }
+    {
+      array[J] int subj_index;
+      for (jj in 1:J) subj_index[jj] = jj;
+      target += reduce_sum(partial_log_lik, subj_index, grainsize,
+			   rts, mu, H, T, distribution, nu);
     }
   }
 }
