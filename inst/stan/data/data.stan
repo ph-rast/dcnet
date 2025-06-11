@@ -16,4 +16,4 @@ int<lower=0, upper=1> simplify_ah; // 0 = random effects correlations among nt's
 int<lower=0, upper=1> simplify_bh; // 0 = random effects correlations among nt's, 1 = only ranefs without corrs among nt's
 array[J] vector<lower=0, upper=1>[T] S_pred; // predictor for S
 vector[nt] grand_mean;
-
+int<lower=1> grainsize;  // e.g., 1, 2, or larger depending on your hardware

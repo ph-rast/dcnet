@@ -5,7 +5,9 @@
 options(width = 190)
 library(data.table)
 
-fitbit <- data.table(read.csv(file = "~/Dropbox/Projekte/M_GARCH/WORK/-DATASETS/SOURCE/fit_bit_dat.csv"))
+#fitbit <- data.table(read.csv(file = "~/Dropbox/Projekte/M_GARCH/WORK/-DATASETS/SOURCE/fit_bit_dat.csv")) 
+fitbit <- data.table(read.csv(file = "~/SiweisFitbit/fit_bit_dat.csv"))
+
 dim(fitbit)
 
 fitbit_summary <- summary(fitbit)
@@ -107,7 +109,7 @@ unique(dt$id )
 
 plt <- ggplot(dt[id == 2],  aes(x = time,  y = active, group = factor(id), color = factor(id)) ) +
   geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2)
-plt
+#plt
 
 N <- length(unique(dt$id ) )
 N
@@ -115,7 +117,7 @@ N
 variables
 plt <- ggplot(dt[id <= N],  aes(x = time,  y = active, group = factor(id), color = factor(id)) ) +
   geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .4)
-plt + facet_wrap(~ id)
+#plt + facet_wrap(~ id)
 
 
 #ggsave(filename = "~/Nextcloud/Documents/fitbit_raw.pdf", width = 15, height = 15 )
@@ -156,7 +158,10 @@ devtools::load_all(path = "./")
 
 ## Model with two S matrices pre/post intervention
 fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
-             standardize_data = FALSE, sampling_algorithm = "HMC", threads = 4)#, init = 0.5, tol_rel_obj = 0.0025)
+             iterations=1000,
+             standardize_data = FALSE, sampling_algorithm = "HMC",
+             chains=4, threads = 8,
+             grainsize = 5)#, init = 0.5, tol_rel_obj = 0.0025)
 
 summary(fit)
 

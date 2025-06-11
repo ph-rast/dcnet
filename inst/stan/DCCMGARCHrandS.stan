@@ -261,11 +261,11 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau ~ student_t(3,0, 1); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ student_t(3, 0, 1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
-  a_h_tau ~ student_t(3, 0, 1); // SD for c_h ranefs
-  b_h_tau ~ student_t(3, 0, 1);
+  phi0_tau ~ student_t(3,0, .5); // SD for multiplication with cholesky phi0_L
+  phi_tau ~ student_t(3, 0, .5); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ student_t(3, 0, .5); // SD for c_h ranefs
+  a_h_tau ~ student_t(3, 0, .5); // SD for c_h ranefs
+  b_h_tau ~ student_t(3, 0, .5);
   
   // C
   to_vector(beta) ~ std_normal();

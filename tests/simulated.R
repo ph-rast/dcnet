@@ -4,7 +4,7 @@
 #remotes::install_github("stan-dev/cmdstanr")
 #cmdstanr::install_cmdstan( )
 
-
+set.seed(234)
 
 ivv <- function(V,  nt ) {
   vnt <- length(V )
@@ -63,26 +63,28 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 75
-tl <- 100
-nts <- 4
+N <- 30
+tl <- 50
+nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi0_sd = 0.2,
-                   log_c_fixed = rep(-1, 4),
+                   log_c_fixed = rep(-0.8, nts),
                    log_c_r_sd = 0.8,
-                   a_h_fixed = rep(-1.4, 4 ),
-                   b_h_fixed = rep(-1.1, 4 ),
-                   l_a_q_fixed = -1.4,
-                   l_b_q_fixed = -1.1,
+                   a_h_fixed = rep(-1.5, nts),
+                   a_h_r_sd = 0.2,
+                   b_h_fixed = rep(-1.5, nts),
+                   b_h_r_sd = 0.2,
+                   l_a_q_fixed = -1,
+                   l_b_q_fixed = -1.5,
                    ranef_sd_S = 0.5,
-                   l_a_q_r_sd = 0.2,
-                   l_b_q_r_sd = 0.2,
-                   phi0_fixed =  c(0, 0, 0 , 0),
+                   l_a_q_r_sd = 0.3,
+                   l_b_q_r_sd = 0.3,
+                   phi0_fixed =  rep(0, nts ),
                    ranS_sd = 0.3,
                    phi_mu = 0, ## populate phi
                    phi_sd = 0, ## create non-zero values (if non-0)
-                   phi_ranef_sd = 0.1,
-                   stationarity_phi = TRUE)
+                   phi_ranef_sd = 0.3,
+                   stationarity_phi = FALSE)
 
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
@@ -120,13 +122,19 @@ devtools::load_all( )
 
 system.time( {
   fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-               group =  groupvec, standardize_data = FALSE, init = .0,
-               meanstructure =  "VAR",
-               iterations = 2000,
-#               threads = 1, #tol_rel_obj =  0.001,
-               sampling_algorithm = 'pathfinder',
-               num_threads =  1)
+               group =  groupvec, standardize_data = FALSE, init = 0,
+               meanstructure =  "VAR",               
+               iterations = 50000,
+               threads = 4, #tol_rel_obj =  0.001, ## 8 threads: 188 mins / 2thr: 98 mins / 3 thr: 98 mins / 4 thr: 93 mins
+               # 5 thr: 95miOCns / 6thr: 93mins
+               sampling_algorithm = 'variational',
+               algorithm = "fullrank",  ## fullrank should be less biased with respect to variances 
+               #chains = 4,
+               grainsize = 200) ## 46 mins to beat (gs=30) / gs=1, 60 mins / gs = 2, 118 / gs=3, 93 mins / gs=4,  / gs=6,   
+               #num_threads =  8)
 })
+
+
 
 fit$model_fit$output()
 
@@ -160,7 +168,6 @@ replication_data <- list( )
 
 ## objects used to extract the data and assign it to the right unit and variable
 tsl <- 1:tl
-nts <- 4
 cols <- 1:nts
 
 ## init single replicate data object
@@ -193,10 +200,12 @@ phi0_fixed_cov <-phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_cov
 ## Function to prevent loop to stop when stan model encounters errors
 default_return <- FALSE
 safe_sample <- purrr::possibly( function(s) {
-  dcnet( data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
+  dcnet(data =  replication_data[[s]], parameterization = 'DCCr' , J =  N,
         meanstructure =  "constant",
         group =  groupvec, standardize_data = FALSE, init = 0,
-        threads = 1, sampling_algorithm = 'variational')
+        threads = 1,
+        sampling_algorithm = 'variational',
+        algorithm = "fullrank")        
 }, otherwise = default_return)
 
 ## Function to compute coverage probability ranging from L to U in the original population distribution
@@ -204,6 +213,87 @@ overlap <- function(population, L,  U,    iterations =  1000 ) {
   O <- sum(population > L & population < U)/iterations
   return(O)
 }
+
+## V2:
+safe_sample <- function(s, max_retries = 3) {
+
+  # Helper to check if model_fit is broken
+  is_model_fit_broken <- function(fit) {
+    tryCatch({
+      if (!inherits(fit$model_fit, "CmdStanFit")) return(TRUE)
+      fit$model_fit$metadata()  # harmless method, fails if object is invalid
+      return(FALSE)
+    }, error = function(e) {
+      return(TRUE)
+    })
+  }
+
+  for (attempt in seq_len(max_retries)) {
+    message(sprintf("Fitting attempt %d for index %d", attempt, s))
+
+    fit <- tryCatch({
+      dcnet(
+        data = replication_data[[s]],
+        parameterization = 'DCCr',
+        J = N,
+        meanstructure = "constant",
+        group = groupvec,
+        standardize_data = FALSE,
+        init = 0,
+        threads = 1,
+        iterations = 50000,
+        sampling_algorithm = 'variational',
+        algorithm = "fullrank"
+      )
+    }, error = function(e) {
+      message(sprintf("Hard failure on attempt %d: %s", attempt, e$message))
+      return(NULL)
+    })
+
+    if (is.null(fit)) next
+
+    # Check if model_fit is broken
+    if (is_model_fit_broken(fit)) {
+      message("model_fit is invalid or unusable — retrying...")
+      next
+    }
+
+    # Try to extract model output
+    output_lines <- tryCatch({
+      out <- fit$model_fit$output()
+      if (is.character(out)) out else as.character(unlist(out))
+    }, error = function(e) {
+      message("Could not retrieve model output — assuming failure.")
+      return("ERROR_FETCHING_OUTPUT")
+    })
+
+    # Patterns that indicate failure or non-convergence
+    failure_patterns <- c(
+      "All proposed step-sizes failed",
+      "algorithm may not have converged",
+      "Exception:.*not positive definite",
+      "Exception:",
+      "Fitting failed. Unable to print"
+    )
+
+    failed <- any(sapply(failure_patterns, function(pat) {
+      any(grepl(pat, output_lines, ignore.case = TRUE, perl = TRUE))
+    }))
+
+    if (failed) {
+      message("Detected Stan warning or internal failure — retrying...")
+      next
+    }
+
+    # Everything looks okay
+    return(fit)
+  }
+
+  message(sprintf("All %d attempts failed for index %d.", max_retries, s))
+  return(NULL)
+}
+
+## END V2
   
 rmse <- function(model, population) {
   rmse <- sqrt(mean(( model - population )^2 ) )
@@ -247,11 +337,17 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 10:20) {  
+for (s in 1:100) {  
 
   fit_r <- safe_sample(s)
-  fit_r$error  
-  if (!is.null(fit_r$error)) {
+
+  ## fitted <- tryCatch(print(fit_r), error = function(e) {
+  ##   message(sprintf("Fitting failed at index %d: %s", i, e$message))
+  ##   return(NULL)
+  ## }
+  ## )
+  
+  if (is.null(fit_r)) {
     next
   }
   
@@ -288,10 +384,11 @@ cov_list
 var_averages <- list()
 for (i in 1:length(cov_list)) {
   nested_average <- c()                                                
-  for (j in 1:length(cov_list[[i]])) {                                     
-    nested_average <- c(nested_average, mean(cov_list[[i]][[j]], na.rm = TRUE))
-  }                                                                    
-  var_averages[[i]] <- nested_average                                        
+  for (j in 1:length(cov_list[[i]])) {
+    if (is.null(cov_list[[i]][[j]])) cov_list[[i]][[j]] <- NA
+    nested_average <- c(nested_average, mean(cov_list[[i]][[j]], na.rm = TRUE))                                                                    
+    var_averages[[i]] <- nested_average                                        
+  }
 }
 names(var_averages ) <- names(cov_list )
 var_averages
@@ -299,7 +396,9 @@ var_averages
 
 var_av <- sapply(var_averages, function(x ) mean(x, na.rm = TRUE))
 var_av
-##n30tl50 <- round(var_av, 2)
+
+
+n30tl50 <- round(var_av, 2)
 n30tl50
 ##n50tl50 <- round(var_av, 2)
 n50tl50
@@ -342,12 +441,24 @@ dev.off( )
 ## Unfactored version of loop above
 ## Fit model to replication dataset(s)
 for(s in 1:100) {
+
+  fit_r <- tryCatch( {
+    safe_sample(s)
+  }, error = function(e) {
+    message(sprintf("Sampling failed at index %d: %s", i, e$message))
+    return(NULL)
+  })
   
-  fit_r <- safe_sample(s)
-  fit_r$error
-  if(!is.null(fit_r$error)) {
+  if (is.null(fit_r)) {
     next
   }
+#  fit_r <-  safe_sample(s)
+  
+#  fit_r
+#  fit_r$error
+#  if(!is.null(fit_r$error)) {
+#    next
+#  }
             
   ## Sampled
   SF <- fit_r$model_fit$summary(variables = 'phi0_fixed', "mean",
@@ -550,9 +661,7 @@ unlist(covresults[[1]])
 
 ######################################################################################
 ######################################################################################
-
-
-
+## Compare values to R simu
 ###
 
 
@@ -560,8 +669,9 @@ unlist(covresults[[1]])
 
 
 svf <- posterior::as_draws_matrix( fit$model_fit$draws(variables = 'S_vec_fixed' ) )
+svf
 dt <- data.table(fit$model_fit$summary(variables = c('phi0_fixed', 'S_vec_fixed', 'vec_phi_fixed')))[,c(1,2,6,7)]
-
+dt
 
 ## Coverage: phi0_fixed
 SF <- fit$model_fit$summary(variables = 'phi0_fixed', "mean",

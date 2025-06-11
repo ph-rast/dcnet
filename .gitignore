@@ -38,3 +38,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/DCPCrand
 /inst/stan/DCPCfixedDelta
 /inst/stan/DCCMT
+/inst/stan/DCCMGARCHrandSredsum

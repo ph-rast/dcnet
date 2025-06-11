@@ -51,7 +51,8 @@ dcnet <- function(data,
                   simplify_bh = 1,
                   lbound =  FALSE,
                   ubound =  FALSE,
-                  threads_per_chain = 4, ...) {
+                  threads_per_chain = 4,
+                  grainsize = 1, ...) {
   
   ## Identify distribution type
   num_dist <- switch(tolower(distribution),
@@ -69,7 +70,7 @@ dcnet <- function(data,
   stan_data <- stan_data(data, J, group, xC, S_pred, P, Q,
                          standardize_data, distribution = num_dist,
                          meanstructure, simplify_ch, simplify_ah,
-                         simplify_bh, lbound, ubound)
+                         simplify_bh, lbound, ubound, grainsize)
 
   ## Select the correct pre-compiled model from the global environment
   stanmodel <- switch(parameterization,
@@ -112,11 +113,13 @@ dcnet <- function(data,
     ## Sampling via Variational Bayes
     if (is.null(iterations)) iterations <- 30000
     model_fit <- stanmodel$variational(data = stan_data,
-                                       iter = iterations, ...)
+                                       iter = iterations,
+                                       threads = threads_per_chain,
+                                       ...)
   } else if (tolower(sampling_algorithm) == "pathfinder") {
     ## Sampling via Pathfinder Method
     if (is.null(iterations)) iterations <- 30000
-    model_fit <- stanmodel$pathfinder(data = stan_data,
+      model_fit <- stanmodel$pathfinder(data = stan_data,
                                       #iter = iterations,
                                       #jacobian =  TRUE,
                                       ...)
@@ -175,4 +178,4 @@ dcnet <- function(data,
 #' May facilitate more parameterizations, as we only have to update these, and the switch statements.
 #' @keywords internal
 #' @author Philippe Rast
-supported_models <- c("CCC", "DCC", "DCCr")
+supported_models <- c("CCC", "DCC", "DCCr", "DCCrs")

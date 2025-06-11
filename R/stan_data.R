@@ -20,7 +20,7 @@
 #' @keywords internal
 stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data, distribution = 0,
                       meanstructure =  'VAR', simplify_ch = 1, simplify_ah = 1, simplify_bh = 1,
-                      lbound, ubound) {
+                      lbound, ubound, grainsize) {
 
   ## Check for data type:
   ## dim data needs to return NULL as the list is a collection of individual matrices for each individual.
@@ -129,7 +129,8 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
                            simplify_ch = simplify_ch,
                            simplify_ah = simplify_ah,
                            simplify_bh = simplify_bh,
-                           lbound = lbound, ubound = ubound)
+                           lbound = lbound, ubound = ubound,
+                           grainsize = grainsize)
   } else {
     ## Unstandardized
     ctrx <- data
@@ -160,7 +161,8 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
                            simplify_ch = simplify_ch,
                            simplify_ah = simplify_ah,
                            simplify_bh = simplify_bh,
-                           lbound = lbound, ubound = ubound)
+                           lbound = lbound, ubound = ubound,
+                           grainsize = grainsize)
   }
   
   return(return_standat)
