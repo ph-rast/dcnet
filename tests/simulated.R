@@ -6,52 +6,49 @@
 
 set.seed(234)
 
-ivv <- function(V,  nt ) {
-  vnt <- length(V )
-  z <- diag(0, nt)
-  L <- diag(0, nt)
-  index <- 0
-   for(j in 1:nt) {
-    for(i in 1:nt) {
-      if( i > j ) {
-	index = index + 1
-	z[i,j] = V[index]
-      }
-      if (i < j) {
-	z[i,j] = 0
-	  }
-    }
-   }
-  for(i in 1:nt) {
-    for(j in 1:nt){
-      if(i < j){
-        L[i,j]=0
-      }
-      if(i == j){
-        if(i == 1){
-          L[i,j]=1
+ivv <- function(V, nt) {
+    z <- diag(0, nt)
+    L <- diag(0, nt)
+    index <- 0
+    for (j in 1:nt) {
+        for (i in 1:nt) {
+            if (i > j) {
+                index <- index + 1
+                z[i, j] <- V[index]
+            }
+            if (i < j) {
+                z[i, j] <- 0
+            }
         }
-        if(i > 1){ 
-          L[i,j]=sqrt( 1 - sum( L[i, 1:j]^2 ) )
-        }
-      }
-      if(i > j){
-        L[i,j]=z[i,j]*sqrt(1 - sum( L[i,1:j]^2) )
-      }
     }
-  }
-    return(L)
+    for (i in 1:nt) {
+        for (j in 1:nt) {
+            if (i < j) {
+                L[i, j] <- 0
+            }
+            if (i == j) {
+                if (i == 1) {
+                    L[i, j] <- 1
+                }
+                if (i > 1) {
+                    L[i, j] <- sqrt(1 - sum(L[i, 1:j]^2))
+                }
+            }
+            if (i > j) {
+                L[i, j] <- z[i, j] * sqrt(1 - sum(L[i, 1:j]^2))
+            }
+        }
+    }
+    L
 }
 
 
 L <- ivv(tanh(c(0.3, -0.5, 1.1, 0, 0.3, -.2)), 4)
+L
 
+L %*% t(L)
 
-L%*%t(L)
-
-
-
-devtools::load_all( )
+devtools::load_all()
 options(width = 200, crayon.enabled = FALSE)
 
 S <- list()
@@ -63,27 +60,26 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 30
+N <- 3
 tl <- 50
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   phi0_sd = 0.2,
-                   log_c_fixed = rep(-0.8, nts),
-                   log_c_r_sd = 0.8,
+                   phi0_sd = 0.5,  ## random effects
+                   log_c_fixed = rep(1, nts),
+                   log_c_r_sd = 0.25,
                    a_h_fixed = rep(-1.5, nts),
-                   a_h_r_sd = 0.2,
-                   b_h_fixed = rep(-1.5, nts),
-                   b_h_r_sd = 0.2,
-                   l_a_q_fixed = -1,
-                   l_b_q_fixed = -1.5,
-                   ranef_sd_S = 0.5,
-                   l_a_q_r_sd = 0.3,
-                   l_b_q_r_sd = 0.3,
-                   phi0_fixed =  rep(0, nts ),
-                   ranS_sd = 0.3,
+                   a_h_r_sd = 0.5,
+                   b_h_fixed = rep(-0.5, nts),  ## On logit scale
+                   b_h_r_sd = 0.5,
+                   l_a_q_fixed = -1.5,  ## on logit scale
+                   l_b_q_fixed = -0.5,   ## on logit scale
+                   l_a_q_r_sd = 0.5,
+                   l_b_q_r_sd = 0.5,
+                   phi0_fixed =  rep(0, nts),
+                   ranS_sd = 0.25, ## random effects on atanh scale
                    phi_mu = 0, ## populate phi
-                   phi_sd = 0, ## create non-zero values (if non-0)
-                   phi_ranef_sd = 0.3,
+                   phi_sd = 0, ## create variation in the intercepts of the time series
+                   phi_ranef_sd = 0.01, ## ranef of the parameter matrix
                    stationarity_phi = FALSE)
 
 
@@ -99,39 +95,42 @@ simdat$fixed_phi
 
 
 person <- 2
-plot(rtsgen[[person]][,1], type = 'l')#, ylim = c(-6, 6))
-lines(rtsgen[[person]][,2], lty = 2)
-lines(rtsgen[[person]][,3], lty = 3, col = 'red')
-lines(rtsgen[[person]][,4], lty = 4, col = 'blue')
+plot(rtsgen[[person]][, 1], type = "l")#, ylim = c(-6, 6))
+lines(rtsgen[[person]][, 2], lty = 2)
+lines(rtsgen[[person]][, 3], lty = 3, col = "red")
+#lines(rtsgen[[person]][, 4], lty = 4, col = "blue")
 
-dev.off( )
+dev.off()
 simdat$fixed_phi
 
 ## Generated TS for person 1: simdat[[1=TS; 2=Correlation Mat's]][,,person]
-X <- rbind( t(simdat[[1]][,,1]), t(simdat[[1]][,,2]), t(simdat[[1]][,,3]), t(simdat[[1]][,,4]) )
+X <- rbind(t(simdat[[1]][, , 1]), t(simdat[[1]][, , 2]), t(simdat[[1]][, , 3]), t(simdat[[1]][, , 4]) )
 
-X <- array(0,  dim = c(N*tl, nts ) )
+X <- array(0,  dim = c(N * tl, nts))
 
-groupvec <- rep(c(1:N),  each = tl )
+groupvec <- rep(c(1:N),  each = tl)
 
 
 #getwd( )
 #setwd("./tests")
 
-devtools::load_all( )
+devtools::load_all()
 
-system.time( {
-  fit <- dcnet( data =  rtsgen, parameterization = 'DCCr' , J =  N,
-               group =  groupvec, standardize_data = FALSE, init = 0,
-               meanstructure =  "VAR",               
-               iterations = 50000,
-               threads = 4, #tol_rel_obj =  0.001, ## 8 threads: 188 mins / 2thr: 98 mins / 3 thr: 98 mins / 4 thr: 93 mins
-               # 5 thr: 95miOCns / 6thr: 93mins
-               sampling_algorithm = 'variational',
-               algorithm = "fullrank",  ## fullrank should be less biased with respect to variances 
-               #chains = 4,
-               grainsize = 200) ## 46 mins to beat (gs=30) / gs=1, 60 mins / gs = 2, 118 / gs=3, 93 mins / gs=4,  / gs=6,   
-               #num_threads =  8)
+system.time({
+    fit <- dcnet(data = rtsgen, parameterization = "DCCrs", J =  N,
+                 group = groupvec, standardize_data = FALSE,
+                 init = 0,
+                 meanstructure = "VAR",
+                 iterations = 50000,
+                 threads = 4, #tol_rel_obj =  0.001, ## 8 threads: 188 mins /
+                 ## 2thr: 98 mins / 3 thr: 98 mins / 4 thr: 93 mins
+                                        # 5 thr: 95miOCns / 6thr: 93mins
+                 sampling_algorithm = "pathfinder",
+#                 algorithm = "fullrank",  ## fullrank should be less biased
+                 ##chains = 4,
+                 grainsize = 1)
+    ## 46 mins to beat (gs=30) / gs=1, 60 mins / gs = 2, 118 / gs=3, 93 mins / gs=4,  / gs=6,   
+    ##num_threads =  8)
 })
 
 
@@ -204,8 +203,8 @@ safe_sample <- purrr::possibly( function(s) {
         meanstructure =  "constant",
         group =  groupvec, standardize_data = FALSE, init = 0,
         threads = 1,
-        sampling_algorithm = 'variational',
-        algorithm = "fullrank")        
+#        algorithm = "fullrank",
+        sampling_algorithm = 'variational')        
 }, otherwise = default_return)
 
 ## Function to compute coverage probability ranging from L to U in the original population distribution
@@ -217,92 +216,92 @@ overlap <- function(population, L,  U,    iterations =  1000 ) {
 ## V2:
 safe_sample <- function(s, max_retries = 3) {
 
-  # Helper to check if model_fit is broken
-  is_model_fit_broken <- function(fit) {
-    tryCatch({
-      if (!inherits(fit$model_fit, "CmdStanFit")) return(TRUE)
-      fit$model_fit$metadata()  # harmless method, fails if object is invalid
-      return(FALSE)
-    }, error = function(e) {
-      return(TRUE)
-    })
-  }
-
-  for (attempt in seq_len(max_retries)) {
-    message(sprintf("Fitting attempt %d for index %d", attempt, s))
-
-    fit <- tryCatch({
-      dcnet(
-        data = replication_data[[s]],
-        parameterization = 'DCCr',
-        J = N,
-        meanstructure = "constant",
-        group = groupvec,
-        standardize_data = FALSE,
-        init = 0,
-        threads = 1,
-        iterations = 50000,
-        sampling_algorithm = 'variational',
-        algorithm = "fullrank"
-      )
-    }, error = function(e) {
-      message(sprintf("Hard failure on attempt %d: %s", attempt, e$message))
-      return(NULL)
-    })
-
-    if (is.null(fit)) next
-
-    # Check if model_fit is broken
-    if (is_model_fit_broken(fit)) {
-      message("model_fit is invalid or unusable — retrying...")
-      next
+    ## Helper to check if model_fit is broken
+    is_model_fit_broken <- function(fit) {
+        tryCatch({
+            if (!inherits(fit$model_fit, "CmdStanFit")) return(TRUE)
+            fit$model_fit$metadata()  # harmless method, fails if object is invalid
+            return(FALSE)
+        }, error = function(e) {
+            return(TRUE)
+        })
     }
 
-    # Try to extract model output
-    output_lines <- tryCatch({
-      out <- fit$model_fit$output()
-      if (is.character(out)) out else as.character(unlist(out))
-    }, error = function(e) {
-      message("Could not retrieve model output — assuming failure.")
-      return("ERROR_FETCHING_OUTPUT")
-    })
+    for (attempt in seq_len(max_retries)) {
+        message(sprintf("Fitting attempt %d for index %d", attempt, s))
 
-    # Patterns that indicate failure or non-convergence
-    failure_patterns <- c(
-      "All proposed step-sizes failed",
-      "algorithm may not have converged",
-      "Exception:.*not positive definite",
-      "Exception:",
-      "Fitting failed. Unable to print"
-    )
+        fit <- tryCatch({
+            dcnet(
+                data = replication_data[[s]],
+                parameterization = 'DCCr',
+                J = N,
+                meanstructure = "constant",
+                group = groupvec,
+                standardize_data = FALSE,
+                init = 0,
+                threads = 1,
+                iterations = 50000,
+                algorithm = "fullrank",
+                sampling_algorithm = 'variational'
+            )
+        }, error = function(e) {
+            message(sprintf("Hard failure on attempt %d: %s", attempt, e$message))
+            return(NULL)
+        })
 
-    failed <- any(sapply(failure_patterns, function(pat) {
-      any(grepl(pat, output_lines, ignore.case = TRUE, perl = TRUE))
-    }))
+        if (is.null(fit)) next
 
-    if (failed) {
-      message("Detected Stan warning or internal failure — retrying...")
-      next
+        ## Check if model_fit is broken
+        if (is_model_fit_broken(fit)) {
+            message("model_fit is invalid or unusable — retrying...")
+            next
+        }
+
+        ## Try to extract model output
+        output_lines <- tryCatch({
+            out <- fit$model_fit$output()
+            if (is.character(out)) out else as.character(unlist(out))
+        }, error = function(e) {
+            message("Could not retrieve model output — assuming failure.")
+            return("ERROR_FETCHING_OUTPUT")
+        })
+
+        ## Patterns that indicate failure or non-convergence
+        failure_patterns <- c(
+            "All proposed step-sizes failed",
+            "algorithm may not have converged",
+            "Exception:.*not positive definite",
+            "Exception:",
+            "Fitting failed. Unable to print"
+        )
+
+        failed <- any(sapply(failure_patterns, function(pat) {
+            any(grepl(pat, output_lines, ignore.case = TRUE, perl = TRUE))
+        }))
+
+        if (failed) {
+            message("Detected Stan warning or internal failure — retrying...")
+            next
+        }
+
+        ## Everything looks okay
+        return(fit)
     }
 
-    # Everything looks okay
-    return(fit)
-  }
-
-  message(sprintf("All %d attempts failed for index %d.", max_retries, s))
-  return(NULL)
+    message(sprintf("All %d attempts failed for index %d.", max_retries, s))
+    return(NULL)
 }
 
 ## END V2
-  
+
 rmse <- function(model, population) {
-  rmse <- sqrt(mean(( model - population )^2 ) )
-  return(rmse )
+    rmse <- sqrt(mean((model - population)^2))
+    return(rmse)
 }
 
 bias <- function(model, population) {
-  bias <- mean( model - population ) 
-  return(bias )
+    bias <- mean(model - population)
+    return(bias)
 }
 
 #variables
@@ -337,39 +336,38 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 1:100) {  
+for (s in 1:20) {
 
-  fit_r <- safe_sample(s)
+    fit_r <- safe_sample(s)
 
-  ## fitted <- tryCatch(print(fit_r), error = function(e) {
-  ##   message(sprintf("Fitting failed at index %d: %s", i, e$message))
-  ##   return(NULL)
-  ## }
-  ## )
-  
-  if (is.null(fit_r)) {
-    next
-  }
-  
-  for (var in variables) {    
-    SF <- fit_r$model_fit$summary(variables = var, "mean",
-                                  extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)))
-    cov_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
-      overlap(fit$model_fit$draws(variables = var)[,i], L = SF$q2.5[i], U = SF$q97.5[i])
-    })    
-    rmse_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
-      rmse(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
-    })    
-    bias_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
-      bias(fit_r$model_fit$draws(variables = var)[,i], fit$model_fit$draws(variables = var)[,i])
-    })
-    bins_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
-      sbc(fit_r$model_fit$draws(variables = var), fit$model_fit$draws(variables = var), column = i)
-    })
-  }
-  gc( )  
-  s
+    ## fitted <- tryCatch(print(fit_r), error = function(e) {
+    ##   message(sprintf("Fitting failed at index %d: %s", i, e$message))
+    ##   return(NULL)
+    ## }
+    ## )
 
+    if (is.null(fit_r)) {
+        next
+    }
+
+    for (var in variables) {
+        SF <- fit_r$model_fit$summary(variables = var, "mean",
+                                      extra_quantiles = ~posterior::quantile2(., probs = c(0.025, 0.975)))
+        cov_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+            overlap(fit$model_fit$draws(variables = var)[, i], L = SF$q2.5[i], U = SF$q97.5[i])
+        })
+        rmse_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+            rmse(fit_r$model_fit$draws(variables = var)[, i], fit$model_fit$draws(variables = var)[, i])
+        })
+        bias_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+            bias(fit_r$model_fit$draws(variables = var)[, i], fit$model_fit$draws(variables = var)[, i])
+        })
+        bins_list[[var]][[s]] <- sapply(seq_len(nrow(SF)), function(i) {
+            sbc(fit_r$model_fit$draws(variables = var), fit$model_fit$draws(variables = var), column = i)
+        })
+    }
+    gc()
+    s
 }
 
 ## Try reducing the convergence criterion to 0.005

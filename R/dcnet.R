@@ -88,44 +88,52 @@ dcnet <- function(data,
   ##          ".")
   ## }
 
-  ## HMC Sampling
-  if (tolower(sampling_algorithm) == "hmc") {
-    if (is.null(iterations)) {
-      iter_warmup <- 1000
-      iter_sampling <- 1000
-    } else if (!is.null(iterations)) {
-      iter_warmup <- round(iterations/2)
-      iter_sampling <- iterations - iter_warmup
-    }
+    ## HMC Sampling
+    if (tolower(sampling_algorithm) == "hmc") {
+        if (is.null(iterations)) {
+            iter_warmup <- 1000
+            iter_sampling <- 1000
+        } else if (!is.null(iterations)) {
+            iter_warmup <- round(iterations / 2)
+            iter_sampling <- iterations - iter_warmup
+        }
 
-    ##
-    max_cores <- parallel::detectCores()
-    Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
-    model_fit <- stanmodel$sample(data = stan_data,
-                                  iter_warmup = iter_warmup,
-                                  iter_sampling = iter_sampling,
-                                  adapt_delta = .95,
-                                  chains = chains,
-                                  parallel_chains = min(max_cores, chains),
-                                  threads_per_chain = threads_per_chain,
-                                  ...)
-  } else if (tolower(sampling_algorithm) == "variational") {
-    ## Sampling via Variational Bayes
-    if (is.null(iterations)) iterations <- 30000
-    model_fit <- stanmodel$variational(data = stan_data,
-                                       iter = iterations,
-                                       threads = threads_per_chain,
-                                       ...)
-  } else if (tolower(sampling_algorithm) == "pathfinder") {
-    ## Sampling via Pathfinder Method
-    if (is.null(iterations)) iterations <- 30000
-      model_fit <- stanmodel$pathfinder(data = stan_data,
-                                      #iter = iterations,
-                                      #jacobian =  TRUE,
+        ##
+        max_cores <- parallel::detectCores()
+        Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
+        model_fit <- stanmodel$sample(data = stan_data,
+                                      iter_warmup = iter_warmup,
+                                      iter_sampling = iter_sampling,
+                                      adapt_delta = .95,
+                                      chains = chains,
+                                      parallel_chains = min(max_cores, chains),
+                                      threads_per_chain = threads_per_chain,
                                       ...)
-  } else {
-    stop("\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n")
-  }
+    } else if (tolower(sampling_algorithm) == "variational") {
+        ## Sampling via Variational Bayes
+        if (is.null(iterations)) iterations <- 30000
+        model_fit <- stanmodel$variational(data = stan_data,
+                                           iter = iterations,
+                                           threads = threads_per_chain,
+                                           ...)
+    } else if (tolower(sampling_algorithm) == "pathfinder") {
+        max_cores <- parallel::detectCores()
+        Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
+        ## Sampling via Pathfinder Method
+        if (is.null(iterations)) iterations <- 30000
+        model_fit <- stanmodel$pathfinder(data = stan_data,
+                                          num_threads = 4,
+                                        #iter = iterations,
+                                        #jacobian =  TRUE,
+                                          ...)
+    } else if (tolower(sampling_algorithm) == "laplace") {
+        max_cores <- parallel::detectCores()
+        Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
+        fit_mode <- stanmodel$optimize(data = stan_data, jacobian = TRUE, threads = threads, ...)
+        model_fit <- stanmodel$laplace(data = stan_data, mode = fit_mode, threads = threads, ...)
+    } else {
+        stop("\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n")
+    }
 
   ## Model fit is based on standardized values.
   if (standardize_data) {

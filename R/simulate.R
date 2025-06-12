@@ -27,42 +27,42 @@
 ##' @param n_ts Number of time series
 ##' @author Philippe Rast
 .ranS <- function(n_ts, fixedS, ranS_sd) {
-  lt <- choose(n_ts,2)
-  x <- tanh( atanh(fixedS) + rnorm(lt, 0, sd = ranS_sd) )
-  z <- diag(rep(0, n_ts))
-  index <- 0
-  for(j in 1:n_ts) {
-    for(i in 1:n_ts) {
-      if( i > j ) {
-	index = index + 1
-	z[i,j] = x[index] 
-      }
-      if (i < j) {
-	z[i,j] = 0
-      }
-    }
-  }
-  L <- diag(rep(0, n_ts))
-  for(i in 1:n_ts) {
-    for(j in 1:n_ts){
-      if(i < j){
-	L[i,j]=0.0;
-      }
-      if(i == j){
-	if(i == 1){
-	  L[i,j]=1.0;
+    lt <- choose(n_ts, 2)
+    x <- tanh(atanh(fixedS) + rnorm(lt, 0, sd = ranS_sd))
+    z <- diag(rep(0, n_ts))
+    index <- 0
+    for (j in 1:n_ts) {
+        for (i in 1:n_ts) {
+            if (i > j) {
+                index <- index + 1
+                z[i, j] <- x[index]
+            }
+            if (i < j) {
+                z[i, j] <- 0
+            }
         }
-	if(i > 1){ 
-	  L[i,j]=sqrt( 1 - sum( L[i, 1:j]^2 ) );
-	}
-      }
-      if(i > j){
-	L[i,j]=z[i,j]*sqrt(1 - sum( L[i, 1:j]^2) );
-      }
     }
-  }
-  R <- L%*%t(L)
-  return(R)
+    L <- diag(rep(0, n_ts))
+    for (i in 1:n_ts) {
+        for (j in 1:n_ts) {
+            if (i < j) {
+                L[i, j] <- 0.0
+            }
+            if (i == j) {
+                if (i == 1) {
+                    L[i, j] <- 1.0
+                }
+                if (i > 1) {
+                    L[i, j] <- sqrt(1 - sum(L[i, 1:j]^2))
+                }
+            }
+            if (i > j) {
+                L[i, j] <- z[i, j] * sqrt(1 - sum(L[i, 1:j]^2))
+            }
+        }
+    }
+    R <- L %*% t(L)
+    return(R)
 }
 
 ##' @title Internal function to generate constrained a's and b's
@@ -81,15 +81,15 @@
 ##' The function returns a matrix with eigen values less than 1 in modulus
 ##' @param fixed_phi A fixed effects square matrix
 .stat_var <- function(n_ts, fixed_phi, phi_ranef_sd, D, stationarity = TRUE) {
-  #D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
-  vecfix <- c(fixed_phi ) ## columnwise
-  indfix <- vecfix + rnorm(n_ts^2, 0, phi_ranef_sd)
-  A <- matrix(indfix, nrow = n_ts)
-  stationary <- A%*%D%*%solve(A)
-  nonstationary <- A
-  if(stationarity == TRUE) {
-    return(stationary )
-  } else return(nonstationary )
+    ##D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
+    vecfix <- c(fixed_phi) ## columnwise
+    indfix <- vecfix + rnorm(n_ts^2, 0, phi_ranef_sd)
+    A <- matrix(indfix, nrow = n_ts)
+    stationary <- A %*% D %*% solve(A)
+    nonstationary <- A
+    if (stationarity == TRUE) {
+        return(stationary)
+    } else return(nonstationary)
 }
 
 
@@ -97,7 +97,7 @@
 ##' @param tslength Length of time series, for all N (everyone has same TS length)
 ##' @param n_ts Number of simultaneous TS per person. Currently only supports 3 or less
 ##' @param N Subjects
-##' @param ranef_sd_S Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number
+##' @param ranS_sd Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number
 ##' @param phi0_fixed Vector of population values of length n_ts
 ##' @param empirical Sample from the emprirical multivariate normal distribution. Defaults to `FALSE`
 ##' @importFrom clusterGeneration rcorrmatrix
@@ -108,59 +108,60 @@
                      phi_mu = 0, ## Values of phi
                      phi_sd = 0, ## This is to generate a phi matrix with different values
                      phi_ranef_sd = 0.01, ## This is the random effect of phi
-                     stationarity_phi = FALSE, ## Should the phi values ensure that ts is stationary?
+                     stationarity_phi = FALSE, ## Should the phi values ensure that ts is stationary
                      log_c_fixed = rep(0, n_ts), ## on log scale
                      log_c_r_sd = 0.1,
                      a_h_fixed = rep(0, n_ts),
-                     a_h_r_sd = 0.1,## on logit scale
+                     a_h_r_sd = 0.1, ## on logit scale
                      b_h_fixed = rep(0, n_ts),
-                     b_h_r_sd = 0.1,## on logit scale
+                     b_h_r_sd = 0.1, ## on logit scale
                      l_a_q_fixed = 0,
                      l_a_q_r_sd = 0.1,
                      l_b_q_fixed = 0,
-                     l_b_q_r_sd = 0.1,                     
-                     ranef_sd_S, 
+                     l_b_q_r_sd = 0.1,
                      ranS_sd = 1,
                      empirical = FALSE) {
 
-  ## Define fixed diag for c_h on log scale
-  log_c_fixed_diag <- log_c_fixed
-  ## individual deviations
-  log_c_dev_ind <- t(replicate(N, rnorm(n_ts, 0,  log_c_r_sd ) ))
-  ## combine to fixed +  ranef
-  c_h <- exp( log_c_fixed_diag + log_c_dev_ind )
-  
-  ## Create individual a_h and b_h
-  a_h_random <- t(replicate(N, rnorm(n_ts, 0,  a_h_r_sd ) ))
-  a_h <- 1 / (1 + exp(-( a_h_fixed + a_h_random )))
+    ## Define fixed diag for c_h on log scale
+    log_c_fixed_diag <- log_c_fixed
+    ## individual deviations
+    log_c_dev_ind <- t(replicate(N, rnorm(n_ts, 0,  log_c_r_sd)))
+    ## combine to fixed +  ranef
+    c_h <- exp(log_c_fixed_diag + log_c_dev_ind)
 
-  ## Create individual a_h and b_h
-  b_h_random <- t(replicate(N, rnorm(n_ts, 0,  b_h_r_sd ) ))
-  b_h <- (1 - a_h) / (1 + exp(-( b_h_fixed + b_h_random )))
+    ## Create individual a_h and b_h
+    a_h_random <- t(replicate(N, rnorm(n_ts, 0,  a_h_r_sd)))
+    a_h <- 1 / (1 + exp(- (a_h_fixed + a_h_random)))
 
-  a_q <- 1 / ( 1 + exp(-( l_a_q_fixed + rnorm(N, 0, l_a_q_r_sd) )))
-  b_q <- (1-a_q) / ( 1 + exp(-( l_b_q_fixed + rnorm(N, 0, l_b_q_r_sd) )))
-  
-  ## location
-  ## Generate random starting values for the location intercept as sum of fixed plus random
-  phi0 <- phi0_fixed + replicate(n = N, rnorm(n_ts, 0, phi0_sd ))
-  
-  ## phi is bound by -1;1. n_tsXn_ts matrix
-  ## Create N individual matrices
-  ## watch out, this might create non-stationary series
-  ## To avoid this, create matrices who's eigenvalues are less than 1 in modulus.
-  ## This ensures stationary of the VAR(1) model: https://phdinds-aim.github.io/time_series_handbook/03_VectorAutoregressiveModels/03_VectorAutoregressiveMethods.html#stationarity-of-the-var-1-model
+    ## Create individual a_h and b_h
+    b_h_random <- t(replicate(N, rnorm(n_ts, 0,  b_h_r_sd)))
+    b_h <- (1 - a_h) / (1 + exp(- (b_h_fixed + b_h_random)))
 
-  ## Create fixed phi
-  phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts )
-  D <- diag(tanh(rnorm(n_ts, 0, 1) ) )
-  
-  ## add  random effect with .stat_var function
-  phi <- replicate(N, .stat_var(n_ts,
-                                fixed_phi = phi_fixed,
-                                phi_ranef_sd = phi_ranef_sd, D, stationarity = stationarity_phi),
-                   simplify = FALSE)
-  
+    a_q <- 1 / (1 + exp(- (l_a_q_fixed + rnorm(N, 0, l_a_q_r_sd))))
+    b_q <- (1 - a_q) / (1 + exp(- (l_b_q_fixed + rnorm(N, 0, l_b_q_r_sd))))
+
+    ## location
+    ## Generate random starting values for the location intercept as sum of fixed plus random
+    phi0 <- phi0_fixed + replicate(n = N, rnorm(n_ts, 0, phi0_sd))
+
+    ## phi is bound by -1;1. n_tsXn_ts matrix
+    ## Create N individual matrices
+    ## watch out, this might create non-stationary series
+    ## To avoid this, create matrices who's eigenvalues are less than 1 in modulus.
+    ## This ensures stationary of the VAR(1) model: https://phdinds-aim.github.io/time_series_handbook/03_VectorAutoregressiveModels/03_VectorAutoregressiveMethods.html#stationarity-of-the-var-1-model
+
+    ## Create fixed phi
+    phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts)
+    D <- diag(tanh(rnorm(n_ts, 0, 1)))
+
+    ## add  random effect with .stat_var function
+    phi <- replicate(N, .stat_var(n_ts,
+                                  fixed_phi = phi_fixed,
+                                  phi_ranef_sd = phi_ranef_sd,
+                                  D,
+                                  stationarity = stationarity_phi),
+                     simplify = FALSE)
+
   y <- array(NA, dim = c(n_ts, tslength, N))
   ## create named variables:
   rownames(y) <-  paste0('X',  seq_len(n_ts) )
