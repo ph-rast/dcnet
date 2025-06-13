@@ -122,15 +122,15 @@ dcnet <- function(data,
         ## Sampling via Pathfinder Method
         if (is.null(iterations)) iterations <- 30000
         model_fit <- stanmodel$pathfinder(data = stan_data,
-                                          num_threads = 4,
+                                          num_threads = threads_per_chain,
                                         #iter = iterations,
                                         #jacobian =  TRUE,
                                           ...)
     } else if (tolower(sampling_algorithm) == "laplace") {
         max_cores <- parallel::detectCores()
         Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
-        fit_mode <- stanmodel$optimize(data = stan_data, jacobian = TRUE, threads = threads, ...)
-        model_fit <- stanmodel$laplace(data = stan_data, mode = fit_mode, threads = threads, ...)
+        fit_mode <- stanmodel$optimize(data = stan_data, jacobian = TRUE, threads = threads_per_chain, ...)
+        model_fit <- stanmodel$laplace(data = stan_data, mode = fit_mode, threads = threads_per_chain, ...)
     } else {
         stop("\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n")
     }
