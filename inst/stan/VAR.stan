@@ -49,7 +49,7 @@ transformed parameters {
   }
 
   // Beter to loop first through array, then matrix column and row 
-  // iterations geq 2
+  // iterations geq 2 
   for( j in 1:J ){
     for( t in 2:T ){
 #include /model_components/mu.stan

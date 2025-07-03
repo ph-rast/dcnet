@@ -157,13 +157,36 @@ getwd()
 devtools::load_all(path = "./")
 
 ## Model with two S matrices pre/post intervention
-fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
-             iterations=1000,
-             standardize_data = FALSE, sampling_algorithm = "HMC",
-             chains=4, threads = 8,
-             grainsize = 5)#, init = 0.5, tol_rel_obj = 0.0025)
+fit_init <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL,
+                  standardize_data = TRUE,
+                  parameterization = "DCCrs",
+                  iterations = 30000,
+                  sampling_algorithm = "pathfinder",
+                  meanstructure = "VAR",
+                  chains = 4,
+                  threads = 4,
+                  grainsize = 3,
+                  init = 0.1)
 
-summary(fit)
+summary(fit_init)
+
+
+fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
+             iterations = 1000,
+             standardize_data = TRUE,
+             sampling_algorithm = "hmc",
+             #algorithm = "fullrank",
+             #grad_samples = 20,
+             #elbo_samples = 200,
+             #adapt_iter = 200,
+             #eta = 0.005,
+             chains = 4,
+             threads_per_chain = 4,
+             grainsize = 3,
+             #init = fit_init$model_fit,
+             max_treedepth = 8)
+
+hsummary(fit)
 
 grep("mu", colnames(fit$model_fit$draws()))
 colMeans(fit$model_fit$draws()[, 139346:139350])

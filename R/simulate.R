@@ -121,7 +121,6 @@
                      l_b_q_r_sd = 0.1,
                      ranS_sd = 1,
                      empirical = FALSE) {
-
     ## Define fixed diag for c_h on log scale
     log_c_fixed_diag <- log_c_fixed
     ## individual deviations
@@ -177,51 +176,53 @@
   DCC_R <- array( NA, c(n_ts,n_ts, tslength, N))
   RawCorr <- array( NA, c(n_ts,n_ts, tslength, N))
   
-  ## Distribution of random effects    
-  ## Unconditional Corr;
-  ## Fixed :
-  Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
-  Fixed_S <- Sc[lower.tri(Sc)]
+    ## Distribution of random effects
+    ## Unconditional Corr;
+    ## Fixed :
+    Sc <- clusterGeneration::rcorrmatrix( d =  n_ts, alphad = n_ts*2)
+    Fixed_S <- Sc[lower.tri(Sc)]
 
-  S <- list( )
-  for(j in 1:N ){
-    S[[j]] <- .ranS(n_ts = n_ts, fixedS = Fixed_S, ranS_sd = ranS_sd)
-  }
-  
-  ## Q is symmetric
-  Q <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
-  Qs <- array(diag(n_ts), c(n_ts,n_ts, tslength, N))
-  R <-  array(S[[1]], c(n_ts,n_ts, tslength, N))
+    S <- list()
+    for (j in 1:N) {
+        S[[j]] <- .ranS(n_ts = n_ts, fixedS = Fixed_S, ranS_sd = ranS_sd)
+    }
 
-  u <- array(NA, c(n_ts,tslength,N))
+    ## Q is symmetric
+    Q <- array(diag(n_ts), c(n_ts, n_ts, tslength, N))
+    Qs <- array(diag(n_ts), c(n_ts, n_ts, tslength, N))
+    R <-  array(S[[1]], c(n_ts, n_ts, tslength, N))
 
-    for(j in 1:N ) {
-      h[,1,j] <- c_h[j,]
+    u <- array(NA, c(n_ts, tslength,N))
+
+    for (j in 1:N) {
+        h[, 1, j] <- c_h[j, ]
       
-      for(t in 2:tslength) {
-        DCC_mu[,t,j] <- 
-          phi0[,j] + phi[[j]] %*% (y[,t-1,j] - phi0[,j]) #DCC_mu[,t-1,j])
+        for (t in 2:tslength) {
+            DCC_mu[, t, j] <-
+                phi0[, j] + phi[[j]] %*% (y[, t - 1, j] - phi0[, j]) #DCC_mu[, t - 1, j])
 
-        for(i in 1:n_ts) {
-          h[i,t,j] <-
-            sqrt(c_h[j,i] + a_h[j,i]*(y[i, t-1,j] - DCC_mu[i, t-1,j])^2 + b_h[j,i]*h[i,t-1,j]^2)
-        }
-        
-        u[,t-1,j] <-
-          solve( diag(h[,t-1,j]) ) %*% (y[,t-1,j] - DCC_mu[,t-1,j])
+            for (i in 1:n_ts) {
+                h[i,t,j] <-
+                    sqrt(c_h[j,i] +
+                         a_h[j,i] * (y[i, t - 1, j] - DCC_mu[i, t - 1, j])^2 +
+                         b_h[j,i] * h[i, t - 1, j]^2)
+            }
 
-        Q[,,t,j] <-
-          (1 - a_q[[j]] - b_q[[j]]) * S[[j]] +
-          a_q[[j]] * (u[,t-1,j] %*% t(u[,t-1,j])) + 
-          b_q[[j]] * Q[,,t-1,j] 
-        
-        R[,,t,j] <- cov2cor(Q[,,t,j])
-        R[,,t,j]
-        
-        DCC_H[,,t,j] <-
-          diag(h[,t,j])%*%R[,,t,j]%*%diag(h[,t,j])
-        DCC_H[,,t,j]
-        ##
+            u[, t - 1, j] <-
+                solve(diag(h[, t - 1, j])) %*% (y[, t - 1, j] - DCC_mu[, t - 1, j])
+
+            Q[, , t, j] <-
+                (1 - a_q[[j]] - b_q[[j]]) * S[[j]] +
+                a_q[[j]] * (u[, t - 1, j] %*% t(u[, t - 1, j])) +
+              b_q[[j]] * Q[, , t - 1, j]
+
+            R[, , t, j] <- cov2cor(Q[, , t, j])
+            R[, , t, j]
+
+            DCC_H[, , t, j] <-
+                diag(h[, t, j]) %*% R[, , t, j] %*% diag(h[, t, j])
+            DCC_H[, , t, j]
+            ##
         y[,t,j] <- mvrnorm(mu = DCC_mu[,t,j], Sigma = DCC_H[,,t,j], empirical =  empirical)
         ## compute partial corr from DCC_H
         DCC_R[,,t,j] <- cov2cor( solve(DCC_H[,,t,j]) ) * ( diag(n_ts) - 1)
@@ -235,11 +236,15 @@
   } else {
     fixed_phi <- phi_fixed
   }
+    ## Return lower tri of Fixed_S on tanh scale, for comparison w. model
+    fixed_S_atanh <- atanh(Sc[lower.tri(Sc)])
+    
   return(list(DCC_y,
               DCC_R = DCC_R,
               S = S,
               RawCorr =  RawCorr,
               Fixed_S = Sc,
+              fixed_S_atanh = fixed_S_atanh,
               fixed_phi = fixed_phi,
               ranS_sd = ranS_sd,
               l_b_q_r_sd = l_b_q_r_sd,
@@ -255,4 +260,4 @@
               phi_ranef_sd = phi_ranef_sd,
               phi0_sd = phi0_sd,
               phi0_fixed = phi0_fixed))
-  }
+}

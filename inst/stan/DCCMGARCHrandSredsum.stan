@@ -3,10 +3,11 @@ functions {
   //#include /functions/jacobian.stan
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
+// reduced sums:  
    real partial_log_lik(array[] int slice_j, int start, int end,
                        array[] matrix rts,
                        array[,] vector mu,
-                       array[,] matrix H,
+                       array[,] matrix L_H,
                        int T,
                        int distribution,
                        real nu) {
@@ -15,10 +16,13 @@ functions {
       int j = slice_j[idx];
       for (t in 1:T) {
         vector[num_elements(rts[j][1])] rts_t = to_vector(rts[j][t, ]);
-        if (distribution == 0)
-          lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
-        else if (distribution == 1)
-          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t], H[j, t]);
+        if (distribution == 0){
+	  lp += multi_normal_cholesky_lpdf(rts_t | mu[j, t], L_H[j, t]);
+	  // lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
+        } else if (distribution == 1) {
+          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t],
+				     multiply_lower_tri_self_transpose(L_H[j, t]));
+	}
       }
     }
     return lp;
@@ -32,8 +36,31 @@ data {
 transformed data { 
   array[J] vector[nt] rts_m;
   array[J] vector[nt] rts_sd;
-  int<lower=nt> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
+  int<lower=1> Sdim = (nt + nt*nt) %/% 2 - nt ; // Dimension of vec(S).
   //  int grainsize = 1;
+  // Find positions of own and cross lags for flattened vec_phi
+  array[nt]          int idx_own;
+  array[nt * (nt-1)] int idx_cross;
+
+  { // local scope to keep the counters private
+    int k_diag  = 1;
+    int k_cross = 1;
+
+    // column-major sweep over the nt × nt matrix
+    for (c in 1:nt) {
+      for (r in 1:nt) {
+        int flat = (c - 1) * nt + r;            // 1-based vector index
+        if (r == c) {
+          idx_own[k_diag]  = flat;
+          k_diag          += 1;
+        } else {
+          idx_cross[k_cross] = flat;
+          k_cross           += 1;
+        }
+      }
+    }
+  }
+
   
 #include /transformed_data/xh_marker.stan
  
@@ -54,7 +81,43 @@ transformed data {
 }
 parameters {
   // VAR parameters
-#include /parameters/arma.stan
+  // Horseshoe
+  // semi-global scales
+  real<lower=0> tau_own;
+  real<lower=0> tau_cross;
+
+  // local scales (Horseshoe example)
+  vector<lower=0>[nt]   lambda_own;
+  vector<lower=0>[nt*(nt-1)] lambda_cross;
+
+  // standard-normal draws to be shrunk
+  vector[nt]            g_own;
+  vector[nt*(nt-1)]     g_cross;
+  
+  //#include /parameters/arma.stan
+  // define arma.stan params right here:
+  // BEGIN
+  // Fixed effect vector
+  vector[nt] phi0_fixed;
+
+  cholesky_factor_corr[nt] phi0_L;
+  vector<lower=0>[nt] phi0_tau; // ranef SD for phi0
+  array[J] vector[nt] phi0_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
+  // vec_phi_fixed is now defined in transformed params
+  cholesky_factor_corr[nt*nt] phi_L;
+
+  // Block separable SD's
+  real<lower=0> sigma_re_own;
+  real<lower=0> sigma_re_cross;
+
+  // phi_tau now in transformed params
+  // vector<lower=0>[nt*nt] phi_tau; // ranef SD for phi0
+
+  array[J] vector[nt*nt] phi_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
+  // END
+
+  vector[nt] phi0_fixed2;  // In case of S_pred != NULL 
+  
   // predictor for H
 #include /parameters/predH.stan
 
@@ -77,18 +140,27 @@ parameters {
   cholesky_factor_corr[nt] b_h_L;
   vector<lower=0>[nt] b_h_tau; // ranef SD for phi0
   array[J] vector[nt] b_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
+
+  // Create raws to facilitate prior assignments
+  vector<lower=0, upper=1>[nt] a_h_pop_raw;
+  vector<lower=0, upper=1>[nt] b_h_pop_raw_raw;
+
   
   // GARCH q parameters
-  //  real<lower=0, upper = 1 > a_q; // Define on log scale so that it can go below 0
-  real l_a_q; // Define on log scale so that it can go below 0
+  //real l_a_q; // Define on log scale so that it can go below 0
   
   real<lower=0> l_a_q_sigma; //random effect variance
   array[J] real l_a_q_stdnorm;
   
   //real<lower=0, upper = (1 - a_q) > b_q; //
-  real l_b_q; //
+  //real l_b_q; 
   real<lower=0> l_b_q_sigma; //random effect variance
   array[J] real l_b_q_stdnorm;
+
+  // Try with a_q/b_q params that are on original scale for priors:
+  real<lower=0, upper=1> a_q_pop_raw;         // population mean of a_q
+  real<lower=0, upper=1> b_q_pop_raw_raw;     // temporary, to enforce sum<1
+
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
@@ -115,7 +187,66 @@ transformed parameters {
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
+  //  build vec_phi_fixed (length nt^2)
+  // fixed effec: Grouped HS
+  vector[nt*nt] vec_phi_fixed = rep_vector(0, nt*nt);
 
+  // Ranefs SD  vector
+  vector<lower=0>[nt*nt] phi_tau = rep_vector(0, nt * nt);
+
+  // Write own- and cross-lags into the right position in the flattened vectors:
+  // own-lags (diagonal)
+  for (k in 1:nt) {
+    int pos = idx_own[k];                                  // 1-based flat index
+    vec_phi_fixed[pos] = tau_own * lambda_own[k] * g_own[k];
+    phi_tau[pos]       = sigma_re_own;
+  }
+
+  // cross-lags (off-diagonals)
+  for (k in 1:(nt * (nt - 1))) {
+    int pos = idx_cross[k];
+    vec_phi_fixed[pos] = tau_cross * lambda_cross[k] * g_cross[k];
+    phi_tau[pos]       = sigma_re_cross;
+  }
+
+  
+  // shrink b_q so that a_q + b_q ≤ 0.99   (add a small ε margin)
+  real<lower=0, upper=1> a_q_pop = a_q_pop_raw;
+  real<lower=0, upper=1> b_q_pop = (1 - a_q_pop - 0.01) * b_q_pop_raw_raw;
+
+  vector<lower=0, upper=1>[nt] a_h_pop;
+  vector<lower=0, upper=1>[nt] b_h_pop;
+  for (d in 1:nt) {
+    a_h_pop[d] = 0.50 * a_h_pop_raw[d];                        // centred ~0.25
+    b_h_pop[d] = (0.99 - a_h_pop[d]) * b_h_pop_raw_raw[d];     // centred ~0.37
+  }
+  // --------- subject-specific coefficients -------------------------
+  array[J] vector<lower=0, upper=1>[nt] a_h_sum;
+  array[J] vector<lower=0, upper=1>[nt] b_h_sum;
+  
+  for (j in 1:J) {
+    vector[nt] a_re = a_h_tau .* a_h_stdnorm[j];               // non-centred RE
+    vector[nt] b_re = b_h_tau .* b_h_stdnorm[j];
+    
+    // add REs on logit scale, then transform back  
+    a_h_sum[j] =
+      inv_logit( logit(a_h_pop) + a_re );                      // stays in (0,1)
+    
+    // ensure a_h + b_h < 0.99 element-wise
+    for (d in 1:nt) {
+      real b_raw = inv_logit( logit(b_h_pop[d]) + b_re[d] );   // (0,1)
+      b_h_sum[j,d] = (0.99 - a_h_sum[j,d]) * b_raw;            // (0, 0.99-a)
+    }
+  }
+
+
+  
+
+  
+  // logit versions used elsewhere in my code
+  real l_a_q = logit(a_q_pop);
+  real l_b_q = logit(b_q_pop);
+  
   //Scale
   array[J] real<lower = 0, upper = 1> a_q;
   array[J] real<lower = 0, upper = 1> b_q;
@@ -126,10 +257,14 @@ transformed parameters {
   array[J] vector[nt] a_h_random; // variance on log metric
   array[J] vector[nt] b_h_random;
 
-  array[J] vector<lower=0, upper = 1>[nt] a_h_sum;
-  array[J] vector<lower=0, upper = 1>[nt] b_h_sum;
+  //array[J] vector<lower=0, upper = 1>[nt] a_h_sum;
+  //array[J] vector<lower=0, upper = 1>[nt] b_h_sum;
+
+  //old
+  //array[J,T] cov_matrix[nt] H;
+  // try cholesky
+  array[J,T] cholesky_factor_cov[nt] L_H;
   
-  array[J,T] cov_matrix[nt] H;
   array[J,T] corr_matrix[nt] R;
   array[J,T-1] vector[nt] rr;
   array[J,T] vector[nt] mu;
@@ -166,8 +301,12 @@ transformed parameters {
     //R[j,1] = R1_init[j];//cov2cor((rts[j]' * rts[j]) / (nt - 1));
     //R[j,1]=diag_matrix(rep_vector(1.0, nt));
     R[j,1] = quad_form_diag(Qr[j,1], Qr_sdi[j,1]); //
-    H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
-
+    //H[j,1] = quad_form_diag(R[j,1],  D[j,1]);
+    matrix[nt,nt] Hi1 = quad_form_diag(R[j,1], D[j,1]);
+    Hi1 = 0.5 * (Hi1 + Hi1');
+    Hi1 += diag_matrix(rep_vector(1e-6, nt));
+    L_H[j,1] = cholesky_decompose(Hi1);
+    
     ////////////
     // Ranefs //
     ////////////
@@ -258,19 +397,39 @@ transformed parameters {
       Qr[j,t ] = (1 - a_q[j] - b_q[j]) * S[j] + a_q[j] * (u[j, t-1 ] * u[j, t-1 ]') + b_q[j] * Qr[j, t-1]; // S and UU' define dimension of Qr
       Qr_sdi[j, t] = 1 ./ sqrt(diagonal(Qr[j, t])) ; // inverse of diagonal matrix of sd's of Qr
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
-      H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
+      // H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
+
+      /* Add Jitter to avoid non SPD matrix error: */
+      matrix[nt,nt] Hij = quad_form_diag(R[j,t],  D[j,t]);
+      // enforce symmetry
+      Hij = 0.5 * (Hij + Hij');
+      
+      // add 1e-6 to diagonal to guarantee SPD
+      Hij +=  diag_matrix(rep_vector(1e-6, nt));
+      L_H[j,t] = cholesky_decompose(Hij);
+      
+      
+      //H[j,t] = 0.5 * (H[j,t] + H[j,t]');
     }
   }
 }
 
 model {
   // print("Upper Limits:", UPs);
+  // population-level priors
+  a_q_pop_raw     ~ beta(2, 20);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
+  b_q_pop_raw_raw ~ beta(2,  6);   // mean ≈ 0.25 BEFORE scaling
+  // population means: weak Beta priors (most mass ≤ 0.3)
+  a_h_pop_raw      ~ beta(2, 8);         // mean ≈ 0.20
+  b_h_pop_raw_raw  ~ beta(2, 6);         // mean ≈ 0.25 (scaled later)
+  
+  
   // priors
-  l_a_q ~ student_t(3, -1.5, 2);
-  l_b_q ~ student_t(3, -1.5, 2);
-  l_a_q_sigma ~ student_t(3, 0, 2);
+  //l_a_q ~ student_t(3, -1.5, 2);
+  //l_b_q ~ student_t(3, -1.5, 2);
+  l_a_q_sigma ~ normal(0, 0.05); //student_t(3, 0, 2);
   to_vector(l_a_q_stdnorm) ~ std_normal();
-  l_b_q_sigma ~ student_t(3, 0, 2);
+  l_b_q_sigma ~ normal(0, 0.05); //student_t(3, 0, 2);
   to_vector(l_b_q_stdnorm) ~ std_normal();
 
   // VAR
@@ -282,24 +441,39 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau ~ student_t(3,0, .5); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ student_t(3, 0, .5); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ student_t(3, 0, .5); // SD for c_h ranefs
-  a_h_tau ~ student_t(3, 0, .5); // SD for c_h ranefs
-  b_h_tau ~ student_t(3, 0, .5);
+  phi0_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
+  phi_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ normal(0, .05); // SD for c_h ranefs
+  a_h_tau ~ normal(0, .05); // SD for c_h ranefs
+  b_h_tau ~ normal(0, .05);
+
+  // Horseshoe:
+  //// standard normal prior
+  g_own ~ std_normal();
+  g_cross ~ std_normal();
+  //// semi-global scales
+  tau_own ~ cauchy(0, 0.5);
+  tau_cross ~ cauchy(0, 0.02);
+  /// local scales
+  lambda_own   ~ normal(0, 1);
+  lambda_cross ~ normal(0, 1);
+
+  // VAR phi ranefs for own and cross lags:
+  sigma_re_own   ~ normal(0, 0.1);   // looser
+  sigma_re_cross ~ normal(0, 0.025);  // tight shrinkage
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ student_t(3, -2, 1);
-  to_vector(a_h_fixed) ~ student_t(3, -2, 1);
-  to_vector(b_h_fixed) ~ student_t(3, -2, 1);
+  to_vector(c_h_fixed) ~ normal( -2, .11);
+  to_vector(a_h_fixed) ~ normal( -2, .11);
+  to_vector(b_h_fixed) ~ normal( -2, .11);
   // Prior for initial state
   
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 5 );
   //to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
-  phi0_fixed ~ student_t(3, 0, 5);
+  phi0_fixed ~ student_t(3, 0, 1);
   vec_phi_fixed ~ student_t(3, 0, 1);
   S_vec_fixed ~ std_normal();
   S_vec_fixed2 ~ std_normal();  
@@ -328,7 +502,7 @@ model {
       array[J] int subj_index;
       for (jj in 1:J) subj_index[jj] = jj;
       target += reduce_sum(partial_log_lik, subj_index, grainsize,
-			   rts, mu, H, T, distribution, nu);
+			   rts, mu, L_H, T, distribution, nu);
     }
   }
 }
@@ -338,11 +512,13 @@ generated quantities {
   array[J,T] matrix[nt,nt] pcor;
   matrix[nt,nt] Sfixed;
   matrix[nt,nt] Sfixed2;
+  array[J,T] cov_matrix[nt] H; 
 #include /generated/retrodict.stan
   for(j in 1:J){
     for(t in 1:T){
       //precision[j,t] = inverse(H[j,t]);
-      pcor[j, t] = - cov2cor( inverse(H[j,t]) );
+      H[j, t] = multiply_lower_tri_self_transpose(L_H[j,t]);
+      pcor[j, t] = - cov2cor( inverse(multiply_lower_tri_self_transpose(L_H[j,t])) );
     }
   }
   Sfixed = invvec_to_corr( tanh(S_vec_fixed), nt);

@@ -4,7 +4,7 @@
 ##' @author Philippe Rast
 ##' @import data.table
 ##' @export
-summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
+summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ...) {
   
   ## Parameters for each model
   common_params <- c("lp")
@@ -31,6 +31,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
                    CCC = paste0(ccc_params,'|', var_params, '|', common_params),
                    DCC = paste0(dcc_params,'|', var_params,'|', common_params),
                    DCCr = paste0(dcc_params,'|', var_params,'|', common_params),
+                   DCCrs = paste0(dcc_params,'|', var_params,'|', common_params),
                    NULL
                    )
   if(is.null(params)) {
@@ -180,7 +181,7 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ... ) {
 print.summary.dcnet <- function(x,  ... ) {
   if(x$meta$param == "CCC") {
     .print.summary.ccc(x)
-  } else if(x$meta$param == "DCC" | x$meta$param == "DCCr" ) {
+  } else if(x$meta$param == "DCC" | x$meta$param == "DCCr" | x$meta$param == "DCCrs") {
     .print.summary.dcc(x)
   } 
   .newline(2)
