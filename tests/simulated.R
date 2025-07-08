@@ -122,7 +122,19 @@ init_fun <- function() {
 devtools::load_all()
 
 system.time({
-   
+
+    fit0 <- dcnet(
+        data = rtsgen, parameterization = "CCC", J =  N,
+        group = groupvec, standardize_data = FALSE,
+        init = 0,
+        meanstructure = "VAR",
+        iterations = 30000,
+        chains = 4,
+        threads = 5, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
+        sampling_algorithm = "pathfinder", # "laplace",
+        grainsize = 10)
+
+    
     fit0 <- dcnet(
         data = rtsgen, parameterization = "DCCrs", J =  N,
         group = groupvec, standardize_data = FALSE,

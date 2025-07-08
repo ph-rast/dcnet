@@ -161,7 +161,7 @@ fit_init <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL,
                   standardize_data = TRUE,
                   parameterization = "DCCrs",
                   iterations = 30000,
-                  sampling_algorithm = "pathfinder",
+                  sampling_algorithm = "variational",
                   meanstructure = "VAR",
                   chains = 4,
                   threads = 4,
@@ -172,7 +172,7 @@ summary(fit_init)
 
 
 fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
-             iterations = 1000,
+             iterations = 6000,
              standardize_data = TRUE,
              sampling_algorithm = "hmc",
              #algorithm = "fullrank",
@@ -180,11 +180,11 @@ fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterizat
              #elbo_samples = 200,
              #adapt_iter = 200,
              #eta = 0.005,
-             chains = 4,
+             chains = 5,
              threads_per_chain = 4,
              grainsize = 3,
-             #init = fit_init$model_fit,
-             max_treedepth = 8)
+             init = fit_init$model_fit,
+             max_treedepth = 12)
 
 hsummary(fit)
 

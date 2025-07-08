@@ -39,3 +39,5 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/DCPCfixedDelta
 /inst/stan/DCCMT
 /inst/stan/DCCMGARCHrandSredsum
+/tests/local/sxd_imp.rds
+/inst/stan/VARredsum

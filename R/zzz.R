@@ -8,7 +8,7 @@
   stan_path <- system.file("stan", package = pkgname)
 
   ## Paths to the Stan model files
-  ccc_file <- file.path(stan_path, "VAR.stan")
+  ccc_file <- file.path(stan_path, "VARredsum.stan")
   dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan")
   dccr_file <- file.path(stan_path, "DCCMGARCHrandS.stan")
   dccrs_file <- file.path(stan_path, "DCCMGARCHrandSredsum.stan")

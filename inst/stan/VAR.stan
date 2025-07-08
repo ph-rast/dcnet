@@ -31,7 +31,7 @@ parameters {
 #include /parameters/arma.stan
   
   // Residual covmat
-  cov_matrix[nt] rescov;
+  cholesky_factor_cov[nt] L_rescov;
   real< lower = 2 > nu; // nu for student_t
 }
 
@@ -42,6 +42,8 @@ transformed parameters {
   array[J] vector[nt*nt] phi; // vectorized VAR parameter matrix, fixed + random
 
   array[J,T] vector[nt] mu;
+  
+  matrix[nt,nt] rescov = multiply_lower_tri_self_transpose(L_rescov);
   
   // Initialize t=1 across all subjects
   for( j in 1:J){
@@ -67,7 +69,8 @@ model {
     phi_stdnorm[j] ~ std_normal();
   }
   // Prior for initial state
-  rescov ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
+  // rescov ~ wishart(nt + 1.0, diag_matrix(rep_vector(1.0, nt)) );
+  L_rescov ~ lkj_corr_cholesky(2);
   // Prior on nu for student_t 
   nu ~ normal( nt, 50 );
   //  phi0_fixed ~ multi_normal(rts_m[1,1], diag_matrix( rep_vector(1.0, nt) ) ); //REVISIT rts[1,1]
