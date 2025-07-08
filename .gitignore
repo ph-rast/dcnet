@@ -15,6 +15,7 @@
 ## Do not ignore this:
 !inst/include/stan_meta_header.hpp
 !/tests/local/Bringmann.R
+!/tests/local/eric.R
 /tests/local/*.R
 /tests/local/*.txt
 *.Rds
