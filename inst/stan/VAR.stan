@@ -13,7 +13,7 @@ transformed data {
   /* if( meanstructure == 0 ){ */
   /*   for ( j in 1:J ){ */
   /*     for ( i in 1:nt ){ */
-  /* 	rts_m[j] = rep_vector(mean(rts[j,i]),nt); */
+  /* 	rts_m[j] = rep_vector(mean(rts[j,i]),nt); */ 
   /* 	rts_sd[j] =  rep_vector(sd(rts[j,i]),nt); */
   /*     } */
   /*   } */

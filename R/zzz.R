@@ -8,10 +8,10 @@
   stan_path <- system.file("stan", package = pkgname)
 
   ## Paths to the Stan model files
-  ccc_file <- file.path(stan_path, "VARredsum.stan")
+  ccc_file <- file.path(stan_path, "VAR.stan")
   dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan")
   dccr_file <- file.path(stan_path, "DCCMGARCHrandS.stan")
-  dccrs_file <- file.path(stan_path, "DCCMGARCHrandSredsum.stan")
+  dccrs_file <- file.path(stan_path, "DCCMGARCHrandShs.stan")
 
   ## Compile the models if not already compiled
   assign("ccc_model", cmdstanr::cmdstan_model(ccc_file,  cpp_option = list(stan_threads = TRUE)), envir = .GlobalEnv)

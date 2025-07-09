@@ -1,29 +1,5 @@
 // DCC-Parameterization with random D components, random S fixed q's
-functions {
-// reduced sums:  
-   real partial_log_lik(array[] int slice_j, int start, int end,
-                       array[] matrix rts,
-                       array[,] vector mu,
-                       matrix L_rescov,
-                       int T,
-                       int distribution,
-                       real nu) {
-    real lp = 0;
-    for (idx in 1:size(slice_j)) {
-      int j = slice_j[idx];
-      for (t in 1:T) {
-        vector[num_elements(rts[j][1])] rts_t = to_vector(rts[j][t]);
-        if (distribution == 0){
-	  lp += multi_normal_cholesky_lpdf(rts_t | mu[j, t], L_rescov);
-	  // lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
-        } else if (distribution == 1) {
-          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t], L_rescov);
-	}
-      }
-    }
-    return lp;
-  }
-}
+
 
 data {
 #include /data/data.stan
@@ -101,7 +77,7 @@ parameters {
 
   vector[nt] phi0_fixed2;  // In case of S_pred != NULL
   cholesky_factor_cov[nt] L_rescov;
-  real< lower = 2 > nu; // nu for student_t
+  real< lower = 2 > nu; // nu for student_t 
 }
 
 transformed parameters {
@@ -112,6 +88,7 @@ transformed parameters {
   //  build vec_phi_fixed (length nt^2)
   // fixed effec: Grouped HS
   vector[nt*nt] vec_phi_fixed = rep_vector(0, nt*nt);
+  cov_matrix[nt] rescov = multiply_lower_tri_self_transpose( L_rescov ) ;
 
   // Ranefs SD  vector
   vector<lower=0>[nt*nt] phi_tau = rep_vector(0, nt * nt);
@@ -181,16 +158,18 @@ model {
   vec_phi_fixed ~ student_t(3, 0, 1);
   
   // likelihood
-  for( j in 1:J) {  
+  for( j in 1:J) {
     phi0_stdnorm[j] ~ std_normal();
     phi_stdnorm[j] ~ std_normal();
-      // Likelihood
-    {
-      array[J] int subj_index;
-      for (jj in 1:J) subj_index[jj] = jj;
-      target += reduce_sum(partial_log_lik, subj_index, grainsize,
-			   rts, mu, L_rescov, T, distribution, nu);
-    }
+    if ( distribution == 0 ) {
+      for(t in 1:T){
+	to_vector(rts[j,t]) ~ multi_normal(mu[j,t], rescov);
+      }
+    } else if ( distribution == 1 ) {
+      for(t in 1:T){ 
+	to_vector(rts[j,t]) ~ multi_student_t(nu, mu[j,t], rescov); 
+      } 
+    } 
   }
 }
 
@@ -198,7 +177,7 @@ generated quantities {
   //#include /generated/retrodict.stan
   array[J] matrix[T, nt] rts_out;
   array[J] vector[T] log_lik;
-  cov_matrix[nt] rescov = multiply_lower_tri_self_transpose( L_rescov ) ;
+
 
   if ( distribution == 0 ){
     for( j in 1:J ) {

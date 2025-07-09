@@ -1,5 +1,5 @@
 // DCC-Parameterization with random D components, random S fixed q's
-functions {
+functions { 
   //#include /functions/jacobian.stan
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
@@ -492,11 +492,11 @@ model {
     /*   ULs[j,k] ~ uniform(0, UPs[j,k]); // Truncation not needed. */
     /*   target += a_b_scale_jacobian(0.0, ULs[j,k], b_h_sum_s[j,k]); */
     /* } */
-    phi0_stdnorm[J] ~ std_normal();
-    phi_stdnorm[J] ~ std_normal();
-    c_h_stdnorm[J] ~ std_normal();
-    a_h_stdnorm[J] ~ std_normal();
-    b_h_stdnorm[J] ~ std_normal();
+    phi0_stdnorm[j] ~ std_normal();
+    phi_stdnorm[j] ~ std_normal();
+    c_h_stdnorm[j] ~ std_normal();
+    a_h_stdnorm[] ~ std_normal();
+    b_h_stdnorm[j] ~ std_normal();
       // Likelihood
     {
       array[J] int subj_index;
@@ -520,6 +520,7 @@ generated quantities {
   if ( distribution == 0 ){
     for( j in 1:J ) {
       for (t in 1:T) {
+	H[j, t] = multiply_lower_tri_self_transpose(L_H[j,t]);
 	rts_out[j,t] = multi_normal_rng(mu[j,t],
 					multiply_lower_tri_self_transpose(L_H[j,t]))';
 	log_lik[j,t] = multi_normal_lpdf(rts[j,t] | mu[j,t],
