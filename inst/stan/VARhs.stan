@@ -136,8 +136,8 @@ model {
   g_own ~ std_normal();
   g_cross ~ std_normal();
   //// semi-global scales
-  tau_own ~ cauchy(0, 0.5);
-  tau_cross ~ cauchy(0, 0.02);
+  tau_own ~ cauchy(0, .5);
+  tau_cross ~ cauchy(0, .25);
   /// local scales
   lambda_own   ~ normal(0, 1);
   lambda_cross ~ normal(0, 1);
