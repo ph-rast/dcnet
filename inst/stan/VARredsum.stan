@@ -1,24 +1,28 @@
 // DCC-Parameterization with random D components, random S fixed q's
 functions {
 // reduced sums:  
-   real partial_log_lik(array[] int slice_j, int start, int end,
-                       array[] matrix rts,
+  real partial_log_lik(array[] matrix rts_slice,
+                       int  start, int end,
                        array[,] vector mu,
                        matrix L_rescov,
-                       int T,
-                       int distribution,
+                       int  distribution,
                        real nu) {
+
+    int T = dims(rts_slice[1])[1];        // # time points
     real lp = 0;
-    for (idx in 1:size(slice_j)) {
-      int j = slice_j[idx];
+
+    for (i in 1:size(rts_slice)) {
+      int j = start + i - 1;              // global subject index
+
       for (t in 1:T) {
-        vector[num_elements(rts[j][1])] rts_t = to_vector(rts[j][t]);
-        if (distribution == 0){
-	  lp += multi_normal_cholesky_lpdf(rts_t | mu[j, t], L_rescov);
-	  // lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
-        } else if (distribution == 1) {
-          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t], L_rescov);
-	}
+        vector[num_elements(rts_slice[i][1])] y =
+            to_vector(rts_slice[i][t]');  // row to column vector
+
+        if (distribution == 0) {
+          lp += multi_normal_cholesky_lpdf(y | mu[j, t], L_rescov);
+        } else {
+          lp += multi_student_t_cholesky_lpdf(y | nu, mu[j, t], L_rescov);
+        }
       }
     }
     return lp;
@@ -185,12 +189,11 @@ model {
     phi0_stdnorm[j] ~ std_normal();
     phi_stdnorm[j] ~ std_normal();
       // Likelihood
-    {
-      array[J] int subj_index;
-      for (jj in 1:J) subj_index[jj] = jj;
-      target += reduce_sum(partial_log_lik, subj_index, grainsize,
-			   rts, mu, L_rescov, T, distribution, nu);
-    }
+    target += reduce_sum(partial_log_lik,
+			 rts,
+			 grainsize,
+			 mu, L_rescov,
+			 distribution, nu);
   }
 }
 

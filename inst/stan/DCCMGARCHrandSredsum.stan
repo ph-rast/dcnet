@@ -4,25 +4,28 @@ functions {
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
 // reduced sums:  
-   real partial_log_lik(array[] int slice_j, int start, int end,
-                       array[] matrix rts,
+  real partial_log_lik(array[] matrix rts_slice,
+                       int  start, int end,
                        array[,] vector mu,
                        array[,] matrix L_H,
-                       int T,
-                       int distribution,
+                       int  distribution,
                        real nu) {
+
+    int T = dims(rts_slice[1])[1];        // # time points
     real lp = 0;
-    for (idx in 1:size(slice_j)) {
-      int j = slice_j[idx];
+
+    for (i in 1:size(rts_slice)) {
+      int j = start + i - 1;              // global subject index
+
       for (t in 1:T) {
-        vector[num_elements(rts[j][1])] rts_t = to_vector(rts[j][t, ]);
-        if (distribution == 0){
-	  lp += multi_normal_cholesky_lpdf(rts_t | mu[j, t], L_H[j, t]);
-	  // lp += multi_normal_lpdf(rts_t | mu[j, t], H[j, t]);
-        } else if (distribution == 1) {
-          lp += multi_student_t_lpdf(rts_t | nu, mu[j, t],
-				     multiply_lower_tri_self_transpose(L_H[j, t]));
-	}
+        vector[num_elements(rts_slice[i][1])] y =
+            to_vector(rts_slice[i][t]');  // row to column vector
+
+        if (distribution == 0) {
+          lp += multi_normal_cholesky_lpdf(y | mu[j, t], L_H[j, t]);
+        } else {
+          lp += multi_student_t_cholesky_lpdf(y | nu, mu[j, t], L_H[j, t]);
+        }
       }
     }
     return lp;
@@ -495,15 +498,14 @@ model {
     phi0_stdnorm[j] ~ std_normal();
     phi_stdnorm[j] ~ std_normal();
     c_h_stdnorm[j] ~ std_normal();
-    a_h_stdnorm[] ~ std_normal();
+    a_h_stdnorm[j] ~ std_normal();
     b_h_stdnorm[j] ~ std_normal();
       // Likelihood
-    {
-      array[J] int subj_index;
-      for (jj in 1:J) subj_index[jj] = jj;
-      target += reduce_sum(partial_log_lik, subj_index, grainsize,
-			   rts, mu, L_H, T, distribution, nu);
-    }
+      target += reduce_sum(partial_log_lik,
+			   rts,
+			   grainsize,
+			   mu, L_H,
+			   distribution, nu);
   }
 }
 
