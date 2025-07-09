@@ -111,7 +111,7 @@ plt <- ggplot(dt[id == 2],  aes(x = time,  y = active, group = factor(id), color
   geom_smooth( show.legend = FALSE, se = FALSE) + geom_point(alpha = .2)
 #plt
 
-N <- length(unique(dt$id ) )
+N <- length(unique(dt$id))
 N
 
 variables
@@ -121,7 +121,7 @@ plt <- ggplot(dt[id <= N],  aes(x = time,  y = active, group = factor(id), color
 
 
 #ggsave(filename = "~/Nextcloud/Documents/fitbit_raw.pdf", width = 15, height = 15 )
-dev.off( )
+dev.off()
 
 
 ids <- unique(dt$id)
@@ -131,7 +131,7 @@ groupvec <-
 
 variables
 
-tsdat <- lapply(ids, function(x) dt[dt$id == x, .SD, .SDcols = variables] )
+tsdat <- lapply(ids, function(x) dt[dt$id == x, .SD, .SDcols = variables])
 tsdat
 
 ## use tsdat to create a similar dataset for use in the Readme and as example data in the package:
@@ -164,29 +164,25 @@ fit_init <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL,
                   sampling_algorithm = "variational",
                   meanstructure = "VAR",
                   chains = 4,
-                  threads = 4,
-                  grainsize = 3,
                   init = 0.1)
 
 summary(fit_init)
 
 
-fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL, parameterization = "DCCrs",
-             iterations = 6000,
+fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL,
+             parameterization = "DCCrs",
+             iterations = 30000,
              standardize_data = TRUE,
-             sampling_algorithm = "hmc",
-             #algorithm = "fullrank",
+             sampling_algorithm = "variational",
+             algorithm = "fullrank",
              #grad_samples = 20,
              #elbo_samples = 200,
              #adapt_iter = 200,
              #eta = 0.005,
              chains = 5,
-             threads_per_chain = 4,
-             grainsize = 3,
-             init = fit_init$model_fit,
-             max_treedepth = 12)
+             init = fit_init$model_fit)
 
-hsummary(fit)
+summary(fit)
 
 grep("mu", colnames(fit$model_fit$draws()))
 colMeans(fit$model_fit$draws()[, 139346:139350])

@@ -61,8 +61,8 @@ array(S, c(4,4,3) )
 
 ## Create data:
 N <- 40
-tl <- 100
-nts <- 3
+tl <- 50
+nts <- 4
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi0_sd = 0.5,  ## random effects
                    log_c_fixed = rep(1, nts),
@@ -151,16 +151,16 @@ system.time({
         group = groupvec, standardize_data = FALSE,
         init = fit0$model_fit,
         meanstructure = "VAR",
-        iterations = 50000,
-        sampling_algorithm = "variational",
-        algorithm = "fullrank", ## fullrank should be less biased
-        grad_samples = 1,
-        elbo_samples = 150,
-        eta = 0.25,
-        adapt_iter = 500,
-        chains = 4,
-        grainsize = 3,
-        threads_per_chain = 4
+        iterations = 1000,
+        sampling_algorithm = "hmc",
+#        algorithm = "fullrank", ## fullrank should be less biased
+        #grad_samples = 1,
+        #elbo_samples = 150,
+        #eta = 0.25,
+        #adapt_iter = 500,
+        #grainsize = 3,
+        #threads_per_chain = 4
+        chains = 4
     ) ## grain is subject. Make it max 3 per chunk, then grainsize * threads =(approx) subjects
     ## 46 mins to beat (gs=30) / gs=1, 60 mins / gs = 2, 118 / gs=3, 93 mins / gs=4,  / gs=6,   
     ##num_threads =  8)
