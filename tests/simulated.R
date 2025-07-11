@@ -60,30 +60,48 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 40
-tl <- 50
-nts <- 4
+N <- 200
+tl <- 200
+nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi0_sd = 0.5,  ## random effects
-                   log_c_fixed = rep(1, nts),
+                   log_c_fixed = rep(0, nts),
                    log_c_r_sd = 0.5,
-                   a_h_fixed = rep(-1.5, nts),
+                   a_h_fixed = rep(-5.5, nts),
                    a_h_r_sd = 0.5,
-                   b_h_fixed = rep(-0.5, nts),  ## On logit scale
+                   b_h_fixed = rep(-1.5, nts),  ## On logit scale
                    b_h_r_sd = 0.5,
                    l_a_q_fixed = -1.5,  ## on logit scale
-                   l_b_q_fixed = -0.5,   ## on logit scale
+                   l_b_q_fixed = -.5,   ## on logit scale
                    l_a_q_r_sd = 0.5,
                    l_b_q_r_sd = 0.5,
                    phi0_fixed =  rep(0, nts),
                    ranS_sd = 0.1, ## random effects on atanh scale
                    phi_mu = 0, ## populate phi
-                   phi_sd = 0.1, ## create variation in the intercepts of the time series
-                   phi_ranef_sd = 0.1, ## ranef of the parameter matrix
-                   stationarity_phi = TRUE)
+                   phi_sd = 0.5, ## create variation in the intercepts of the time series
+                   phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity 
+                   stationarity_phi = FALSE)
+
+rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
 
 
-rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t( simdat[[1]][,,x] ))
+### CHECK mlVAR
+df  <- as.data.frame(                                     # final data-frame
+         do.call(rbind,
+           Map(function(mat, id)                          # walk through rtsgen
+                 cbind( id   = id,                        # id column
+                        time = seq_len(nrow(mat)) - 1,    # 0 … T-1
+                        mat),                             # X1 X2 X3
+               rtsgen,                                    # list of matrices
+               seq_along(rtsgen))) )                      # matching ids
+rownames(df) <- NULL
+tail(df)
+
+library(mlVAR)
+fit1 <- mlVAR(df, vars = names(df)[3:5], idvar = "id", lags = 1, temporal = "correlated", scale = FALSE)
+summary(fit1)
+
+
 groupvec <- rep(c(1:N),  each = tl)
 
 atanh(simdat$Fixed_S[lower.tri(simdat$Fixed_S)])
@@ -92,10 +110,10 @@ simdat$fixed_S_atanh
 rtsgen[[1]][,1]
 
 ## Fixed Corr
-csimdat$S
-simdat$Fixed_S
-simdat$phi0_fixed
-simdat$fixed_phi
+simdat$S
+round(simdat$Fixed_S, 2)
+round(simdat$phi0_fixed, 2)
+round(simdat$fixed_phi, 2)
 
 
 person <- 2
@@ -131,48 +149,50 @@ system.time({
         iterations = 30000,
         chains = 4,
         threads = 5, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
-        sampling_algorithm = "pathfinder", # "laplace",
+        sampling_algorithm = "variational",
         grainsize = 10)
 
-    
+phi <- matrix(colMeans(fit0$model_fit$draws()[, grep("vec_phi_fixed", colnames(fit0$model_fit$draws()))]), ncol = 3)
+round(phi, 4)
+
+
     fit0 <- dcnet(
         data = rtsgen, parameterization = "DCCrs", J =  N,
-        group = groupvec, standardize_data = FALSE,
+        group = groupvec, standardize_data = TRUE,
         init = 0,
         meanstructure = "VAR",
         iterations = 30000,
         chains = 4,
-        threads = 4, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
+        threads = 4, tol_rel_obj =  0.01, ## 8 threads: 188 mins /
         sampling_algorithm = "variational",#"pathfinder", # "laplace",
         grainsize = 3)
 
     fit <- dcnet(
         data = rtsgen, parameterization = "DCCrs", J = N,
-        group = groupvec, standardize_data = FALSE,
+        group = groupvec, standardize_data = TRUE,
         init = fit0$model_fit,
         meanstructure = "VAR",
-        iterations = 1000,
-        sampling_algorithm = "hmc",
-#        algorithm = "fullrank", ## fullrank should be less biased
+        iterations = 30000,
+        sampling_algorithm = "variational",
+        algorithm = "fullrank", ## fullrank should be less biased
         #grad_samples = 1,
         #elbo_samples = 150,
-        #eta = 0.25,
-        #adapt_iter = 500,
-        #grainsize = 3,
-        #threads_per_chain = 4
+        eta = 0.001,
+        adapt_iter = 200,
         chains = 4
-    ) ## grain is subject. Make it max 3 per chunk, then grainsize * threads =(approx) subjects
-    ## 46 mins to beat (gs=30) / gs=1, 60 mins / gs = 2, 118 / gs=3, 93 mins / gs=4,  / gs=6,   
-    ##num_threads =  8)
-
+    )
+    
 })
 
 
 
 fit$model_fit$output()
 
+summary(fit0)
 
-fit
+summary(fit)
+
+fit$model_fit$summary()
 
 ######################################
 ## Simulate 
@@ -188,19 +208,19 @@ simulate_data <- function(N = 15, tl = 50, nts = 3) {
         phi0_sd = 0.5, ## random effects
         log_c_fixed = rep(1, nts),
         log_c_r_sd = 0.25,
-        a_h_fixed = rep(-1.5, nts),
-        a_h_r_sd = 0.5,
-        b_h_fixed = rep(-0.5, nts), ## On logit scale
-        b_h_r_sd = 0.5,
-        l_a_q_fixed = -1.5, ## on logit scale
-        l_b_q_fixed = -0.5, ## on logit scale
-        l_a_q_r_sd = 0.5,
-        l_b_q_r_sd = 0.5,
+        a_h_fixed = rep(-2, nts),
+        a_h_r_sd = 0.1,
+        b_h_fixed = rep(-1.5, nts), ## On logit scale
+        b_h_r_sd = 0.1,
+        l_a_q_fixed = -2, ## on logit scale
+        l_b_q_fixed = -1.5, ## on logit scale
+        l_a_q_r_sd = 0.1,
+        l_b_q_r_sd = 0.1,
         phi0_fixed = rep(0, nts),
-        ranS_sd = 0.25, ## random effects on atanh scale
+        ranS_sd = 0.2, ## random effects on atanh scale
         phi_mu = 0, ## populate phi
         phi_sd = 0, ## create variation in the intercepts of the time series
-        phi_ranef_sd = 0.1, ## ranef of the parameter matrix
+        phi_ranef_sd = 0.005, ## ranef of the parameter matrix
         stationarity_phi = FALSE
     )
     rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
@@ -209,7 +229,7 @@ simulate_data <- function(N = 15, tl = 50, nts = 3) {
 }
 
 
-replication_data <- simulate_data(N = 10)
+replication_data <- simulate_data(N = 30)
 replication_data[[1]]
 replication_data[[2]]
 replication_data[[3]]
@@ -376,7 +396,7 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 1:100) {
+for (s in 1:10) {
 
     replication_data <- simulate_data(N = 30)
     fit_r <- safe_sample(s, replication_data = replication_data)
@@ -385,7 +405,7 @@ for (s in 1:100) {
         next
     }
 
-    for (p in 1:length(variables)) {
+    for (p in 1:length(variables_m)) {
         SF <- fit_r$model_fit$summary(
             variables = variables_m[p], "mean",
             extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))

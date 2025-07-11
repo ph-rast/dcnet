@@ -418,9 +418,9 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ normal(0, .05); // SD for c_h ranefs
+  phi0_tau ~ normal(0, .5); // SD for multiplication with cholesky phi0_L
+  phi_tau ~ normal(0, .01); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ normal(0, .25); // SD for c_h ranefs
   a_h_tau ~ normal(0, .05); // SD for c_h ranefs
   b_h_tau ~ normal(0, .05);
 
@@ -441,9 +441,9 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ normal( -2, .11);
-  to_vector(a_h_fixed) ~ normal( -2, .11);
-  to_vector(b_h_fixed) ~ normal( -2, .11);
+  to_vector(c_h_fixed) ~ normal(  1, .1);
+  to_vector(a_h_fixed) ~ normal( -2, .1);
+  to_vector(b_h_fixed) ~ normal( -1.5, .1);
   // Prior for initial state
   
   // Prior on nu for student_t
