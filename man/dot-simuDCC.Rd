@@ -24,8 +24,8 @@
   l_a_q_r_sd = 0.1,
   l_b_q_fixed = 0,
   l_b_q_r_sd = 0.1,
-  ranef_sd_S,
-  ranS_sd = 1
+  ranS_sd = 1,
+  empirical = FALSE
 )
 }
 \arguments{
@@ -37,7 +37,9 @@
 
 \item{phi0_fixed}{Vector of population values of length n_ts}
 
-\item{ranef_sd_S}{Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number}
+\item{ranS_sd}{Size of random effects SD in the function that generates random effects around fixed sqrt(r). I'd suggest a rather small number}
+
+\item{empirical}{Sample from the emprirical multivariate normal distribution. Defaults to \code{FALSE}}
 }
 \description{
 Simulate TS's for N individuals

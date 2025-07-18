@@ -125,7 +125,6 @@ system.time({
         meanstructure = "VAR",
         iterations = 50000,
         threads = 4, #tol_rel_obj =  0.001, ## 8 threads: 188 mins /
-        sampling_algorithm = "pathfinder",
         grainsize = 3)
 
     fit <- dcnet(
@@ -214,13 +213,12 @@ phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_co
 
 ## Function to prevent loop to stop when stan model encounters errors
 default_return <- FALSE
-safe_sample <- purrr::possibly( function(s) {
+safe_sample <- purrr::possibly(function(s){
     dcnet(data = replication_data[[s]], parameterization = "DCCrs", J = N,
-          meanstructure = "constant",
-          group =  groupvec, standardize_data = FALSE, init = 0, tol_rel_obj = 0.005, eta = 0.25,
+          meanstructure = "VAR",
+          group =  groupvec, standardize_data = FALSE, init = 0, tol_rel_obj = 0.005,
           threads = 4,
           grainsize = 4,
-          algorithm = "fullrank",
           sampling_algorithm = 'variational')        
 }, otherwise = default_return)
 
@@ -258,10 +256,8 @@ safe_sample <- function(s, max_retries = 3) {
                 init = fit$model_fit,
                 threads = 4,
                 iterations = 50000,
-                algorithm = "meanfield",
                 sampling_algorithm = 'variational',
-                eta = 0.25,
-                adapt_iter = 200,
+                #adapt_iter = 200,
                 chains = 4,
                 grainsize = 3
             )
@@ -357,7 +353,7 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 1:20) {
+for (s in 1:10) {
 
     fit_r <- safe_sample(s)
     if (is.null(fit_r)) {

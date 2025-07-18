@@ -24,6 +24,8 @@ dcnet(
   simplify_bh = 1,
   lbound = FALSE,
   ubound = FALSE,
+  threads_per_chain = 4,
+  grainsize = 1,
   ...
 )
 }
@@ -38,7 +40,7 @@ dcnet(
 
 \item{S_pred}{Dummy for S, for each time-point (same dimension as data)}
 
-\item{parameterization}{Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC'.}
+\item{parameterization}{Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC', or 'DCCrs' for multithread.}
 
 \item{P}{Integer. Dimension of GARCH component in MGARCH(P,Q).}
 
