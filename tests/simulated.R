@@ -60,11 +60,15 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 200
-tl <- 200
+N <- 100
+tl <- 100
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   phi0_sd = 0.5,  ## random effects
+                   phi_mu = 0, ## populate phi
+                   phi0_sd = 0, ## create variation in the intercepts of the time series
+                   phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
+                   phi_sd_diag = 0.5,  ## random effects
+                   phi_sd_off = 0.05,
                    log_c_fixed = rep(0, nts),
                    log_c_r_sd = 0.5,
                    a_h_fixed = rep(-5.5, nts),
@@ -77,9 +81,6 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    l_b_q_r_sd = 0.5,
                    phi0_fixed =  rep(0, nts),
                    ranS_sd = 0.1, ## random effects on atanh scale
-                   phi_mu = 0, ## populate phi
-                   phi_sd = 0.5, ## create variation in the intercepts of the time series
-                   phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity 
                    stationarity_phi = FALSE)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
@@ -107,7 +108,9 @@ groupvec <- rep(c(1:N),  each = tl)
 atanh(simdat$Fixed_S[lower.tri(simdat$Fixed_S)])
 simdat$fixed_S_atanh
 
-rtsgen[[1]][,1]
+rtsgen[[1]][, 1]
+rtsgen[[1]][, 2]
+
 
 ## Fixed Corr
 simdat$S
@@ -139,60 +142,60 @@ init_fun <- function() {
 
 devtools::load_all()
 
-system.time({
+## system.time({
 
-    fit0 <- dcnet(
-        data = rtsgen, parameterization = "CCC", J =  N,
-        group = groupvec, standardize_data = FALSE,
-        init = 0,
-        meanstructure = "VAR",
-        iterations = 30000,
-        chains = 4,
-        threads = 5, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
-        sampling_algorithm = "variational",
-        grainsize = 10)
+##     fit0 <- dcnet(
+##         data = rtsgen, parameterization = "CCC", J =  N,
+##         group = groupvec, standardize_data = FALSE,
+##         init = 0,
+##         meanstructure = "VAR",
+##         iterations = 30000,
+##         chains = 4,
+##         threads = 5, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
+##         sampling_algorithm = "variational",
+##         grainsize = 10)
 
-phi <- matrix(colMeans(fit0$model_fit$draws()[, grep("vec_phi_fixed", colnames(fit0$model_fit$draws()))]), ncol = 3)
-round(phi, 4)
+## phi <- matrix(colMeans(fit0$model_fit$draws()[, grep("vec_phi_fixed", colnames(fit0$model_fit$draws()))]), ncol = 3)
+## round(phi, 4)
 
 
-    fit0 <- dcnet(
-        data = rtsgen, parameterization = "DCCrs", J =  N,
-        group = groupvec, standardize_data = TRUE,
-        init = 0,
-        meanstructure = "VAR",
-        iterations = 30000,
-        chains = 4,
-        threads = 4, tol_rel_obj =  0.01, ## 8 threads: 188 mins /
-        sampling_algorithm = "variational",#"pathfinder", # "laplace",
-        grainsize = 3)
+##     fit0 <- dcnet(
+##         data = rtsgen, parameterization = "DCCrs", J =  N,
+##         group = groupvec, standardize_data = TRUE,
+##         init = 0,
+##         meanstructure = "VAR",
+##         iterations = 30000,
+##         chains = 4,
+##         threads = 4, tol_rel_obj =  0.01, ## 8 threads: 188 mins /
+##         sampling_algorithm = "variational",#"pathfinder", # "laplace",
+##         grainsize = 3)
 
-    fit <- dcnet(
-        data = rtsgen, parameterization = "DCCrs", J = N,
-        group = groupvec, standardize_data = TRUE,
-        init = fit0$model_fit,
-        meanstructure = "VAR",
-        iterations = 30000,
-        sampling_algorithm = "variational",
-        algorithm = "fullrank", ## fullrank should be less biased
-        #grad_samples = 1,
-        #elbo_samples = 150,
-        eta = 0.001,
-        adapt_iter = 200,
-        chains = 4
-    )
+##     fit <- dcnet(
+##         data = rtsgen, parameterization = "DCCrs", J = N,
+##         group = groupvec, standardize_data = TRUE,
+##         init = fit0$model_fit,
+##         meanstructure = "VAR",
+##         iterations = 30000,
+##         sampling_algorithm = "variational",
+##         algorithm = "fullrank", ## fullrank should be less biased
+##         #grad_samples = 1,
+##         #elbo_samples = 150,
+##         eta = 0.001,
+##         adapt_iter = 200,
+##         chains = 4
+##     )
     
-})
+## })
 
 
 
-fit$model_fit$output()
+## fit$model_fit$output()
 
-summary(fit0)
+## summary(fit0)
 
-summary(fit)
+## summary(fit)
 
-fit$model_fit$summary()
+## fit$model_fit$summary()
 
 ######################################
 ## Simulate 
@@ -202,26 +205,40 @@ fit$model_fit$summary()
 replication_data <- list()
 
 ## Create data:
-simulate_data <- function(N = 15, tl = 50, nts = 3) {
+simulate_data <- function(N = 30, tl = 50, nts = 3) {
     simdat <- .simuDCC(
         tslength = tl, N = N, n_ts = nts,
-        phi0_sd = 0.5, ## random effects
-        log_c_fixed = rep(1, nts),
-        log_c_r_sd = 0.25,
-        a_h_fixed = rep(-2, nts),
-        a_h_r_sd = 0.1,
-        b_h_fixed = rep(-1.5, nts), ## On logit scale
-        b_h_r_sd = 0.1,
-        l_a_q_fixed = -2, ## on logit scale
-        l_b_q_fixed = -1.5, ## on logit scale
-        l_a_q_r_sd = 0.1,
-        l_b_q_r_sd = 0.1,
-        phi0_fixed = rep(0, nts),
-        ranS_sd = 0.2, ## random effects on atanh scale
         phi_mu = 0, ## populate phi
-        phi_sd = 0, ## create variation in the intercepts of the time series
-        phi_ranef_sd = 0.005, ## ranef of the parameter matrix
+        phi0_sd = 0, ## create variation in the intercepts of the time series
+        phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
+        phi_sd_diag = 0.5,  ## random effects
+        phi_sd_off = 0.05,
+        log_c_fixed = rep(0, nts),
+        log_c_r_sd = 0.5,
+        a_h_fixed = rep(-5.5, nts),
+        a_h_r_sd = 0.5,
+        b_h_fixed = rep(-1.5, nts),  ## On logit scale
+        b_h_r_sd = 0.5,
+        l_a_q_fixed = -1.5,  ## on logit scale
+        l_b_q_fixed = -.5,   ## on logit scale
+        l_a_q_r_sd = 0.5,
+        l_b_q_r_sd = 0.5,
+        phi0_fixed =  rep(0, nts),
+        ranS_sd = 0.1, ## random effects on atanh scale
         stationarity_phi = FALSE
+        #phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
+        #phi_sd_diag = 0.5,  ## random effects
+        #phi_sd_off = 0.05,
+        #log_c_fixed = rep(1, nts),
+        #log_c_r_sd = 0.25,
+        #a_h_fixed = rep(-2, nts),
+        #a_h_r_sd = 0.1,
+        #b_h_r_sd = 0.1,
+        #l_a_q_fixed = -2, ## on logit scale
+        #l_b_q_fixed = -1.5, ## on logit scale
+        #l_a_q_r_sd = 0.1,
+        #l_b_q_r_sd = 0.1,
+        #ranS_sd = 0.2, ## random effects on atanh scale
     )
     rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
     groupvec <- rep(c(1:N), each = tl)
@@ -250,7 +267,7 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         meanstructure = "VAR",
         iterations = 50000,
         eta = 0.05,
-        tol_rel_obj =  0.005,
+        tol_rel_obj =  0.01,
         sampling_algorithm = "variational")
     
     ## Helper function to check if model_fit is broken
@@ -396,9 +413,9 @@ bias_list <- list()
 bins_list <- list()
 
 
-for (s in 1:10) {
+for (s in 1:5) {
 
-    replication_data <- simulate_data(N = 30)
+    replication_data <- simulate_data(N = 100, tl = 100)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {
@@ -453,13 +470,28 @@ for (i in 1:length(cov_list)) {
         var_averages[[i]] <- nested_average
     }
 }
-names(var_averages ) <- names(cov_list )
+names(var_averages) <- names(cov_list)
 var_averages
 
 
 var_av <- sapply(var_averages, function(x ) mean(x, na.rm = TRUE))
 var_av
 
+
+bias_averages <- list()
+for (i in 1:length(bias_list)) {
+    nested_average <- c()
+    for (j in 1:length(bias_list[[i]])) {
+        if (is.null(bias_list[[i]][[j]])) bias_list[[i]][[j]] <- NA
+        nested_average <- c(nested_average, mean(bias_list[[i]][[j]], na.rm = TRUE))
+        bias_averages[[i]] <- nested_average
+    }
+}
+names(bias_averages) <- names(bias_list)
+bias_averages
+
+bias_av <- sapply(bias_averages, function(x) mean(x, na.rm = TRUE))
+round(cbind(bias_av, var_av), 3)
 
 n30tl50 <- round(var_av, 2)
 n30tl50
@@ -471,7 +503,7 @@ n50tl75
 n75tl75
 ## n75tl100 <- round(var_av, 2)
 n75tl100
-## n100tl100 <- round(var_av, 2)
+n100tl100 <- round(cbind(bias_av, var_av), 3)
 n100tl100
 
 

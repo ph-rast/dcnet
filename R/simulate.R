@@ -23,6 +23,33 @@
     return( sigma )
 }
 
+##' Draw global and local scales for the (half‑)Student‑t / Cauchy block horseshoe
+##' @param p probability for rcauchy and rt
+##' @param global_df global df's
+##' @param local_df local df
+##' @param g_scale global scale
+##' @param l_scale local scale
+.hs_scales <- function(p,
+                       global_df = 1,   # df = 1 for half‑Cauchy
+                       local_df  = 1,
+                       g_scale   = 0.1, # scale of the global tau
+                       l_scale   = 1) { # scale of local lambdas
+    ## global scale tau
+    tau <- if (global_df == 1) {
+               abs(rcauchy(1, location = 0, scale = g_scale))
+           } else {
+               abs(rt(1, df = global_df) * g_scale)
+           }
+    ## local scales gammas
+    lambda <- if (local_df == 1) {
+                  abs(rcauchy(p, location = 0, scale = l_scale))
+              } else {
+                  abs(rt(p, df = local_df) * l_scale)
+              }
+
+    list(tau = tau, lambda = lambda)
+}
+
 ##' Create Random correlations
 ##' @param n_ts Number of time series
 ##' @author Philippe Rast
@@ -103,10 +130,11 @@
 ##' @importFrom clusterGeneration rcorrmatrix
 
 .simuDCC <- function(tslength, n_ts, N,
-                     phi0_fixed = rep(0, n_ts), 
+                     phi0_fixed = rep(0, n_ts),
                      phi0_sd = .5,
                      phi_mu = 0, ## Values of phi
-                     phi_sd = 0, ## This is to generate a phi matrix with different values
+                     phi_sd_diag =  0.3, ## fixed-effects spread of the diagonal own-lag
+                     phi_sd_off = 0.05, ## fixed-effects spread of the cros-lag
                      phi_ranef_sd = 0.01, ## This is the random effect of phi
                      stationarity_phi = FALSE, ## Should the phi values ensure that ts is stationary
                      log_c_fixed = rep(0, n_ts), ## on log scale
@@ -150,7 +178,25 @@
     ## This ensures stationary of the VAR(1) model: https://phdinds-aim.github.io/time_series_handbook/03_VectorAutoregressiveModels/03_VectorAutoregressiveMethods.html#stationarity-of-the-var-1-model
 
     ## Create fixed phi
-    phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts)
+    ## phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts)
+    ## --- NEW: diagonal‑vs‑off‑diagonal prior ------------------------------------
+    ## user‑tunable hyper‑SDs (defaults give old behaviour w.out off-diagonal shrinkage)
+    phi_sd_diag <- 0.3 # spread of own‑lag coefficients
+    phi_sd_off <- 0.05 # baseline spread of cross‑lags *before* horseshoe
+
+    ## sample diagonal (own‑lags) – usually positive and comparatively large
+    diag_vals <- rnorm(n_ts, mean = phi_mu, sd = phi_sd_diag)
+
+    ## sample block‑horseshoe scales for n_ts*(n_ts‑1) off‑diagonals
+    hs <- .hs_scales(p = n_ts^2 - n_ts, g_scale = phi_sd_off)
+    off_vals <- rnorm(n_ts^2 - n_ts, 0, sd = hs$tau * hs$lambda)
+
+    ## assemble matrix
+    phi_fixed <- matrix(0, n_ts, n_ts)
+    diag(phi_fixed) <- diag_vals
+    phi_fixed[upper.tri(phi_fixed) | lower.tri(phi_fixed)] <- off_vals
+    ## ---------------------------------------------------------------------------
+    
     D <- diag(tanh(rnorm(n_ts, 0, 1)))
 
     ## add  random effect with .stat_var function
