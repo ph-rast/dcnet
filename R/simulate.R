@@ -181,8 +181,8 @@
     ## phi_fixed <- matrix(rnorm(n_ts^2, phi_mu, phi_sd), nrow = n_ts)
     ## --- NEW: diagonal‑vs‑off‑diagonal prior ------------------------------------
     ## user‑tunable hyper‑SDs (defaults give old behaviour w.out off-diagonal shrinkage)
-    phi_sd_diag <- 0.3 # spread of own‑lag coefficients
-    phi_sd_off <- 0.05 # baseline spread of cross‑lags *before* horseshoe
+    phi_sd_diag <- phi_sd_diag # spread of own‑lag coefficients
+    phi_sd_off <- phi_sd_off # baseline spread of cross‑lags *before* horseshoe
 
     ## sample diagonal (own‑lags) – usually positive and comparatively large
     diag_vals <- rnorm(n_ts, mean = phi_mu, sd = phi_sd_diag)
@@ -293,6 +293,8 @@
               fixed_S_atanh = fixed_S_atanh,
               fixed_phi = fixed_phi,
               ranS_sd = ranS_sd,
+              phi_sd_diag =  phi_sd_diag,
+              phi_sd_off =  phi_sd_off,
               l_b_q_r_sd = l_b_q_r_sd,
               l_b_q_fixed = l_b_q_fixed,
               l_a_q_r_sd = l_a_q_r_sd,
