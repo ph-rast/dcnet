@@ -159,16 +159,16 @@ devtools::load_all()
 ## round(phi, 4)
 
 
-##     fit0 <- dcnet(
-##         data = rtsgen, parameterization = "DCCrs", J =  N,
-##         group = groupvec, standardize_data = TRUE,
-##         init = 0,
-##         meanstructure = "VAR",
-##         iterations = 30000,
-##         chains = 4,
-##         threads = 4, tol_rel_obj =  0.01, ## 8 threads: 188 mins /
-##         sampling_algorithm = "variational",#"pathfinder", # "laplace",
-##         grainsize = 3)
+    fit0 <- dcnet(
+        data = rtsgen, parameterization = "DCCrs", J =  N,
+        group = groupvec, standardize_data = TRUE,
+        init = 0,
+        meanstructure = "VAR",
+        iterations = 30000,
+        chains = 4,
+        threads = 4, tol_rel_obj =  0.01, ## 8 threads: 188 mins /
+        sampling_algorithm = "variational",#"pathfinder", # "laplace",
+        grainsize = 3)
 
 ##     fit <- dcnet(
 ##         data = rtsgen, parameterization = "DCCrs", J = N,
@@ -205,40 +205,26 @@ devtools::load_all()
 replication_data <- list()
 
 ## Create data:
-simulate_data <- function(N = 30, tl = 50, nts = 3) {
+simulate_data <- function(N = 100, tl = 30, nts = 3) {
     simdat <- .simuDCC(
         tslength = tl, N = N, n_ts = nts,
         phi_mu = 0, ## populate phi
-        phi0_sd = 0, ## create variation in the intercepts of the time series
-        phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
-        phi_sd_diag = 0.5,  ## random effects
+        phi0_sd = 0.4, ## create variation in the intercepts of the time series
+        phi_sd_diag = 0.3,  ## random effects
         phi_sd_off = 0.05,
-        log_c_fixed = rep(0, nts),
-        log_c_r_sd = 0.5,
-        a_h_fixed = rep(-5.5, nts),
-        a_h_r_sd = 0.5,
+        log_c_fixed = rep(-0.9, nts),
+        log_c_r_sd = 0.3,
+        a_h_fixed = rep(-2.5, nts),
+        a_h_r_sd = 0.1,
         b_h_fixed = rep(-1.5, nts),  ## On logit scale
-        b_h_r_sd = 0.5,
+        b_h_r_sd = 0.1,
         l_a_q_fixed = -1.5,  ## on logit scale
         l_b_q_fixed = -.5,   ## on logit scale
-        l_a_q_r_sd = 0.5,
-        l_b_q_r_sd = 0.5,
+        l_a_q_r_sd = 0.2,
+        l_b_q_r_sd = 0.2,
         phi0_fixed =  rep(0, nts),
-        ranS_sd = 0.1, ## random effects on atanh scale
+        ranS_sd = 0.25, ## random effects on atanh scale
         stationarity_phi = FALSE
-        #phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
-        #phi_sd_diag = 0.5,  ## random effects
-        #phi_sd_off = 0.05,
-        #log_c_fixed = rep(1, nts),
-        #log_c_r_sd = 0.25,
-        #a_h_fixed = rep(-2, nts),
-        #a_h_r_sd = 0.1,
-        #b_h_r_sd = 0.1,
-        #l_a_q_fixed = -2, ## on logit scale
-        #l_b_q_fixed = -1.5, ## on logit scale
-        #l_a_q_r_sd = 0.1,
-        #l_b_q_r_sd = 0.1,
-        #ranS_sd = 0.2, ## random effects on atanh scale
     )
     rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
     groupvec <- rep(c(1:N), each = tl)
@@ -248,6 +234,7 @@ simulate_data <- function(N = 30, tl = 50, nts = 3) {
 
 replication_data <- simulate_data(N = 30)
 replication_data[[1]]
+
 replication_data[[2]]
 replication_data[[3]]
 replication_data$N
@@ -266,9 +253,9 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         init = 0,
         meanstructure = "VAR",
         iterations = 50000,
-        eta = 0.05,
-        tol_rel_obj =  0.01,
-        sampling_algorithm = "variational")
+        #eta = 0.05,
+        tol_rel_obj =  0.005,
+        sampling_algorithm = "variational")#, algorithm = "fullrank")
     
     ## Helper function to check if model_fit is broken
     is_model_fit_broken <- function(fit) {
@@ -355,7 +342,7 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 ## END V2
 
 ## Init all objects:
-phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranef_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list()
+phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranefdiag_covr<-phi_ranefoff_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list()
 
 
 
@@ -364,6 +351,12 @@ overlap <- function(population, L, U) {
     coverage <- as.numeric(population > L & population < U)
     return(coverage)
 }
+
+crirange <- function(L, U) {
+    bwidth <- abs(as.numeric(U-L))
+    return(bwidth)
+}
+
 
 rmse <- function(model, population) {
     rmse <- sqrt(mean((model - population)^2))
@@ -392,30 +385,44 @@ sbc <- function(model, population, column) {
   return(bin)
 }
 
-
 #sbc(fit_r$model_fit$draws(variables = 'phi0_fixed'), fit$model_fit$draws(variables = 'phi0_fixed'),  column = 1 )
 
+looic <- function(fit) {
+    log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
+    log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
+    r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  1000))
+    fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
+    looic <- fr$estimates[3,1]
+    return(looic)
+}
 
-variables_m <- c('phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'phi_tau', 'c_h_fixed', 
-               'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau', 
-               'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
+## Stan variables:
+variables_m <- c(
+    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross', 'c_h_fixed', 
+    'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
+    'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
+## Simulation variables:
 var <- c(
-    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "log_c_fixed",
+    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_sd_diag", "phi_sd_off", "log_c_fixed",
     "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
     "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd"
 )
 
+if(!length(variables_m) == length(var)) stop("variable list does not match!")
+
 # Initialize empty lists to store the results for each variable
 cov_list <- list()
+crir_list <- list()
 rmse_list <- list()
 bias_list <- list()
 bins_list <- list()
+looic_list <- list()
 
 
-for (s in 1:5) {
+for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 100, tl = 100)
+    replication_data <- simulate_data(N = 100, tl = 30)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {
@@ -432,7 +439,8 @@ for (s in 1:5) {
                 unlist(replication_data[[3]][var[p]]),
                 L = SF$q2.5, U = SF$q97.5
             )
-
+        crir_list[[variables_m[p]]][[s]] <-
+            crirange(L = SF$q2.5, U = SF$q97.5)
         rmse_list[[variables_m[p]]][[s]] <-
             sapply(seq_len(nrow(SF)), function(i) {
                 rmse(
@@ -447,6 +455,8 @@ for (s in 1:5) {
                     unlist(replication_data[[3]][var[p]])
                 )
             })
+        looic_list[[variables_m[p]]][[s]] <-
+            suppressWarnings(looic(fit_r))
     }
     gc()
     s
@@ -454,12 +464,11 @@ for (s in 1:5) {
 
 ## Try reducing the convergence criterion to 0.005
 cov_list
+crir_list
 rmse_list
 bias_list
 bins_list
-
-cov_list
-
+looic_list
 
 var_averages <- list()
 for (i in 1:length(cov_list)) {
@@ -493,7 +502,7 @@ bias_averages
 bias_av <- sapply(bias_averages, function(x) mean(x, na.rm = TRUE))
 round(cbind(bias_av, var_av), 3)
 
-n30tl50 <- round(var_av, 2)
+n30tl50 <- round(cbind(bias_av, var_av), 3)
 n30tl50
 ##n50tl50 <- round(var_av, 2)
 n50tl50

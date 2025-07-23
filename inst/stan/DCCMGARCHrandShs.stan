@@ -84,8 +84,8 @@ parameters {
   cholesky_factor_corr[nt*nt] phi_L;
 
   // Block separable SD's
-  real<lower=0> sigma_re_own;
-  real<lower=0> sigma_re_cross;
+  real sigma_re_own_log;
+  real sigma_re_cross_log;
 
   // phi_tau now in transformed params
   // vector<lower=0>[nt*nt] phi_tau; // ranef SD for phi0
@@ -141,7 +141,7 @@ parameters {
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
-  vector<lower=0>[Sdim] S_vec_tau; 
+  vector[Sdim] S_vec_tau_log; 
   vector[Sdim] S_vec_fixed;  // Vectorized fixed effect for S
   vector[Sdim] S_vec_fixed2; // Vectorized fixed effect for S
   array[J] vector[Sdim] S_vec_sd;
@@ -160,6 +160,11 @@ parameters {
 }
 
 transformed parameters {
+  vector<lower=0>[Sdim] S_vec_tau = exp(S_vec_tau_log);
+  real<lower=0> sigma_re_own = exp(sigma_re_own_log);
+  real<lower=0> sigma_re_cross = exp(sigma_re_cross_log);
+
+  
   // transform vec_phi to nt*nt parameter matrix
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
@@ -394,19 +399,19 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // population-level priors
-  a_q_pop_raw     ~ beta(2, 20);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
-  b_q_pop_raw_raw ~ beta(2,  6);   // mean ≈ 0.25 BEFORE scaling
+  a_q_pop_raw     ~ beta(1.8, 8.2);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
+  b_q_pop_raw_raw ~ beta(3.8,  6.2);   // mean ≈ 0.25 BEFORE scaling
   // population means: weak Beta priors (most mass ≤ 0.3)
-  a_h_pop_raw      ~ beta(2, 8);         // mean ≈ 0.20
-  b_h_pop_raw_raw  ~ beta(2, 6);         // mean ≈ 0.25 (scaled later)
+  a_h_pop_raw      ~ beta(1.5, 18.5);         // mean ≈ 0.20
+  b_h_pop_raw_raw  ~ beta(3.4, 16.6);         // mean ≈ 0.25 (scaled later)
   
   
   // priors
   //l_a_q ~ student_t(3, -1.5, 2);
   //l_b_q ~ student_t(3, -1.5, 2);
-  l_a_q_sigma ~ normal(0, 0.05); //student_t(3, 0, 2);
+  l_a_q_sigma ~ normal(0, 0.63); //student_t(3, 0, 2);
   to_vector(l_a_q_stdnorm) ~ std_normal();
-  l_b_q_sigma ~ normal(0, 0.05); //student_t(3, 0, 2);
+  l_b_q_sigma ~ normal(0, 0.63); //student_t(3, 0, 2);
   to_vector(l_b_q_stdnorm) ~ std_normal();
 
   // VAR
@@ -419,10 +424,10 @@ model {
   // R part in DRD
 
   phi0_tau ~ normal(0, .5); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ normal(0, .01); // SD for multiplication with cholesky phi0_L
-  c_h_tau ~ normal(0, .25); // SD for c_h ranefs
-  a_h_tau ~ normal(0, .05); // SD for c_h ranefs
-  b_h_tau ~ normal(0, .05);
+  //phi_tau ~ normal(0, 0.0063); // SD for multiplication with cholesky phi0_L
+  c_h_tau ~ normal(0, .38); // SD for c_h ranefs
+  a_h_tau ~ normal(0, .125); // SD for c_h ranefs
+  b_h_tau ~ normal(0, .125);
 
   // Horseshoe:
   //// standard normal prior
@@ -436,14 +441,14 @@ model {
   lambda_cross ~ normal(0, 1);
 
   // VAR phi ranefs for own and cross lags:
-  sigma_re_own   ~ normal(0, 0.1);   // looser
-  sigma_re_cross ~ normal(0, 0.025);  // tight shrinkage
+  sigma_re_own_log   ~ normal(log(0.3), 0.9);   // looser
+  sigma_re_cross_log ~ normal(log(0.05), 0.2);  // tight shrinkage
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ normal(  1, .1);
-  to_vector(a_h_fixed) ~ normal( -2, .1);
-  to_vector(b_h_fixed) ~ normal( -1.5, .1);
+  to_vector(c_h_fixed) ~ normal( -0.9, .2);
+  to_vector(a_h_fixed) ~ normal( -2.5, .2);
+  to_vector(b_h_fixed) ~ normal( -1.5, .2);
   // Prior for initial state
   
   // Prior on nu for student_t
@@ -451,14 +456,15 @@ model {
   nu ~ normal( nt, 5 );
   //to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
   phi0_fixed ~ student_t(3, 0, 1);
-  vec_phi_fixed ~ student_t(3, 0, 1);
-  S_vec_fixed ~ std_normal();
-  S_vec_fixed2 ~ std_normal();  
+  // vec_phi_fixed ~ student_t(3, 0, 1);
+  S_vec_fixed ~ normal(0, 0.5);
+  S_vec_fixed2 ~ std_normal();
+  
+  S_vec_tau_log ~ student_t(3, log(0.25), 0.5); //student_t(3, 0.0, 0.091);
   
   // likelihood
-  for( j in 1:J) {
-    S_vec_tau ~ student_t(3, 0, 3);
-    S_vec_stdnorm[j] ~ std_normal();
+  for( j in 1:J) {  
+    to_vector(S_vec_stdnorm[j]) ~ std_normal();
   
     //R1_init[j] ~ lkj_corr( 1 );
     to_vector(D1_init[j]) ~ lognormal(c_h[j], 1);
