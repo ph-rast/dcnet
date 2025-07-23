@@ -205,13 +205,14 @@ devtools::load_all()
 replication_data <- list()
 
 ## Create data:
-simulate_data <- function(N = 100, tl = 30, nts = 3) {
+simulate_data <- function(N = 100, tl = 50, nts = 3) {
     simdat <- .simuDCC(
         tslength = tl, N = N, n_ts = nts,
         phi_mu = 0, ## populate phi
         phi0_sd = 0.4, ## create variation in the intercepts of the time series
-        phi_sd_diag = 0.3,  ## random effects
-        phi_sd_off = 0.05,
+        phi_sd_diag = 0.3,  ## SD of own lags across TS's
+        phi_sd_off = 0.05,  ## SD of cross lags across TS's
+        phi_ranef_sd = 0.01, ## random effects in phi
         log_c_fixed = rep(-0.9, nts),
         log_c_r_sd = 0.3,
         a_h_fixed = rep(-2.5, nts),
@@ -232,7 +233,7 @@ simulate_data <- function(N = 100, tl = 30, nts = 3) {
 }
 
 
-replication_data <- simulate_data(N = 30)
+replication_data <- simulate_data()
 replication_data[[1]]
 
 replication_data[[2]]
@@ -253,9 +254,10 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         init = 0,
         meanstructure = "VAR",
         iterations = 50000,
-        #eta = 0.05,
-        tol_rel_obj =  0.005,
-        sampling_algorithm = "variational")#, algorithm = "fullrank")
+        # eta = 0.05,
+        tol_rel_obj = 0.005,
+        sampling_algorithm = "variational"
+    )
     
     ## Helper function to check if model_fit is broken
     is_model_fit_broken <- function(fit) {
@@ -342,7 +344,7 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 ## END V2
 
 ## Init all objects:
-phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranefdiag_covr<-phi_ranefoff_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list()
+## phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranefdiag_covr<-phi_ranefoff_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list()
 
 
 
@@ -398,14 +400,18 @@ looic <- function(fit) {
 
 ## Stan variables:
 variables_m <- c(
-    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross', 'c_h_fixed', 
-    'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
+    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
+    'tau_own_log', 'tau_cross_log',
+    'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
     'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
-## Simulation variables:
+## Simulation variables: Note that the simulatin script only defines one random
+## effect for phi, phi_ranef_sd, but the stan model captures the random effects
+## in both, the own and cross lag of phi in sigma_re_own/cross
 var <- c(
-    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_sd_diag", "phi_sd_off", "log_c_fixed",
-    "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
+    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "phi_ranef_sd",
+    "phi_sd_diag", "phi_sd_off",
+    "log_c_fixed", "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
     "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd"
 )
 
