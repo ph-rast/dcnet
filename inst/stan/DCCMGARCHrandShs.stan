@@ -126,12 +126,12 @@ parameters {
   // GARCH q parameters
   //real l_a_q; // Define on log scale so that it can go below 0
   
-  real<lower=0> l_a_q_sigma; //random effect variance
+  real l_a_q_sigma_log; //random effect variance
   array[J] real l_a_q_stdnorm;
   
   //real<lower=0, upper = (1 - a_q) > b_q; //
   //real l_b_q; 
-  real<lower=0> l_b_q_sigma; //random effect variance
+  real l_b_q_sigma_log; //random effect variance
   array[J] real l_b_q_stdnorm;
 
   // Try with a_q/b_q params that are on original scale for priors:
@@ -171,7 +171,8 @@ transformed parameters {
   vector<lower=0>[nt] c_h_tau = exp(c_h_tau_log);
   vector<lower=0>[nt] a_h_tau = exp(a_h_tau_log); // ranef SD for phi0
   vector<lower=0>[nt] b_h_tau = exp(b_h_tau_log); // ranef SD for phi0
-  
+  real<lower=0> l_a_q_sigma = exp(l_a_q_sigma_log); //random effect variance
+  real<lower=0> l_b_q_sigma = exp(l_b_q_sigma_log); //random effect variance
   // transform vec_phi to nt*nt parameter matrix
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
@@ -416,9 +417,9 @@ model {
   // priors
   //l_a_q ~ student_t(3, -1.5, 2);
   //l_b_q ~ student_t(3, -1.5, 2);
-  l_a_q_sigma ~ normal(0, 0.63); //student_t(3, 0, 2);
+  l_a_q_sigma_log ~ normal(log(0.63), 0.5); //student_t(3, 0, 2);
   to_vector(l_a_q_stdnorm) ~ std_normal();
-  l_b_q_sigma ~ normal(0, 0.63); //student_t(3, 0, 2);
+  l_b_q_sigma_log ~ normal(log(0.63), .5); //student_t(3, 0, 2);
   to_vector(l_b_q_stdnorm) ~ std_normal();
 
   // VAR
