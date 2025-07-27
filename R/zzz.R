@@ -9,7 +9,7 @@
 
     ## Paths to the Stan model files
     ccc_file <- file.path(stan_path, "VARhs.stan")
-    dcc_file <- file.path(stan_path, "DCCMGARCHrandQ.stan")
+    dcc_file <- file.path(stan_path, "mlVARDCCfixedSrandQ.stan")
     dccr_file <- file.path(stan_path, "DCCMGARCHrandS.stan")
     dccrs_file <- file.path(stan_path, "DCCMGARCHrandShs.stan")
 

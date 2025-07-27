@@ -45,3 +45,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/VARhs
 /inst/stan/DCCMGARCHrandShs
 /Rplots.pdf
+/inst/stan/mlVARDCCfixedSrandQ
