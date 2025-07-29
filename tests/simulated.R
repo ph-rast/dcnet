@@ -60,8 +60,8 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 100
-tl <- 100
+N <- 20
+tl <- 30
 nts <- 3
 simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    phi_mu = 0, ## populate phi
@@ -84,6 +84,14 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
                    stationarity_phi = FALSE)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
+
+Rj <- cor(rtsgen[[20]])
+atanh(Rj[lower.tri(Rj)])
+
+lapply(seq_len(N), function(x) {
+    Rj <- cor(rtsgen[[x]])
+    atanh(Rj[lower.tri(Rj)])
+})
 
 
 ### CHECK mlVAR
@@ -170,6 +178,11 @@ devtools::load_all()
         sampling_algorithm = "variational",#"pathfinder", # "laplace",
         grainsize = 3)
 
+post2_draw <- posterior::as_draws_matrix(fit0$model_fit$draws("tau_own_log"))
+
+
+.
+
 ##     fit <- dcnet(
 ##         data = rtsgen, parameterization = "DCCrs", J = N,
 ##         group = groupvec, standardize_data = TRUE,
@@ -191,7 +204,7 @@ devtools::load_all()
 
 ## fit$model_fit$output()
 
-## summary(fit0)
+##summary(fit0)
 
 ## summary(fit)
 
@@ -428,7 +441,7 @@ looic_list <- list()
 
 for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 100, tl = 30)
+    replication_data <- simulate_data(N = 50, tl = 30)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {

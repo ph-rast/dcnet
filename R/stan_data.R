@@ -48,7 +48,7 @@ stan_data <- function(data, J, group, xC, S_pred, P = 1, Q = 1, standardize_data
   
   ## Tests on predictor
   nt <- ncol(data[[1]])
-  
+    
   ## Pass in a 0 matrix, so that stan does not complain
   
   if ( is.null(xC) ) {

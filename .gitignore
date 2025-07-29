@@ -48,3 +48,5 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/mlVARDCCfixedSrandQ
 /plot_list.rds
 /simulation_performance.rds
+/inst/stan/mlVARDCC2stage
+/inst/stan/stage2_zhier
