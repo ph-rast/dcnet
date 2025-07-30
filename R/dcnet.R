@@ -57,7 +57,7 @@ dcnet <- function(data,
                   ubound =  FALSE,
                   threads_per_chain = 4,
                   grainsize = 1, ...) {
-  
+
   ## Identify distribution type
   num_dist <- switch(tolower(distribution),
                      "gaussian" = 0,
@@ -83,8 +83,9 @@ dcnet <- function(data,
                         DCCr = dccr_model,
                         DCCrs = dccrs_model,
                         stop("Invalid parameterization"))
-    
+
     ## Precompute S if twostage == TRUE
+    post2draws <- NA
     if(twostage == TRUE) {
         ## Compute individual sample correlations
         ## Extract fisher z transform off diagional elements
@@ -99,7 +100,7 @@ dcnet <- function(data,
                        nt = stan_data$nt,
                        Sdim = Sdim,
                        zhat = zhat) 
-        if (is.null(iterations)) iterations <- 30000
+        if (is.null(iterations)) iterations <- 50000
         cat("Stage 1: Random effect of S is estimated \n")
         precomp_fit <- stage2_model$variational(data = s_data,
                                                 iter = iterations,
@@ -107,16 +108,12 @@ dcnet <- function(data,
                                                 ...)
         cat("\n Stage 2: mlVAR-DCC is estimated \n")
         ## Extract the random effects SD vector
-        post2draws <- precomp_fit$draws(format = "df")
-        sigma_z <- post2draws$sigma_z
+        post2draws <- precomp_fit$draws(format = "matrix", variables = paste0("sigma_z[",1:Sdim,"]"))
         ## Simplest approach: Average across draws and use E(sigma_z) as SD for all S ranefs
-        sigma_z_hat <- rep(mean(sigma_z), Sdim)
-        ## TODO expand and include full posterior of sigma_z instead of point estimate
-        sigma_z_hat_full <- sigma_z
+        sigma_z_hat <- colMeans(post2draws)
         ## Attach to stan_data
         stan_data$Sdim <- Sdim
         stan_data$S_vec_tau_fixed <- sigma_z_hat
-        stan_data$S_vec_tau_full <- sigma_z_hat_full ## save draw to report posterior Cri etc. 
     }
     
   ## if(is.null(stanmodel)) {
@@ -127,17 +124,17 @@ dcnet <- function(data,
   ##          ".")
   ## }
 
-    ## HMC Sampling
+  ## HMC Sampling
     if (tolower(sampling_algorithm) == "hmc") {
-        if (is.null(iterations)) {
-            iter_warmup <- 1000
+    if (is.null(iterations)) {
+      iter_warmup <- 1000
             iter_sampling <- 1000
-        } else if (!is.null(iterations)) {
-            iter_warmup <- round(iterations / 2)
+    } else if (!is.null(iterations)) {
+      iter_warmup <- round(iterations / 2)
             iter_sampling <- iterations - iter_warmup
-        }
+    }
 
-        ##
+    ##
         max_cores <- parallel::detectCores()
         Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
         model_fit <- stanmodel$sample(data = stan_data,
@@ -147,14 +144,14 @@ dcnet <- function(data,
                                       chains = chains,
                                       parallel_chains = min(max_cores, chains),
                                       threads_per_chain = threads_per_chain,
-                                      ...)
+                                     ...)
     } else if (tolower(sampling_algorithm) == "variational") {
         ## Sampling via Variational Bayes
         if (is.null(iterations)) iterations <- 30000
         model_fit <- stanmodel$variational(data = stan_data,
                                            iter = iterations,
                                            threads = threads_per_chain,
-                                          ...)
+                                           ...)
     } else if (tolower(sampling_algorithm) == "pathfinder") {
         max_cores <- parallel::detectCores()
         Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
@@ -212,7 +209,8 @@ dcnet <- function(data,
                      meanstructure = stan_data$meanstructure,
                      std_data = standardize_data,
                      sampling_algorithm = sampling_algorithm,
-                     S_pred = S_pred)
+                     S_pred = S_pred,
+                     S_vec_tau_post = post2draws) ## With 2 stage model, pass posterior for ranef SD along
 
   class(return_fit) <- "dcnet"
   return(return_fit)

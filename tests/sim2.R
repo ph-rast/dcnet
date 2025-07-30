@@ -330,7 +330,7 @@ registerDoParallel(cl)
 ## Stan variables:
 variables_m <- c(
     'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
-    'tau_own_log', 'tau_cross_log',
+    'tau_own', 'tau_cross',
     'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
     'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
@@ -388,11 +388,18 @@ results_list <- foreach(i = seq_len(n_conds),
                                        format = "matrix")
       truth_vec <- unlist(rep_data[[3]][[sim_name]])
 
-      # summary with 2.5 & 97.5 % quantiles
-      SF <- fit_r$model_fit$summary(
-        stan_par, "mean",
-        extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
-      )
+      if (variables_m[p] == "S_vec_tau") {
+          SF <- data.frame(t(apply(
+              fit_r$S_vec_tau_post, 2,
+              function(x) quantile(x, c(0.5, 0.025, .975))
+          )))
+          colnames(SF) <- c("mean", "q2.5", "q97.5")
+      } else {
+          SF <- fit_r$model_fit$summary(
+              variables = variables_m[p], "mean",
+              extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
+          )
+      }
 
       # coverage for each element, then average
       cov_mat[p, s]  <- mean(truth_vec > SF$q2.5 & truth_vec < SF$q97.5)

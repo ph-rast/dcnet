@@ -178,11 +178,20 @@ devtools::load_all()
         sampling_algorithm = "variational",#"pathfinder", # "laplace",
         grainsize = 3)
 
-post2_draw <- posterior::as_draws_matrix(fit0$model_fit$draws("tau_own_log"))
+post2_draw <- posterior::as_draws_matrix(fit0$model_fit$draws(""))
+post2draws <-
+    fit0$draws(format = "df", variables = paste0("sigma_z[", 1:Sdim, "]"))
+Sdim <- 3
+
+post2 <- fit0$model_fit$draws(format = "matrix", variables = paste0("sigma_z[", 1:Sdim, "]"))
+post2
+colMeans(post2)
+
+data.frame(t(apply(fit_r$S_vec_tau_post, 2,
+                   function(x) quantile(x, c(0.5, 0.025, .975)))))
 
 
 .
-
 ##     fit <- dcnet(
 ##         data = rtsgen, parameterization = "DCCrs", J = N,
 ##         group = groupvec, standardize_data = TRUE,
@@ -414,7 +423,7 @@ looic <- function(fit) {
 ## Stan variables:
 variables_m <- c(
     'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
-    'tau_own_log', 'tau_cross_log',
+    'tau_own', 'tau_cross',
     'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
     'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
@@ -449,10 +458,19 @@ for (s in 1:10) {
     }
 
     for (p in 1:length(variables_m)) {
-        SF <- fit_r$model_fit$summary(
-            variables = variables_m[p], "mean",
-            extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
-        )
+        ## Add logic for S_vec_tau: Needs to be taken from step 1 fit, all others form step 2
+        if (variables_m[p] == "S_vec_tau") {
+            SF <- data.frame(t(apply(
+                fit_r$S_vec_tau_post, 2,
+                function(x) quantile(x, c(0.5, 0.025, .975))
+            )))
+            colnames(SF) <- c("mean", "q2.5", "q97.5")
+        } else {
+            SF <- fit_r$model_fit$summary(
+                variables = variables_m[p], "mean",
+                extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
+            )
+        }
         cov_list[[variables_m[p]]][[s]] <-
             overlap(
                 unlist(replication_data[[3]][var[p]]),
@@ -464,14 +482,14 @@ for (s in 1:10) {
             sapply(seq_len(nrow(SF)), function(i) {
                 rmse(
                     fit_r$model_fit$draws(variables = variables_m[p])[, i],
-                    unlist(replication_data[[3]][var[p]])
+                    unlist(replication_data[[3]][var[p]])[i]
                 )
             })
         bias_list[[variables_m[p]]][[s]] <-
             sapply(seq_len(nrow(SF)), function(i) {
                 bias(
                     fit_r$model_fit$draws(variables = variables_m[p])[, i],
-                    unlist(replication_data[[3]][var[p]])
+                    unlist(replication_data[[3]][var[p]])[i]
                 )
             })
         looic_list[[variables_m[p]]][[s]] <-
