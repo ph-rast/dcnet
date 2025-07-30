@@ -127,52 +127,52 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 }
 
 
-## Metrics: 
-## Function to compute coverage probability ranging from L to U in the original population distribution
-overlap <- function(population, L, U) {
-    coverage <- as.numeric(population > L & population < U)
-    return(coverage)
-}
+## ## Metrics: 
+## ## Function to compute coverage probability ranging from L to U in the original population distribution
+## overlap <- function(population, L, U) {
+##     coverage <- as.numeric(population > L & population < U)
+##     return(coverage)
+## }
 
-crirange <- function(L, U) {
-    bwidth <- abs(as.numeric(U-L))
-    return(bwidth)
-}
+## crirange <- function(L, U) {
+##     bwidth <- abs(as.numeric(U-L))
+##     return(bwidth)
+## }
 
 
-rmse <- function(model, population) {
-    rmse <- sqrt(mean((model - population)^2))
-    return(rmse)
-}
+## rmse <- function(model, population) {
+##     rmse <- sqrt(mean((model - population)^2))
+##     return(rmse)
+## }
 
-bias <- function(model, population) {
-    bias <- mean(model - population)
-    return(bias)
-}
+## bias <- function(model, population) {
+##     bias <- mean(model - population)
+##     return(bias)
+## }
 
-sbc <- function(model, population, column) {
-  ## Algorithm 1 from: Validating Bayesian Inference Algorithms with Simulation-Based Calibration (2020)
-  bin <- list()
-  binl <- 0
-  ## Assuming 1000 draws in the fit objects (standard)
-  ## This creates 20 bins 
-  for(start in seq(1, 951, by=50)) {
-    binl <- binl+1
-    end <- start + 49
-    current_sequence <- start:end
-    bin[binl] <- sum(model[start:end,column] < population[start:end,column])
-  }
-  return(bin)
-}
+## sbc <- function(model, population, column) {
+##   ## Algorithm 1 from: Validating Bayesian Inference Algorithms with Simulation-Based Calibration (2020)
+##   bin <- list()
+##   binl <- 0
+##   ## Assuming 1000 draws in the fit objects (standard)
+##   ## This creates 20 bins 
+##   for(start in seq(1, 951, by=50)) {
+##     binl <- binl+1
+##     end <- start + 49
+##     current_sequence <- start:end
+##     bin[binl] <- sum(model[start:end,column] < population[start:end,column])
+##   }
+##   return(bin)
+## }
 
-looic <- function(fit) {
-    log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
-    log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
-    r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  1000))
-    fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
-    looic <- fr$estimates[3,1]
-    return(looic)
-}
+## looic <- function(fit) {
+##     log_lik_r <- grep( "log_lik", colnames(fit$model_fit$draws( )) )
+##     log_lik_r <- fit$model_fit$draws( )[, log_lik_r]
+##     r_eff_r <- loo::relative_eff(exp(log_lik_r ),  chain_id = rep(1,  1000))
+##     fr <- loo::loo(log_lik_r, r_eff = r_eff_r)
+##     looic <- fr$estimates[3,1]
+##     return(looic)
+## }
 
 ## ## Stan variables:
 ## variables_m <- c(
@@ -302,9 +302,9 @@ looic <- function(fit) {
 
 
 ### PArallel version:
-if (!requireNamespace("remotes")) { 
-  install.packages("remotes")   
-}   
+if (!requireNamespace("remotes")) {
+  install.packages("remotes")
+}
 remotes::install_github("ph-rast/dcnet")
 
 
@@ -320,10 +320,10 @@ ns  <- c(25, 50, 100)
 tls <- c(25, 50, 100)
 simcond <- expand.grid(N = ns, tl = tls)
 n_conds <- nrow(simcond)
-replications <- 20
+replications <- 3
 
 # register one worker per condition:
-cl <- makeCluster(min(n_conds, 28))
+cl <- makeCluster(min(n_conds, 6))
 registerDoParallel(cl)
 
 # define the Stan ↔ sim parameter names (positional matching):
@@ -344,7 +344,7 @@ var <- c(
     "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd"
 )
 
-stopifnot(length(variables_m)==length(var))
+stopifnot(length(variables_m) == length(var))
 
 # Make the local functions & objects available on each worker
 clusterExport(cl, c("simulate_data", "safe_sample", "variables_m", "var", "simcond"))

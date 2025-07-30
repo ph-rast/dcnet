@@ -443,9 +443,9 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ normal( -0.9, .2);
-  to_vector(a_h_fixed) ~ normal( -2.5, .2);
-  to_vector(b_h_fixed) ~ normal( -1.5, .2);
+  to_vector(c_h_fixed) ~ student_t(3, -0.9, .5);
+  to_vector(a_h_fixed) ~ student_t(3, -2.5, .5);
+  to_vector(b_h_fixed) ~ student_t(3, -1.5, .5);
   // Prior for initial state
   
   // Prior on nu for student_t
