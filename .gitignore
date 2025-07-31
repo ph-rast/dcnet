@@ -50,3 +50,4 @@ src/stanExports_DCCMGARCH.h
 /simulation_performance.rds
 /inst/stan/mlVARDCC2stage
 /inst/stan/stage2_zhier
+/simulation_performance_100reps.rds
