@@ -11,7 +11,7 @@
 ##' @importFrom posterior as_draws_df
 ##' @author Philippe Rast
 .extract_stage1_posterior <- function(fit, nt, J, T) {
-  draws_df <- as_draws_df(fit$draws(format = "draws_df"))
+  draws_df <- posterior::as_draws_df(fit$draws(format = "draws_df"))
 
   safe_mean <- function(pattern, expected_len = NULL) {
     cols <- grep(pattern, colnames(draws_df), perl = TRUE)

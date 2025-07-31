@@ -96,7 +96,7 @@ dcnet <- function(data,
                                                threads = threads_per_chain,
                                                ...)
         ## Extract relevant params and residuals
-        res <- extract_stage1_posterior(fit_stage1, nt = stan_data$nt, J = J, T = stan_data$T)
+        res <- .extract_stage1_posterior(fit_stage1, nt = stan_data$nt, J = J, T = stan_data$T)
 
         ## collect residuals and add back variable names
         residuals <- list()
