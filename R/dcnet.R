@@ -11,7 +11,7 @@
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
 ##' @param S_pred Dummy for S, for each time-point (same dimension as data)
 ##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC', or 'DCCrs' for multithread.
-##' @param twostage Logical (Defaults to TRUE). Should a two stage approach be used. 
+##' @param multistage Logical (Defaults to TRUE). Should a multi stage approach be used.
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
 ##' @param iterations Integer (Default: 2000). Number of iterations for each chain (including warmup).
@@ -41,7 +41,7 @@ dcnet <- function(data,
                   xC = NULL,
                   S_pred =  NULL,
                   parameterization = "DCC",
-                  twostage = TRUE,
+                  multistage = TRUE,
                   P = 1,
                   Q = 1,
                   iterations = NULL,
@@ -86,11 +86,31 @@ dcnet <- function(data,
 
     ## Precompute S if twostage == TRUE
     post2draws <- NA
-    if(twostage == TRUE) {
+    if(multistage == TRUE) {
+        ## Stage 1: Run mlVAR model to extract residuals.
+        ## Model returns a list containing the phi pop vlaues random efects.
+        ## Residuals are resid . Check .extract_stage1_posterior function
+        cat("\nStage 1: mlVAR is estimated \n")
+        fit_stage1 <- stage1_model$variational(data = stan_data,
+                                               iter = 50000,
+                                               threads = threads_per_chain,
+                                               ...)
+        ## Extract relevant params and residuals
+        res <- extract_stage1_posterior(fit_stage1, nt = stan_data$nt, J = J, T = stan_data$T)
+
+        ## collect residuals and add back variable names
+        residuals <- list()
+        for(i in 1:J) {
+            residuals[[i]] <- res$resid[[i]]
+            colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
+        }
+        ## Overwrite rts (data) in the stan_data object with the residuals
+        stan_data$rts <- residuals
+        
         ## Compute individual sample correlations
         ## Extract fisher z transform off diagional elements
         zhat <- lapply(seq_len(J), function(x) {
-            Rj <- cor(data[[x]])
+            Rj <- cor(residuals[[x]])
             atanh(Rj[lower.tri(Rj)])
         })
         ## S data
@@ -100,13 +120,12 @@ dcnet <- function(data,
                        nt = stan_data$nt,
                        Sdim = Sdim,
                        zhat = zhat) 
-        if (is.null(iterations)) iterations <- 50000
-        cat("Stage 1: Random effect of S is estimated \n")
+        cat("\nStage 2: Random effect of S is estimated \n")
         precomp_fit <- stage2_model$variational(data = s_data,
-                                                iter = iterations,
+                                                iter = 50000,
                                                 threads = threads_per_chain,
                                                 ...)
-        cat("\n Stage 2: mlVAR-DCC is estimated \n")
+        cat("\n Stage 3: mlVAR-DCC is estimated \n")
         ## Extract the random effects SD vector
         post2draws <- precomp_fit$draws(format = "matrix", variables = paste0("sigma_z[",1:Sdim,"]"))
         ## Simplest approach: Average across draws and use E(sigma_z) as SD for all S ranefs

@@ -39,15 +39,14 @@ transformed data {
 }
 parameters {
   // VAR parameters
-  
   // Horseshoe
   // semi-global scales
-  real<lower=0> tau_own;
-  real<lower=0> tau_cross;
+  real tau_own_log;
+  real tau_cross_log;
 
-  // local scales (Horseshoe example)
-  vector<lower=0>[nt]   lambda_own;
-  vector<lower=0>[nt*(nt-1)] lambda_cross;
+  // local scales (Horseshoe)
+  vector[nt]   lambda_own_log;
+  vector[nt*(nt-1)] lambda_cross_log;
 
   // standard-normal draws to be shrunk
   vector[nt]            g_own;
@@ -60,14 +59,14 @@ parameters {
   vector[nt] phi0_fixed;
 
   cholesky_factor_corr[nt] phi0_L;
-  vector<lower=0>[nt] phi0_tau; // ranef SD for phi0
+  vector[nt] phi0_tau_log; // ranef SD for phi0
   array[J] vector[nt] phi0_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
   // vec_phi_fixed is now defined in transformed params
   cholesky_factor_corr[nt*nt] phi_L;
 
   // Block separable SD's
-  real<lower=0> sigma_re_own;
-  real<lower=0> sigma_re_cross;
+  real sigma_re_own_log;
+  real sigma_re_cross_log;
 
   // phi_tau now in transformed params
   // vector<lower=0>[nt*nt] phi_tau; // ranef SD for phi0
@@ -81,6 +80,14 @@ parameters {
 }
 
 transformed parameters {
+  real<lower=0> sigma_re_own = exp(sigma_re_own_log);
+  real<lower=0> sigma_re_cross = exp(sigma_re_cross_log);
+  real<lower=0> tau_own = exp(tau_own_log);
+  real<lower=0> tau_cross = exp(tau_cross_log);
+  vector<lower=0>[nt]   lambda_own = exp(lambda_own_log);
+  vector<lower=0>[nt*(nt-1)] lambda_cross = exp(lambda_cross_log);
+  vector<lower=0>[nt] phi0_tau = exp(phi0_tau_log); // ranef SD for phi0
+
   // transform vec_phi to nt*nt parameter matrix
   //matrix<lower = -1, upper = 1>[nt,nt] phi;
   array[J] vector[nt] phi0; // vector with fixed + random for intercept
@@ -128,24 +135,24 @@ model {
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
 
-  phi0_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
-  phi_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
+  phi0_tau_log ~ normal(log(0.5), .5); // SD for multiplication with cholesky phi0_L
+  //phi_tau ~ normal(0, .1); // SD for multiplication with cholesky phi0_L
 
   // Horseshoe:
   //// standard normal prior
   g_own ~ std_normal();
   g_cross ~ std_normal();
   //// semi-global scales
-  tau_own ~ cauchy(0, .5);
-  tau_cross ~ cauchy(0, .25);
+  tau_own_log ~ student_t(3, log(0.3), .5); //cauchy(0, 0.5);
+  tau_cross_log ~ student_t(3, log(0.05), .2); // cauchy(0, 0.02);
   /// local scales
-  lambda_own   ~ normal(0, 1);
-  lambda_cross ~ normal(0, 1);
+  lambda_own_log   ~ student_t(3, 0, 1);
+  lambda_cross_log ~ student_t(3, 0, 1);
 
   // VAR phi ranefs for own and cross lags:
-  sigma_re_own   ~ normal(0, 0.1);   // looser
-  sigma_re_cross ~ normal(0, 0.025);  // tight shrinkage
-
+  sigma_re_own_log   ~ normal(log(0.01), 0.5);  
+  sigma_re_cross_log ~ normal(log(0.01), 0.5);  
+  
   // Prior for initial state
   // Cholesky factor prior (instead of Wishart)
   L_rescov ~ lkj_corr_cholesky(2);             // weak shrink toward I

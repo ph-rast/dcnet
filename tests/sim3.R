@@ -190,4 +190,118 @@ final_results <- per_rep %>%
 final_results
 
 # 10) Save
-saveRDS(final_results, "simulation_performance_100reps.rds")
+#saveRDS(final_results, "simulation_performance_100reps.rds")
+
+final_results <- readRDS("simulation_performance_100reps.rds")
+
+## Plots:
+
+##reshape for plotting
+library(tidyverse)
+
+fr_long <- final_results %>%
+  pivot_longer(
+    cols      = coverage:looic,
+    names_to  = "metric",
+    values_to = "value"
+  )
+
+fr_long
+
+## coverage heatmap
+fr_long %>%
+  filter(metric == "coverage") %>%
+  ggplot(aes(x = factor(N), y = factor(tl), fill = value)) +
+    geom_tile(color = "white") +
+    facet_wrap(~ parameter, ncol = 3) +
+    scale_fill_viridis_c(limits = c(0,1)) +
+    labs(
+      x = "N (subjects)",
+      y = "T (timepoints)",
+      fill = "Coverage",
+      title = "95% CI Coverage by Condition and Parameter"
+    ) +
+    theme_minimal(base_size = 12)
+
+## Bias
+fr_long %>%
+  filter(metric == "bias") %>%
+  ggplot(aes(x = N, y = value, color = factor(tl))) +
+    geom_line() +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    facet_wrap(~ parameter, scales = "free_y", ncol = 3) +
+    labs(
+      x = "N (subjects)",
+      y = "Bias",
+      color = "T (timepoints)"
+    ) +
+  theme_minimal()
+
+# 2. Create a named list of ggplot objects
+plot_list <- list(
+  coverage = fr_long %>%
+    filter(metric == "coverage") %>%
+    ggplot(aes(factor(N), factor(tl), fill = value)) +
+      geom_tile(color = "white") +
+      facet_wrap(~ parameter, ncol = 3) +
+      scale_fill_viridis_c(limits = c(0,1)) +
+      labs(x = "N", y = "T", fill = "Coverage") +
+      theme_minimal(),
+
+  bias = fr_long %>%
+    filter(metric == "bias") %>%
+    ggplot(aes(x = N, y = value, color = factor(tl))) +
+      geom_line() + geom_hline(yintercept = 0, linetype = "dashed") +
+      facet_wrap(~ parameter, scales = "free_y", ncol = 3) +
+      labs(x = "N", y = "Bias", color = "T") +
+      theme_minimal(),
+
+  rmse = fr_long %>%
+    filter(metric == "rmse") %>%
+    ggplot(aes(x = N, y = value, color = factor(tl))) +
+      geom_line() +
+      facet_wrap(~ parameter, scales = "free_y", ncol = 3) +
+      labs(x = "N", y = "RMSE", color = "T") +
+      theme_minimal(),
+
+  ci_width = fr_long %>%
+    filter(metric == "ci_width") %>%
+    ggplot(aes(x = N, y = value, color = factor(tl))) +
+      geom_line() +
+      facet_wrap(~ parameter, scales = "free_y", ncol = 3) +
+      labs(x = "N", y = "CI width", color = "T") +
+      theme_minimal(),
+
+  looic = fr_long %>%
+    filter(metric == "looic") %>%
+    ggplot(aes(x = N, y = value, color = factor(tl))) +
+      geom_line() +
+      facet_wrap(~ parameter, scales = "free_y", ncol = 3) +
+      labs(x = "N", y = "LOOIC", color = "T") +
+      theme_minimal()
+)
+
+# 3. Write them all to a multi‐page PDF
+pdf("simulation_diagnostics.pdf", width = 11, height = 8.5)
+for (nm in names(plot_list)) {
+  print(plot_list[[nm]] + ggtitle(str_to_title(nm)))
+}
+dev.off()
+
+# 4. (Optional) save the list of plots for later use
+saveRDS(plot_list, "plot_list.rds")
+
+## table
+summary_table <- final_results %>%
+  group_by(parameter) %>%
+  summarise(
+    cov_min   = min(coverage),
+    cov_mean  = mean(coverage),
+    bias_abs  = mean(abs(bias)),
+    rmse_mean = mean(rmse),
+    ciw_mean  = mean(crir),
+    looic     = mean(looic)
+  ) %>%
+  arrange(cov_mean)
+
+print(summary_table)

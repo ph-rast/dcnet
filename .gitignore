@@ -51,3 +51,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/mlVARDCC2stage
 /inst/stan/stage2_zhier
 /simulation_performance_100reps.rds
+/inst/stan/stage1_mlvar_learnSigma
