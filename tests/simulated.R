@@ -85,94 +85,102 @@ simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
 
-Rj <- cor(rtsgen[[20]])
-atanh(Rj[lower.tri(Rj)])
-
-lapply(seq_len(N), function(x) {
-    Rj <- cor(rtsgen[[x]])
-    atanh(Rj[lower.tri(Rj)])
-})
-
-
-### CHECK mlVAR
-df  <- as.data.frame(                                     # final data-frame
-         do.call(rbind,
-           Map(function(mat, id)                          # walk through rtsgen
-                 cbind( id   = id,                        # id column
-                        time = seq_len(nrow(mat)) - 1,    # 0 … T-1
-                        mat),                             # X1 X2 X3
-               rtsgen,                                    # list of matrices
-               seq_along(rtsgen))) )                      # matching ids
-rownames(df) <- NULL
-tail(df)
-
-library(mlVAR)
-fit1 <- mlVAR(df, vars = names(df)[3:5], idvar = "id", lags = 1, temporal = "correlated", scale = FALSE)
-summary(fit1)
-
-
 groupvec <- rep(c(1:N),  each = tl)
 
-atanh(simdat$Fixed_S[lower.tri(simdat$Fixed_S)])
-simdat$fixed_S_atanh
-
-rtsgen[[1]][, 1]
+rtsgen[[1]]
 rtsgen[[1]][, 2]
 
 
-## Fixed Corr
-simdat$S
-round(simdat$Fixed_S, 2)
-round(simdat$phi0_fixed, 2)
-round(simdat$fixed_phi, 2)
-
-
-person <- 2
-plot(rtsgen[[person]][, 1], type = "l")#, ylim = c(-6, 6))
-lines(rtsgen[[person]][, 2], lty = 2)
-lines(rtsgen[[person]][, 3], lty = 3, col = "red")
-#lines(rtsgen[[person]][, 4], lty = 4, col = "blue")
-
-dev.off()
-simdat$fixed_phi
-
-## system.time({
-
-##     fit0 <- dcnet(
-##         data = rtsgen, parameterization = "CCC", J =  N,
-##         group = groupvec, standardize_data = FALSE,
-##         init = 0,
-##         meanstructure = "VAR",
-##         iterations = 30000,
-##         chains = 4,
-##         threads = 5, tol_rel_obj =  0.005, ## 8 threads: 188 mins /
-##         sampling_algorithm = "variational",
-##         grainsize = 10)
-
-## phi <- matrix(colMeans(fit0$model_fit$draws()[, grep("vec_phi_fixed", colnames(fit0$model_fit$draws()))]), ncol = 3)
-## round(phi, 4)
-
-
 fit0 <- dcnet(
-    data = rtsgen, parameterization = "CCC", J =  N,
+    data = rtsgen, parameterization = "DCCrs", J =  N,
     group = groupvec,
     init = 0,
-    meanstructure = "VAR",
+    meanstructure = "constant",
     iterations = 30000,
     chains = 4,
-    threads = 4, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
+    threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
     sampling_algorithm = "variational", # "pathfinder", # "laplace",
     #algorithm = "fullrank",
-    grainsize = 3)
+    grainsize = 1)
 
-post2_draw <- posterior::as_draws_matrix(fit0$model_fit$draws(""))
-post2draws <-
-    fit0$draws(format = "df", variables = paste0("sigma_z[", 1:Sdim, "]"))
-Sdim <- 3
+fit0
 
-post2 <- fit0$model_fit$draws(format = "matrix", variables = paste0("sigma_z[", 1:Sdim, "]"))
-post2
-colMeans(post2)
+resid_draws <- posterior::as_draws_matrix(fit0$model_fit$draws("resid"))
+
+
+########
+
+# fit is your CmdStanFit object
+draws <- fit0$model_fit$draws(format = "draws_df")
+
+
+vec_phi_pop <- suppressWarnings(colMeans(draws[, grep("^vec_phi_pop\\[", names(draws))]))
+Phi_pop <- matrix(vec_phi_pop, nt, nt)
+
+
+# Population intercept
+phi0_pop <- suppressWarnings(colMeans(draws[, grep("^phi0_pop\\[", names(draws))]))
+
+# Subject-specific VAR matrices (posterior mean)
+extract_matrix <- function(prefix, J, nt) {
+  arr <- array(NA_real_, dim = c(nt, nt, J))
+  for (j in 1:J) {
+    for (r in 1:nt) {
+      for (c in 1:nt) {
+        name <- sprintf("%s[%d,%d,%d]", prefix, j, r, c)  # e.g., "Phi_j[1,2,3]"
+        if (name %in% colnames(draws)) { arr[r, c, j] <- mean(draws[[name]])
+        }
+      }
+    }
+  }
+  arr
+}
+
+Phi_j_hat <- extract_matrix("Phi", J = J, nt = nt)  # adjust J, nt
+
+phi0_j_hat <- array(NA_real_, dim = c(J, nt))
+for (j in 1:J) {
+    phi0_j_hat[j, ] <-  colMeans(draws[, grep(sprintf("^phi0_j\\[%d,", j), names(draws))])
+}
+
+# Sigma (posterior mean)
+Sigma_hat <- matrix(NA_real_, nrow = nt, ncol = nt)
+for (r in 1:nt) for (c in 1:nt) {
+  nm <- sprintf("Sigma[%d,%d]", r, c)
+  if (nm %in% colnames(draws)) Sigma_hat[r, c] <- mean(draws[[nm]])
+                }
+Sigma_hat
+
+# Residuals: list of T x nt matrices
+# Assuming resid[j,d,t]
+resid_list <- vector("list", J)
+for (j in 1:J) {
+    mat <- matrix(NA_real_, nrow = T, ncol = nt)
+    for (t in 1:T) {
+        for (d in 1:nt) {
+            nm <- sprintf("resid[%d,%d,%d]", j, d, t)
+            if (nm %in% colnames(draws)) mat[t, d] <- mean(draws[[nm]])
+        }
+    }
+    resid_list[[j]] <- mat
+}
+resid_list
+ ## collect residuals and add back variable names
+        residuals <- list()
+        for (i in 1:J) {
+            residuals[[i]] <- resid_list[[i]]
+            colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
+        }
+
+#########
+
+
+phi0_pop <- colMeans(posterior::as_draws_matrix(fit0$model_fit$draws("phi0_pop")))
+
+Phi_j_hat <- extract_matrix("Phi_j", J, nt)  # adjust J, nt
+Phi_j_hat
+
+
 
 data.frame(t(apply(fit_r$S_vec_tau_post, 2,
                    function(x) quantile(x, c(0.5, 0.025, .975)))))
@@ -258,7 +266,7 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 
     ## First run meanfield algo to obtain init values:
     fit_init <- dcnet(
-        data = replication_data[[1]], parameterization = "DCC", J = replication_data$N,
+        data = replication_data[[1]], parameterization = "DCCrs", J = replication_data$N,
         group = replication_data[[2]], standardize_data = FALSE,
         init = 0,
         meanstructure = "constant",
@@ -436,7 +444,7 @@ looic_list <- list()
 
 for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 75, tl = 75)
+    replication_data <- simulate_data(N = 20, tl = 30)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {

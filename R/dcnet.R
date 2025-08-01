@@ -58,23 +58,24 @@ dcnet <- function(data,
                   threads_per_chain = 4,
                   grainsize = 1, ...) {
 
-  ## Identify distribution type
-  num_dist <- switch(tolower(distribution),
-                     "gaussian" = 0,
-                     "student_t" = 1,
-                     stop("Specify distribution: Gaussian or Student_t"))
+    ## Identify distribution type
+    num_dist <- switch(tolower(distribution),
+        "gaussian" = 0,
+        "student_t" = 1,
+        stop("Specify distribution: Gaussian or Student_t")
+    )
 
-  ## Set number of participants if not provided
-  if(is.null(J)) J <- N <- length(data)
+    ## Set number of participants if not provided
+    if (is.null(J)) J <- N <- length(data)
 
-  ## Create group if not provided
-  if(is.null(group)) group <- rep(seq_len(N),  each = nrow(data[[1]]))
+    ## Create group if not provided
+    if (is.null(group)) group <- rep(seq_len(N), each = nrow(data[[1]]))
 
-  ## Prepare Stan data
-  stan_data <- stan_data(data, J, group, xC, S_pred, P, Q,
-                         standardize_data, distribution = num_dist,
-                         meanstructure, simplify_ch, simplify_ah,
-                         simplify_bh, lbound, ubound, grainsize)
+    ## Prepare Stan data
+    stan_data <- stan_data(data, J, group, xC, S_pred, P, Q,
+                           standardize_data, distribution = num_dist,
+                           meanstructure, simplify_ch, simplify_ah,
+                           simplify_bh, lbound, ubound, grainsize)
 
     ## Select the correct pre-compiled model from the global environment
     stanmodel <- switch(parameterization,
@@ -86,27 +87,93 @@ dcnet <- function(data,
 
     ## Precompute S if twostage == TRUE
     post2draws <- NA
-    if(multistage == TRUE) {
-        ## Stage 1: Run mlVAR model to extract residuals.
+    if (multistage == TRUE) {
+        ####################################################
+        ## Stage 1: Run mlVAR model to extract residuals. ##
+        ####################################################
+        
         ## Model returns a list containing the phi pop vlaues random efects.
-        ## Residuals are resid . Check .extract_stage1_posterior function
+        ## Residuals are resid
         cat("\nStage 1: mlVAR is estimated \n")
         fit_stage1 <- stage1_model$variational(data = stan_data,
                                                iter = 50000,
                                                threads = threads_per_chain,
                                                ...)
         ## Extract relevant params and residuals
-        res <- .extract_stage1_posterior(fit_stage1, nt = stan_data$nt, J = J, T = stan_data$T)
+
+        T <- stan_data$T
+        nt <- stan_data$nt
+
+        ## Extract Residuals and average across draws
+        draws <- fit_stage1$draws(format = "draws_df")
+
+        ## Population intercept
+        phi0_pop <- suppressWarnings(colMeans(draws[, grep("^phi0_pop\\[", names(draws))]))
+
+        ## Pop phi:
+        vec_phi_pop <- suppressWarnings(colMeans(draws[, grep("^vec_phi_pop\\[", names(draws))]))
+        phi_pop <- matrix(vec_phi_pop, nt, nt)
+        
+        ## Subject-specific VAR matrices (posterior mean)
+        extract_matrix <- function(prefix, J, nt) {
+            arr <- array(NA_real_, dim = c(nt, nt, J))
+            for (j in 1:J) {
+                for (r in 1:nt) {
+                    for (c in 1:nt) {
+                        name <- sprintf("%s[%d,%d,%d]", prefix, j, r, c)  # e.g., "Phi_j[1,2,3]"
+                        if (name %in% colnames(draws)) { arr[r, c, j] <- mean(draws[[name]])
+                        }
+                    }
+                }
+            }
+            arr
+        }
+
+        ## Individual phi matrices: Not needed - commented out for now
+        ## Phi_j_hat <- extract_matrix("Phi", J = J, nt = nt)
+
+        ## phi0_j_hat <- array(NA_real_, dim = c(J, nt))
+        ## for (j in 1:J) {
+        ##     phi0_j_hat[j, ] <-  colMeans(draws[, grep(sprintf("^phi0_j\\[%d,", j), names(draws))])
+        ## }
+
+        ## Sigma (posterior mean)
+        Sigma_hat <- matrix(NA_real_, nrow = nt, ncol = nt)
+        for (r in 1:nt) for (c in 1:nt) {
+                            nm <- sprintf("Sigma[%d,%d]", r, c)
+                            if (nm %in% colnames(draws)) Sigma_hat[r, c] <- mean(draws[[nm]])
+                        }
+
+        ## Residuals: list J of T x nt matrices
+        resid_list <- vector("list", J)
+        for (j in 1:J) {
+            mat <- matrix(NA_real_, nrow = T, ncol = nt)
+            for (t in 1:T) {
+                for (d in 1:nt) {
+                    nm <- sprintf("resid[%d,%d,%d]", j, d, t)
+                    if (nm %in% colnames(draws)) mat[t, d] <- mean(draws[[nm]])
+                }
+            }
+            resid_list[[j]] <- mat
+        }
 
         ## collect residuals and add back variable names
         residuals <- list()
-        for(i in 1:J) {
-            residuals[[i]] <- res$resid[[i]]
+        for (i in 1:J) {
+            residuals[[i]] <- resid_list[[i]]
             colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
         }
+
         ## Overwrite rts (data) in the stan_data object with the residuals
         stan_data$rts <- residuals
-        
+        ## Add phi and Sigma to stan_data
+        stan_data$phi0_pop <- phi0_pop
+        stan_data$phi_pop <- phi_pop
+
+        ######################################################
+        ## Stage 2: Compute random effects for uncond corr matrix S  ##
+        ###############################################################
+
         ## Compute individual sample correlations
         ## Extract fisher z transform off diagional elements
         zhat <- lapply(seq_len(J), function(x) {
@@ -114,8 +181,7 @@ dcnet <- function(data,
             atanh(Rj[lower.tri(Rj)])
         })
         ## S data
-        nt <- stan_data$nt
-        Sdim <-  nt*(nt-1)/2
+        Sdim <-  nt * (nt-1) / 2
         s_data <- list(J = J,
                        nt = stan_data$nt,
                        Sdim = Sdim,
@@ -127,33 +193,39 @@ dcnet <- function(data,
                                                 ...)
         cat("\n Stage 3: mlVAR-DCC is estimated \n")
         ## Extract the random effects SD vector
-        post2draws <- precomp_fit$draws(format = "matrix", variables = paste0("sigma_z[",1:Sdim,"]"))
+        post2draws <- precomp_fit$draws(format = "matrix", variables = paste0("sigma_z[", 1:Sdim, "]"))
         ## Simplest approach: Average across draws and use E(sigma_z) as SD for all S ranefs
         sigma_z_hat <- colMeans(post2draws)
         ## Attach to stan_data
         stan_data$Sdim <- Sdim
         stan_data$S_vec_tau_fixed <- sigma_z_hat
-    }
-    
-  ## if(is.null(stanmodel)) {
-  ##     stop("Not a valid model specification. ",
-  ##          parameterization,
-  ##          "must be one of: ",
-  ##          paste0(supported_models, collapse = ", "),
-  ##          ".")
-  ## }
 
-  ## HMC Sampling
+        #####################################################################################
+        ## Stage 3: TODO Fit univariate GARCH to diag(D) elements and pass along estimates ##
+        #####################################################################################
+
+        ##
+    }
+
+    ## if(is.null(stanmodel)) {
+    ##     stop("Not a valid model specification. ",
+    ##          parameterization,
+    ##          "must be one of: ",
+    ##          paste0(supported_models, collapse = ", "),
+    ##          ".")
+    ## }
+
+    ## HMC Sampling
     if (tolower(sampling_algorithm) == "hmc") {
-    if (is.null(iterations)) {
-      iter_warmup <- 1000
+        if (is.null(iterations)) {
+            iter_warmup <- 1000
             iter_sampling <- 1000
-    } else if (!is.null(iterations)) {
-      iter_warmup <- round(iterations / 2)
+        } else if (!is.null(iterations)) {
+            iter_warmup <- round(iterations / 2)
             iter_sampling <- iterations - iter_warmup
-    }
-
-    ##
+        }
+        
+        ##
         max_cores <- parallel::detectCores()
         Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
         model_fit <- stanmodel$sample(data = stan_data,
@@ -163,7 +235,7 @@ dcnet <- function(data,
                                       chains = chains,
                                       parallel_chains = min(max_cores, chains),
                                       threads_per_chain = threads_per_chain,
-                                     ...)
+                                      ...)
     } else if (tolower(sampling_algorithm) == "variational") {
         ## Sampling via Variational Bayes
         if (is.null(iterations)) iterations <- 30000

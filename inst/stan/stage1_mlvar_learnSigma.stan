@@ -152,60 +152,20 @@ model {
 }
 
 generated quantities {
-    // existing residuals
-  array[J] matrix[nt, T] resid;  // residuals u_{j,t} = rts_{j,t} - phi0_j - Phi_j * (rts_{j,t-1} - phi0_j)
-  
-
+  array[J] matrix[nt, T] resid;  // residuals: rts_{j,t} - [phi0_j + Phi_j * (rts_{j,t-1} - phi0_j)]
+ 
+  // Residuals (centered)
   for (j in 1:J) {
-    vector[nt] phi0_j_loc = phi0_pop + sigma_phi0 * z_phi0[j];
-
-    // rebuild population phi vector
-    vector[nt * nt] vec_phi_pop_local = rep_vector(0.0, nt * nt);
-    vector[nt] phi_pop_own_loc = tau_own * lambda_own .* g_own;
-    vector[nt * (nt - 1)] phi_pop_cross_loc = tau_cross * lambda_cross .* g_cross;
-    for (k in 1:nt) {
-      int pos = idx_own[k];
-      vec_phi_pop_local[pos] = phi_pop_own_loc[k];
-    }
-    for (k in 1:(nt * (nt - 1))) {
-      int pos = idx_cross[k];
-      vec_phi_pop_local[pos] = phi_pop_cross_loc[k];
-    }
-
-    // subject delta
-    vector[nt * nt] delta_j = rep_vector(0.0, nt * nt);
-    for (k in 1:nt) {
-      int pos = idx_own[k];
-      delta_j[pos] = exp(sigma_re_own_log) * z_own[j][k];
-    }
-    for (k in 1:(nt * (nt - 1))) {
-      int pos = idx_cross[k];
-      delta_j[pos] = exp(sigma_re_cross_log) * z_cross[j][k];
-    }
-
-    vector[nt * nt] vec_phi_j = vec_phi_pop_local + delta_j;
-
-    // reshape to Phi_j
-    matrix[nt, nt] Phi_j;
-    for (c in 1:nt) {
-      for (r in 1:nt) {
-        int flat = (c - 1) * nt + r;
-        Phi_j[r, c] = vec_phi_j[flat];
-      }
-    }
-
-    // compute residuals for t >= 2
+    vector[nt] phi0_j_loc = phi0_pop + sigma_phi0 * z_phi0[j]; // reuse same transform
     for (t in 2:T) {
       vector[nt] rts_lag = to_vector(row(rts[j], t - 1));
-      vector[nt] mu = Phi_j * (rts_lag - phi0_j_loc) + phi0_j_loc;
+      vector[nt] mu = phi0_j_loc + Phi[j] * (rts_lag - phi0_j_loc);
       vector[nt] rts_t = to_vector(row(rts[j], t));
       resid[j][, t] = rts_t - mu;
     }
-
-    // first timepoint residuals set to zero
+    // first timepoint residuals zero
     for (d in 1:nt) {
       resid[j][d, 1] = 0;
     }
   }
 }
-
