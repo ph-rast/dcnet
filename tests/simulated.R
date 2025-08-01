@@ -258,7 +258,7 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 
     ## First run meanfield algo to obtain init values:
     fit_init <- dcnet(
-        data = replication_data[[1]], parameterization = "CCC", J = replication_data$N,
+        data = replication_data[[1]], parameterization = "DCC", J = replication_data$N,
         group = replication_data[[2]], standardize_data = FALSE,
         init = 0,
         meanstructure = "constant",
@@ -434,7 +434,7 @@ bins_list <- list()
 looic_list <- list()
 
 
-for (s in 2:10) {
+for (s in 1:10) {
 
     replication_data <- simulate_data(N = 75, tl = 75)
     fit_r <- safe_sample(s, replication_data = replication_data)
@@ -1944,3 +1944,4 @@ fitTest <- dcnet(
     grainsize = 3)
 
 summary(fitTest)
+

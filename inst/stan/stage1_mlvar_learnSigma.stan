@@ -56,7 +56,7 @@ parameters {
 }
 
 transformed parameters {
-  // population φ
+  // population phi
   real<lower=0> tau_own   = exp(tau_own_log);
   real<lower=0> tau_cross = exp(tau_cross_log);
   vector<lower=0>[nt]   lambda_own   = exp(lambda_own_log);
@@ -74,7 +74,7 @@ transformed parameters {
     vec_phi_pop[pos] = phi_pop_cross[k];
   }
 
-  // subject-specific φ matrices and intercepts
+  // subject-specific phi matrices and intercepts
   array[J] matrix[nt, nt] Phi;
   array[J] vector[nt] phi0_j;
 
@@ -144,7 +144,7 @@ model {
   for (j in 1:J) {
     for (t in 2:T) {
       vector[nt] rts_lag = to_vector(rts[j][t - 1]); // previous time point as column
-      vector[nt] mu = Phi[j] * rts_lag + phi0_j[j];
+      vector[nt] mu = Phi[j] * (rts_lag - phi0_j[j])  + phi0_j[j]; // centered version with rts_lag - phi0
       vector[nt] rts_t = to_vector(rts[j][t]);
       rts_t ~ multi_normal(mu, Sigma);
     }
@@ -153,7 +153,7 @@ model {
 
 generated quantities {
     // existing residuals
-  array[J] matrix[nt, T] resid;  // residuals u_{j,t} = rts_{j,t} - phi0_j - Phi_j * rts_{j,t-1}
+  array[J] matrix[nt, T] resid;  // residuals u_{j,t} = rts_{j,t} - phi0_j - Phi_j * (rts_{j,t-1} - phi0_j)
   
 
   for (j in 1:J) {
@@ -197,7 +197,7 @@ generated quantities {
     // compute residuals for t >= 2
     for (t in 2:T) {
       vector[nt] rts_lag = to_vector(row(rts[j], t - 1));
-      vector[nt] mu = Phi_j * rts_lag + phi0_j_loc;
+      vector[nt] mu = Phi_j * (rts_lag - phi0_j_loc) + phi0_j_loc;
       vector[nt] rts_t = to_vector(row(rts[j], t));
       resid[j][, t] = rts_t - mu;
     }
