@@ -60,35 +60,36 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 20
-tl <- 30
+N <- 50
+tl <- 50
 nts <- 3
-simdat <- .simuDCC(tslength = tl,  N = N,  n_ts = nts,
-                   phi_mu = 0, ## populate phi
-                   phi0_sd = 0, ## create variation in the intercepts of the time series
-                   phi_ranef_sd = 0.005, ## ranef of the parameter matrix: This one has large impact on phi stationarity if sationarity_phi = FALSE
-                   phi_sd_diag = 0.5,  ## random effects
-                   phi_sd_off = 0.05,
-                   log_c_fixed = rep(0, nts),
-                   log_c_r_sd = 0.5,
-                   a_h_fixed = rep(-5.5, nts),
-                   a_h_r_sd = 0.5,
-                   b_h_fixed = rep(-1.5, nts),  ## On logit scale
-                   b_h_r_sd = 0.5,
-                   l_a_q_fixed = -1.5,  ## on logit scale
-                   l_b_q_fixed = -.5,   ## on logit scale
-                   l_a_q_r_sd = 0.5,
-                   l_b_q_r_sd = 0.5,
-                   phi0_fixed =  rep(0, nts),
-                   ranS_sd = 0.1, ## random effects on atanh scale
-                   stationarity_phi = FALSE)
+simdat <- .simuDCC(
+    tslength = tl, N = N, n_ts = nts,
+    phi_mu = 0, ## populate phi
+    phi0_sd = 0.4, ## create variation in the intercepts of the time series
+    phi_sd_diag = 0.3, ## SD of own lags across TS's
+    phi_sd_off = 0.05, ## SD of cross lags across TS's
+    phi_ranef_sd = 0.01, ## random effects in phi
+    log_c_fixed = rep(-0.9, nts),
+    log_c_r_sd = 0.3,
+    a_h_fixed = rep(-2.5, nts),
+    a_h_r_sd = 0.1,
+    b_h_fixed = rep(-1.5, nts), ## On logit scale
+    b_h_r_sd = 0.1,
+    l_a_q_fixed = -1.5, ## on logit scale
+    l_b_q_fixed = -.5, ## on logit scale
+    l_a_q_r_sd = 0.2,
+    l_b_q_r_sd = 0.2,
+    phi0_fixed = rep(0, nts),
+    ranS_sd = 0.25, ## random effects on atanh scale
+    stationarity_phi = FALSE)
 
 rtsgen <- lapply(seq(dim(simdat[[1]])[3]), function(x) t(simdat[[1]][, , x]))
 
 groupvec <- rep(c(1:N),  each = tl)
 
-rtsgen[[1]]
-rtsgen[[1]][, 2]
+
+range(lapply(1:N, function(x) range(rtsgen[[x]])))
 
 
 fit0 <- dcnet(
@@ -105,9 +106,104 @@ fit0 <- dcnet(
 
 fit0
 
-resid_draws <- posterior::as_draws_matrix(fit0$model_fit$draws("resid"))
+
+summary(fit0)
+
+#### Garch h params
+draws_df <- fit0$model_fit$draws(format = "draws_df")
+
+# assume draws_df is as_draws_df(fit0$model_fit$draws(format="draws_df"))
+# library(posterior)
+# draws_df <- as_draws_df(draws_garch)
+
+# population fixed effects (directly use the raw / logit-scale)
+mu_c <- suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
+mu_a_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))]))
+mu_b_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))]))
+
+# random effect SDs
+sd_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
+sd_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
+sd_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
+
+# Assemble for downstream model
+stage2_summary <- list(
+  c_h_fixed = mu_c,      # log-scale
+  a_h_fixed = mu_a_raw,  # logit-scale
+  b_h_fixed = mu_b_raw,  # logit-scale
+  c_h_tau   = sd_c,
+  a_h_tau   = sd_a,
+  b_h_tau   = sd_b
+)
+
+stage2_summary
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# helper: safe column-mean
+safe_colmean <- function(pattern, expected_len = NULL) {
+  cols <- grep(pattern, colnames(draws_df), value = TRUE)
+  if (length(cols) == 0) stop("No columns matching ", pattern)
+  m <- suppressWarnings(colMeans(draws_df[, cols, drop = FALSE]))
+  if (!is.null(expected_len) && length(m) != expected_len) {
+    warning("Length mismatch for ", pattern, ": got ", length(m), " expected ", expected_len)
+  }
+  m
+}
+
+# Population fixed effects (on the scales used by the downstream model)
+# c_h_fixed is log-scale intercepts
+c_h_fixed <- safe_colmean("^mu_c\\[", NULL)
+
+# a_h_fixed and b_h_fixed: centered version (population-level) before non-centered noise
+a_pop <- 1 / (1 + exp(- safe_colmean("^mu_a_raw\\[", nt)))  # inv_logit(mu_a_raw)
+b_pop_raw <- safe_colmean("^mu_b_raw\\[", nt)
+b_pop <- (0.99 - a_pop) * (1 / (1 + exp(- b_pop_raw)))       # enforces a + b < 0.99
+
+a_h_fixed <- qlogis(a_pop)    # if your downstream model expects logit-scale fixed effect (e.g., l_a_q_fixed)
+b_h_fixed <- qlogis(b_pop)    # similarly
+
+# Random effect SDs (on raw scale for mu + sd * z)
+sd_c <- safe_colmean("^sd_c\\[", nt)
+sd_a <- safe_colmean("^sd_a\\[", nt)
+sd_b <- safe_colmean("^sd_b\\[", nt)
+
+# If the downstream model wants the SDs on the scale before transformation:
+# a_h_tau corresponds to sd_a (but if you used log scaling there adjust accordingly)
+# b_h_tau corresponds to sd_b
+# c_h_tau corresponds to sd_c
+
+# Optional: extract subject-series posterior means of transformed parameters if you emitted them
+# e.g., a_h_out[j,d], b_h_out[j,d], c_h_out[j,d]
+extract_matrix <- function(prefix, J, nt) {
+  arr <- array(NA_real_, dim = c(J, nt))
+  for (j in 1:J) {
+    for (d in 1:nt) {
+      name <- sprintf("%s[%d,%d]", prefix, j, d)
+      if (name %in% colnames(draws_df)) {
+        arr[j, d] <- mean(draws_df[[name]])
+      }
+    }
+  }
+  arr
+}
+
+
+########
 ########
 
 # fit is your CmdStanFit object

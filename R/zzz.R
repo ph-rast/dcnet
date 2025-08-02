@@ -10,6 +10,7 @@
     ## Paths to the Stan model files
     stage1_file <- file.path(stan_path, "stage1_mlvar_learnSigma.stan")
     stage2_file <- file.path(stan_path, "stage2_zhier.stan")
+    stage2garch_file <- file.path(stan_path, "stage2_hierarchical_uvGARCH.stan")
     ccc_file    <- file.path(stan_path, "VARhs.stan")
     dcc_file    <- file.path(stan_path, "mlVARDCCfixedSrandQ.stan")
     dccr_file   <- file.path(stan_path, "DCCMGARCHrandS.stan")
@@ -21,6 +22,8 @@
     assign("dccr_model",   cmdstanr::cmdstan_model(dccr_file,   cpp_option = list(stan_threads = TRUE)), envir = .GlobalEnv)
     assign("dccrs_model",  cmdstanr::cmdstan_model(dccrs_file,  cpp_option = list(stan_threads = TRUE)), envir = .GlobalEnv)
     assign("stage2_model", cmdstanr::cmdstan_model(stage2_file, cpp_option = list(stan_threads = TRUE)), envir = .GlobalEnv)
+    assign("stage2garch_model", cmdstanr::cmdstan_model(stage2garch_file, cpp_option = list(stan_threads = TRUE)),
+           envir = .GlobalEnv)
     assign("stage1_model", cmdstanr::cmdstan_model(stage1_file, cpp_option = list(stan_threads = TRUE)), envir = .GlobalEnv)
     
     message("Stan models compiled successfully.")

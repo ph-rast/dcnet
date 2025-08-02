@@ -94,7 +94,9 @@ dcnet <- function(data,
         
         ## Model returns a list containing the phi pop vlaues random efects.
         ## Residuals are resid
-        cat("\nStage 1: mlVAR is estimated \n")
+        cat("\n---------------------------\n" )
+        cat("Stage 1: mlVAR is estimated \n")
+        cat("---------------------------\n" )
         fit_stage1 <- stage1_model$variational(data = stan_data,
                                                iter = 50000,
                                                threads = threads_per_chain,
@@ -170,10 +172,13 @@ dcnet <- function(data,
         stan_data$phi0_pop <- phi0_pop
         stan_data$phi_pop <- phi_pop
 
-        ######################################################
-        ## Stage 2: Compute random effects for uncond corr matrix S  ##
+        ###############################################################
+        ## Stage 2:                                                  ##
+        ##   Step 1: Compute random effects for uncond corr matrix S ##
+        ##   Step 2: Compute hierarchical GARCH on diag of DRD       ##
         ###############################################################
 
+        ## Step 1:
         ## Compute individual sample correlations
         ## Extract fisher z transform off diagional elements
         zhat <- lapply(seq_len(J), function(x) {
@@ -185,13 +190,15 @@ dcnet <- function(data,
         s_data <- list(J = J,
                        nt = stan_data$nt,
                        Sdim = Sdim,
-                       zhat = zhat) 
-        cat("\nStage 2: Random effect of S is estimated \n")
+                       zhat = zhat)
+        cat("\n--------------------------------------------\n" )
+        cat("Stage 2, Step 1: Estimate random effect of S\n")
+        cat("--------------------------------------------\n\n" )
         precomp_fit <- stage2_model$variational(data = s_data,
                                                 iter = 50000,
                                                 threads = threads_per_chain,
                                                 ...)
-        cat("\n Stage 3: mlVAR-DCC is estimated \n")
+        
         ## Extract the random effects SD vector
         post2draws <- precomp_fit$draws(format = "matrix", variables = paste0("sigma_z[", 1:Sdim, "]"))
         ## Simplest approach: Average across draws and use E(sigma_z) as SD for all S ranefs
@@ -200,20 +207,55 @@ dcnet <- function(data,
         stan_data$Sdim <- Sdim
         stan_data$S_vec_tau_fixed <- sigma_z_hat
 
-        #####################################################################################
-        ## Stage 3: TODO Fit univariate GARCH to diag(D) elements and pass along estimates ##
-        #####################################################################################
+        ## Step 2:
+        ## Use residuals from Stage 1
+        cat("\n------------------------------------------\n" )
+        cat("Stage 2, Step 2: Estimate GARCH on diag(D)\n")
+        cat("------------------------------------------\n\n" )
 
-        ##
+        garch_data <- list(J = J,
+                           nt = stan_data$nt,
+                           T = T,
+                           u = residuals)
+        garch_fit <- stage2garch_model$variational(data = garch_data,
+                                                   iter = 50000,
+                                                   threads = threads_per_chain,
+                                                   ...)
+        ## Extract paramaters for downstream mlVAR-DCC model
+        #### Garch h params
+        draws_df <- garch_fit$draws(format = "draws_df")
+
+        ## population fixed effects (directly use the raw / logit-scale)
+        mu_c <- suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
+        mu_a_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))]))
+        mu_b_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))]))
+
+        ## random effect SDs
+        sd_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
+        sd_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
+        sd_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
+
+        ## Add to stan_data, all nt length vectors
+        stan_data$c_h_fixed <- mu_c      # log-scale
+        stan_data$a_h_fixed <- mu_a_raw  # logit-scale
+        stan_data$b_h_fixed <- mu_b_raw  # logit-scale
+        stan_data$c_h_tau <- sd_c
+        stan_data$a_h_tau <- sd_a
+        stan_data$b_h_tau <- sd_b
+        ## Assemble for easy read-out from fitted object
+        stage2_summary <- list(
+            c_h_fixed = mu_c, # log-scale
+            a_h_fixed = mu_a_raw, # logit-scale
+            b_h_fixed = mu_b_raw, # logit-scale
+            c_h_tau   = sd_c,
+            a_h_tau   = sd_a,
+            b_h_tau   = sd_b
+        )
+
+        cat("\n---------------------------------------\n")
+        cat("\n Stage 3: Estimate final mlVAR-DCC\n")
+        cat("\n---------------------------------------\n")
     }
-
-    ## if(is.null(stanmodel)) {
-    ##     stop("Not a valid model specification. ",
-    ##          parameterization,
-    ##          "must be one of: ",
-    ##          paste0(supported_models, collapse = ", "),
-    ##          ".")
-    ## }
 
     ## HMC Sampling
     if (tolower(sampling_algorithm) == "hmc") {
@@ -224,7 +266,6 @@ dcnet <- function(data,
             iter_warmup <- round(iterations / 2)
             iter_sampling <- iterations - iter_warmup
         }
-        
         ##
         max_cores <- parallel::detectCores()
         Sys.setenv(STAN_NUM_THREADS = threads_per_chain)
@@ -301,7 +342,8 @@ dcnet <- function(data,
                      std_data = standardize_data,
                      sampling_algorithm = sampling_algorithm,
                      S_pred = S_pred,
-                     S_vec_tau_post = post2draws) ## With 2 stage model, pass posterior for ranef SD along
+                     S_vec_tau_post = post2draws,
+                     stage2_summary = stage2_summary)
 
   class(return_fit) <- "dcnet"
   return(return_fit)

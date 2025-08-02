@@ -52,3 +52,4 @@ src/stanExports_DCCMGARCH.h
 /inst/stan/stage2_zhier
 /simulation_performance_100reps.rds
 /inst/stan/stage1_mlvar_learnSigma
+/inst/stan/stage2_hierarchical_uvGARCH

@@ -10,6 +10,9 @@ data {
 #include /data/data.stan
   int Sdim;
   vector[Sdim] S_vec_tau_fixed;
+  vector[nt] c_h_fixed; // variance on log metric
+  vector[nt] a_h_fixed;
+  vector[nt] b_h_fixed;  
 }
 
 transformed data { 
@@ -87,9 +90,6 @@ parameters {
 #include /parameters/predH.stan
 
   // GARCH h parameters on variance metric
-  vector[nt] c_h_fixed; // variance on log metric
-  vector[nt] a_h_fixed;
-  vector[nt] b_h_fixed;
 
   // Random effects for c_h
   cholesky_factor_corr[nt] c_h_L;
@@ -443,9 +443,9 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  to_vector(c_h_fixed) ~ student_t(3,  0, .5);
-  to_vector(a_h_fixed) ~ student_t(3, -3, .5);
-  to_vector(b_h_fixed) ~ student_t(3, -2.5, .5);
+  //to_vector(c_h_fixed) ~ student_t(3,  0, .5);
+  //to_vector(a_h_fixed) ~ student_t(3, -3, .5);
+  //to_vector(b_h_fixed) ~ student_t(3, -2.5, .5);
   // Prior for initial state
   
   // Prior on nu for student_t
