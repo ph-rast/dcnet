@@ -109,9 +109,15 @@ dcnet <- function(data,
         ## Extract Residuals and average across draws
         draws <- fit_stage1$draws(format = "draws_df")
 
-        ## Population intercept
+        ## Phi0 population intercept
         phi0_pop <- suppressWarnings(colMeans(draws[, grep("^phi0_pop\\[", names(draws))]))
-
+        ## corresponding SD's
+        phi0_pop_sd <- suppressWarnings(apply(draws[, grep("^phi0_pop\\[", colnames(draws))], 2, sd, na.rm = TRUE))
+        ## RE estimate:
+        sigma_phi0_log <-  suppressWarnings(colMeans(draws[, grep("^sigma_phi0_log\\[", names(draws))]))
+        sigma_phi0_log_sd <-  suppressWarnings(apply(draws[, grep("^sigma_phi0_log\\[", colnames(draws))], 2, sd, na.rm = TRUE))
+        
+        
         ## Pop phi:
         vec_phi_pop <- suppressWarnings(colMeans(draws[, grep("^vec_phi_pop\\[", names(draws))]))
         phi_pop <- matrix(vec_phi_pop, nt, nt)
@@ -166,10 +172,17 @@ dcnet <- function(data,
             colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
         }
 
+        ## Extract phi0 parameters:
+        
+        
         ## Overwrite rts (data) in the stan_data object with the residuals
         stan_data$rts <- residuals
         ## Add phi and Sigma to stan_data
-        stan_data$phi0_pop <- phi0_pop
+        stan_data$phi0_pop_stage1 <- phi0_pop
+        stan_data$phi0_pop_stage1_sd <- phi0_pop_sd
+        stan_data$sigma_phi0_log_stage1 <- sigma_phi0_log
+        stan_data$sigma_phi0_log_stage1_sd <- sigma_phi0_log_sd
+        
         stan_data$phi_pop <- phi_pop
 
         ###############################################################
@@ -229,27 +242,44 @@ dcnet <- function(data,
         mu_c <- suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
         mu_a_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))]))
         mu_b_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))]))
+        ## correspondind SD's
+        sd_mu_c     <- suppressWarnings(apply(draws_df[, grep("^mu_c\\[",     colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_mu_a_raw <- suppressWarnings(apply(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_mu_b_raw <- suppressWarnings(apply(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
 
         ## random effect SDs
-        sd_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
-        sd_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
-        sd_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
+        tau_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
+        tau_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
+        tau_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
+        ## Corresponding SD's
+        sd_tau_c <- suppressWarnings(apply(draws_df[, grep("^sd_c\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_tau_a <- suppressWarnings(apply(draws_df[, grep("^sd_a\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_tau_b <- suppressWarnings(apply(draws_df[, grep("^sd_b\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
 
-        ## Add to stan_data, all nt length vectors
-        stan_data$c_h_fixed <- mu_c      # log-scale
-        stan_data$a_h_fixed <- mu_a_raw  # logit-scale
-        stan_data$b_h_fixed <- mu_b_raw  # logit-scale
-        stan_data$c_h_tau <- sd_c
-        stan_data$a_h_tau <- sd_a
-        stan_data$b_h_tau <- sd_b
+        
+        ## Add to stan_data, all nt length vectors to pass to stan
+        stan_data$c_h_fixed_s2 <- mu_c      # log-scale
+        stan_data$a_h_fixed_s2 <- mu_a_raw  # logit-scale
+        stan_data$b_h_fixed_s2 <- mu_b_raw  # logit-scale
+        stan_data$c_h_fixed_s2_sd <- sd_mu_c      # log-scale
+        stan_data$a_h_fixed_s2_sd <- sd_mu_a_raw  # logit-scale
+        stan_data$b_h_fixed_s2_sd <- sd_mu_b_raw  # logit-scale
+        
+        stan_data$c_h_tau_s2 <- tau_c
+        stan_data$a_h_tau_s2 <- tau_a
+        stan_data$b_h_tau_s2 <- tau_b
+        stan_data$c_h_tau_s2_sd <- sd_tau_c
+        stan_data$a_h_tau_s2_sd <- sd_tau_a
+        stan_data$b_h_tau_s2_sd <- sd_tau_b
+        
         ## Assemble for easy read-out from fitted object
         stage2_summary <- list(
             c_h_fixed = mu_c, # log-scale
             a_h_fixed = mu_a_raw, # logit-scale
             b_h_fixed = mu_b_raw, # logit-scale
-            c_h_tau   = sd_c,
-            a_h_tau   = sd_a,
-            b_h_tau   = sd_b
+            c_h_tau   = sd_tau_c,
+            a_h_tau   = sd_tau_a,
+            b_h_tau   = sd_tau_b
         )
 
         cat("\n---------------------------------------\n")

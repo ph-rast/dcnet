@@ -33,7 +33,7 @@ transformed data {
 parameters {
   // intercept hierarchy
   vector[nt] phi0_pop;
-  real<lower=0> sigma_phi0;
+  vector[nt] sigma_phi0_log;
   array[J] vector[nt] z_phi0; // non-centered intercept deviations
 
   // population VAR phi with grouped horseshoe (own vs cross)
@@ -56,6 +56,7 @@ parameters {
 }
 
 transformed parameters {
+  vector[nt] sigma_phi0 = exp(sigma_phi0_log);
   // population phi
   real<lower=0> tau_own   = exp(tau_own_log);
   real<lower=0> tau_cross = exp(tau_cross_log);
@@ -83,7 +84,7 @@ transformed parameters {
 
   for (j in 1:J) {
     // intercept non-centered
-    phi0_j[j] = phi0_pop + sigma_phi0 * z_phi0[j];
+    phi0_j[j] = phi0_pop + sigma_phi0 .* z_phi0[j];
 
     // build subject delta
     vector[nt * nt] delta_j = rep_vector(0.0, nt * nt);
@@ -156,7 +157,7 @@ generated quantities {
  
   // Residuals (centered)
   for (j in 1:J) {
-    vector[nt] phi0_j_loc = phi0_pop + sigma_phi0 * z_phi0[j]; // reuse same transform
+    vector[nt] phi0_j_loc = phi0_pop + sigma_phi0 .* z_phi0[j]; // reuse same transform
     for (t in 2:T) {
       vector[nt] rts_lag = to_vector(row(rts[j], t - 1));
       vector[nt] mu = phi0_j_loc + Phi[j] * (rts_lag - phi0_j_loc);

@@ -96,7 +96,7 @@ fit0 <- dcnet(
     data = rtsgen, parameterization = "DCCrs", J =  N,
     group = groupvec,
     init = 0,
-    meanstructure = "constant",
+    meanstructure = "VAR",
     iterations = 30000,
     chains = 4,
     threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
@@ -540,7 +540,7 @@ looic_list <- list()
 
 for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 20, tl = 30)
+    replication_data <- simulate_data(N = 50, tl = 50)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {

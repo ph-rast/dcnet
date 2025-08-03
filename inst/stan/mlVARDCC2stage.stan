@@ -8,11 +8,32 @@ functions {
 
 data {
 #include /data/data.stan
+  // data inputs from stage 1
+  vector[nt] phi0_pop_stage1;            // mean of phi0_pop
+  vector[nt] phi0_pop_stage1_sd;         // posterior SD of each element
+  vector[nt] sigma_phi0_log_stage1;       // population-level sd (or average across j)
+  vector[nt] sigma_phi0_log_stage1_sd;    // uncertainty in that optional
+
+  
+
+  // data inputs from stage 2
+  vector[nt] c_h_fixed_s2; // variance on log metric
+  vector[nt] a_h_fixed_s2;
+  vector[nt] b_h_fixed_s2;
+  vector[nt] c_h_fixed_s2_sd; // variance on log metric
+  vector[nt] a_h_fixed_s2_sd;
+  vector[nt] b_h_fixed_s2_sd;
+  
+  vector[nt] c_h_tau_s2; // variance on log metric
+  vector[nt] a_h_tau_s2;
+  vector[nt] b_h_tau_s2;
+  vector[nt] c_h_tau_s2_sd;
+  vector[nt] a_h_tau_s2_sd;
+  vector[nt] b_h_tau_s2_sd;  
+
   int Sdim;
   vector[Sdim] S_vec_tau_fixed;
-  vector[nt] c_h_fixed; // variance on log metric
-  vector[nt] a_h_fixed;
-  vector[nt] b_h_fixed;  
+  
 }
 
 transformed data { 
@@ -90,7 +111,10 @@ parameters {
 #include /parameters/predH.stan
 
   // GARCH h parameters on variance metric
-
+  vector[nt] c_h_fixed; // variance on log metric
+  vector[nt] a_h_fixed;
+  vector[nt] b_h_fixed;
+  
   // Random effects for c_h
   cholesky_factor_corr[nt] c_h_L;
   vector[nt] c_h_tau_log;
@@ -420,11 +444,11 @@ model {
   b_h_L ~ lkj_corr_cholesky(1);
   // R part in DRD
 
-  phi0_tau_log ~ normal(log(0.5), .5); // SD for multiplication with cholesky phi0_L
+  phi0_tau_log ~ normal(sigma_phi0_log_stage1, sigma_phi0_log_stage1_sd);; // SD for multiplication with cholesky phi0_L
   //phi_tau ~ normal(0, 0.0063); // SD for multiplication with cholesky phi0_L
-  c_h_tau_log ~ normal(-1, .5); // SD for c_h ranefs
-  a_h_tau_log ~ normal(-2, .5); // SD for c_h ranefs
-  b_h_tau_log ~ normal(-2, .5);
+  c_h_tau_log ~ normal(c_h_tau_s2, c_h_tau_s2_sd); // SD for c_h ranefs
+  a_h_tau_log ~ normal(a_h_tau_s2, a_h_tau_s2_sd); // SD for c_h ranefs
+  b_h_tau_log ~ normal(b_h_tau_s2, b_h_tau_s2_sd);
 
   // Horseshoe:
   //// standard normal prior
@@ -443,16 +467,16 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  //to_vector(c_h_fixed) ~ student_t(3,  0, .5);
-  //to_vector(a_h_fixed) ~ student_t(3, -3, .5);
-  //to_vector(b_h_fixed) ~ student_t(3, -2.5, .5);
+  c_h_fixed ~ normal(c_h_fixed_s2, c_h_fixed_s2_sd);
+  a_h_fixed ~ normal(a_h_fixed_s2, a_h_fixed_s2_sd);
+  b_h_fixed ~ normal(b_h_fixed_s2, b_h_fixed_s2_sd);
   // Prior for initial state
   
   // Prior on nu for student_t
   //if ( distribution == 1 )
   nu ~ normal( nt, 5 );
   //to_vector(phi0_fixed) ~ student_t(3,0,1);//multi_normal(rts_m, diag_matrix( rep_vector(1.0, nt) ) );
-  phi0_fixed ~ student_t(3, 0, 1);
+  phi0_fixed ~ normal(phi0_pop_stage1, phi0_pop_stage1_sd);
   // vec_phi_fixed ~ student_t(3, 0, 1);
   S_vec_fixed ~ normal(0, 0.5);
   S_vec_fixed2 ~ std_normal();
