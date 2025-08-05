@@ -162,18 +162,6 @@ replication_data$N
 ## V2:
 safe_sample <- function(s, max_retries = 3, replication_data) {
     replication_data <- replication_data
-
-    ## First run meanfield algo to obtain init values:
-    fit_init <- dcnet(
-        data = replication_data[[1]], parameterization = "DCCrs", J = replication_data$N,
-        group = replication_data[[2]], standardize_data = FALSE,
-        init = 0,
-        meanstructure = "VAR",
-        iterations = 50000,
-        # eta = 0.05,
-        #tol_rel_obj = 0.005,
-        sampling_algorithm = "variational"
-    )
     
     ## Helper function to check if model_fit is broken
     is_model_fit_broken <- function(fit) {
@@ -191,25 +179,16 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         message(sprintf("Fitting attempt %d for index %d", attempt, s))
 
         fit <- tryCatch({
-            fit_init
-            ## dcnet(
-            ##    data = replication_data[[1]],
-            ##    parameterization = 'DCCrs',
-            ##    J = replication_data$N,
-            ##    meanstructure = "VAR",
-            ##    group = replication_data[[2]], ## groupvec
-            ##    standardize_data = FALSE,
-            ##    init = fit_init$model_fit,
-            ##    threads = 4,
-            ##    iterations = 50000,
-            ##    #calgorithm = "fullrank",
-            ##    sampling_algorithm = 'variational',
-            ##    tol_rel_obj =  0.005,
-            ##    eta = 0.05,
-            ##    adapt_iter = 200,
-            ##    chains = 4,
-            ##    grainsize = 3
-            ## )
+            fit_init <- dcnet(
+                data = replication_data[[1]], parameterization = "DCCrs", J = replication_data$N,
+                group = replication_data[[2]], standardize_data = FALSE,
+                init = 0,
+                meanstructure = "VAR",
+                iterations = 50000,
+                ## eta = 0.05,
+                tol_rel_obj = 0.007,
+                sampling_algorithm = "variational"
+            )
         }, error = function(e) {
             message(sprintf("Hard failure on attempt %d: %s", attempt, e$message))
             return(NULL)
@@ -341,9 +320,9 @@ bins_list <- list()
 looic_list <- list()
 
 
-for (s in 8:10) {
+for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 50, tl = 50)
+    replication_data <- simulate_data(N = 100, tl = 100)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {
