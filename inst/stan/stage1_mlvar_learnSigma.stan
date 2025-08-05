@@ -1,4 +1,4 @@
-// stage1_mlvar_learnSigma_rts.stan
+// mlVAR:
 data {
   int<lower=1> J;                              // subjects
   int<lower=1> T;                              // time length

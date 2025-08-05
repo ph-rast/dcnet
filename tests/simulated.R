@@ -112,203 +112,6 @@ summary(fit0)
 #### Garch h params
 draws_df <- fit0$model_fit$draws(format = "draws_df")
 
-# assume draws_df is as_draws_df(fit0$model_fit$draws(format="draws_df"))
-# library(posterior)
-# draws_df <- as_draws_df(draws_garch)
-
-# population fixed effects (directly use the raw / logit-scale)
-mu_c <- suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
-mu_a_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))]))
-mu_b_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))]))
-
-# random effect SDs
-sd_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
-sd_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
-sd_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
-
-# Assemble for downstream model
-stage2_summary <- list(
-  c_h_fixed = mu_c,      # log-scale
-  a_h_fixed = mu_a_raw,  # logit-scale
-  b_h_fixed = mu_b_raw,  # logit-scale
-  c_h_tau   = sd_c,
-  a_h_tau   = sd_a,
-  b_h_tau   = sd_b
-)
-
-stage2_summary
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# helper: safe column-mean
-safe_colmean <- function(pattern, expected_len = NULL) {
-  cols <- grep(pattern, colnames(draws_df), value = TRUE)
-  if (length(cols) == 0) stop("No columns matching ", pattern)
-  m <- suppressWarnings(colMeans(draws_df[, cols, drop = FALSE]))
-  if (!is.null(expected_len) && length(m) != expected_len) {
-    warning("Length mismatch for ", pattern, ": got ", length(m), " expected ", expected_len)
-  }
-  m
-}
-
-# Population fixed effects (on the scales used by the downstream model)
-# c_h_fixed is log-scale intercepts
-c_h_fixed <- safe_colmean("^mu_c\\[", NULL)
-
-# a_h_fixed and b_h_fixed: centered version (population-level) before non-centered noise
-a_pop <- 1 / (1 + exp(- safe_colmean("^mu_a_raw\\[", nt)))  # inv_logit(mu_a_raw)
-b_pop_raw <- safe_colmean("^mu_b_raw\\[", nt)
-b_pop <- (0.99 - a_pop) * (1 / (1 + exp(- b_pop_raw)))       # enforces a + b < 0.99
-
-a_h_fixed <- qlogis(a_pop)    # if your downstream model expects logit-scale fixed effect (e.g., l_a_q_fixed)
-b_h_fixed <- qlogis(b_pop)    # similarly
-
-# Random effect SDs (on raw scale for mu + sd * z)
-sd_c <- safe_colmean("^sd_c\\[", nt)
-sd_a <- safe_colmean("^sd_a\\[", nt)
-sd_b <- safe_colmean("^sd_b\\[", nt)
-
-# If the downstream model wants the SDs on the scale before transformation:
-# a_h_tau corresponds to sd_a (but if you used log scaling there adjust accordingly)
-# b_h_tau corresponds to sd_b
-# c_h_tau corresponds to sd_c
-
-# Optional: extract subject-series posterior means of transformed parameters if you emitted them
-# e.g., a_h_out[j,d], b_h_out[j,d], c_h_out[j,d]
-extract_matrix <- function(prefix, J, nt) {
-  arr <- array(NA_real_, dim = c(J, nt))
-  for (j in 1:J) {
-    for (d in 1:nt) {
-      name <- sprintf("%s[%d,%d]", prefix, j, d)
-      if (name %in% colnames(draws_df)) {
-        arr[j, d] <- mean(draws_df[[name]])
-      }
-    }
-  }
-  arr
-}
-
-
-########
-########
-
-# fit is your CmdStanFit object
-draws <- fit0$model_fit$draws(format = "draws_df")
-
-
-vec_phi_pop <- suppressWarnings(colMeans(draws[, grep("^vec_phi_pop\\[", names(draws))]))
-Phi_pop <- matrix(vec_phi_pop, nt, nt)
-
-
-# Population intercept
-phi0_pop <- suppressWarnings(colMeans(draws[, grep("^phi0_pop\\[", names(draws))]))
-
-# Subject-specific VAR matrices (posterior mean)
-extract_matrix <- function(prefix, J, nt) {
-  arr <- array(NA_real_, dim = c(nt, nt, J))
-  for (j in 1:J) {
-    for (r in 1:nt) {
-      for (c in 1:nt) {
-        name <- sprintf("%s[%d,%d,%d]", prefix, j, r, c)  # e.g., "Phi_j[1,2,3]"
-        if (name %in% colnames(draws)) { arr[r, c, j] <- mean(draws[[name]])
-        }
-      }
-    }
-  }
-  arr
-}
-
-Phi_j_hat <- extract_matrix("Phi", J = J, nt = nt)  # adjust J, nt
-
-phi0_j_hat <- array(NA_real_, dim = c(J, nt))
-for (j in 1:J) {
-    phi0_j_hat[j, ] <-  colMeans(draws[, grep(sprintf("^phi0_j\\[%d,", j), names(draws))])
-}
-
-# Sigma (posterior mean)
-Sigma_hat <- matrix(NA_real_, nrow = nt, ncol = nt)
-for (r in 1:nt) for (c in 1:nt) {
-  nm <- sprintf("Sigma[%d,%d]", r, c)
-  if (nm %in% colnames(draws)) Sigma_hat[r, c] <- mean(draws[[nm]])
-                }
-Sigma_hat
-
-# Residuals: list of T x nt matrices
-# Assuming resid[j,d,t]
-resid_list <- vector("list", J)
-for (j in 1:J) {
-    mat <- matrix(NA_real_, nrow = T, ncol = nt)
-    for (t in 1:T) {
-        for (d in 1:nt) {
-            nm <- sprintf("resid[%d,%d,%d]", j, d, t)
-            if (nm %in% colnames(draws)) mat[t, d] <- mean(draws[[nm]])
-        }
-    }
-    resid_list[[j]] <- mat
-}
-resid_list
- ## collect residuals and add back variable names
-        residuals <- list()
-        for (i in 1:J) {
-            residuals[[i]] <- resid_list[[i]]
-            colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
-        }
-
-#########
-
-
-phi0_pop <- colMeans(posterior::as_draws_matrix(fit0$model_fit$draws("phi0_pop")))
-
-Phi_j_hat <- extract_matrix("Phi_j", J, nt)  # adjust J, nt
-Phi_j_hat
-
-
-
-data.frame(t(apply(fit_r$S_vec_tau_post, 2,
-                   function(x) quantile(x, c(0.5, 0.025, .975)))))
-
-
-.
-##     fit <- dcnet(
-##         data = rtsgen, parameterization = "DCCrs", J = N,
-##         group = groupvec, standardize_data = TRUE,
-##         init = fit0$model_fit,
-##         meanstructure = "VAR",
-##         iterations = 30000,
-##         sampling_algorithm = "variational",
-##         algorithm = "fullrank", ## fullrank should be less biased
-##         #grad_samples = 1,
-##         #elbo_samples = 150,
-##         eta = 0.001,
-##         adapt_iter = 200,
-##         chains = 4
-##     )
-    
-## })
-
-
-
-## fit$model_fit$output()
-
-##summary(fit0)
-
-## summary(fit)
-
-## fit$model_fit$summary()
 
 ######################################
 ## Simulate 
@@ -365,10 +168,10 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         data = replication_data[[1]], parameterization = "DCCrs", J = replication_data$N,
         group = replication_data[[2]], standardize_data = FALSE,
         init = 0,
-        meanstructure = "constant",
+        meanstructure = "VAR",
         iterations = 50000,
         # eta = 0.05,
-        tol_rel_obj = 0.005,
+        #tol_rel_obj = 0.005,
         sampling_algorithm = "variational"
     )
     
@@ -513,17 +316,17 @@ looic <- function(fit) {
 
 ## Stan variables:
 variables_m <- c(
-#    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
-#    'tau_own', 'tau_cross'),
+    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
+    'tau_own', 'tau_cross',
     'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
-    'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
+    'a_q_pop', 'l_a_q_sigma', 'b_q_pop', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
 ## Simulation variables: Note that the simulatin script only defines one random
 ## effect for phi, phi_ranef_sd, but the stan model captures the random effects
 ## in both, the own and cross lag of phi in sigma_re_own/cross
 var <- c(
-#    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "phi_ranef_sd",
- #   "phi_sd_diag", "phi_sd_off")#,
+    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "phi_ranef_sd",
+    "phi_sd_diag", "phi_sd_off",
     "log_c_fixed", "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
     "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd")
 
@@ -538,7 +341,7 @@ bins_list <- list()
 looic_list <- list()
 
 
-for (s in 1:10) {
+for (s in 8:10) {
 
     replication_data <- simulate_data(N = 50, tl = 50)
     fit_r <- safe_sample(s, replication_data = replication_data)

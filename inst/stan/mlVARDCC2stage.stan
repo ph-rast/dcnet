@@ -24,12 +24,12 @@ data {
   vector[nt] a_h_fixed_s2_sd;
   vector[nt] b_h_fixed_s2_sd;
   
-  vector[nt] c_h_tau_s2; // variance on log metric
-  vector[nt] a_h_tau_s2;
-  vector[nt] b_h_tau_s2;
-  vector[nt] c_h_tau_s2_sd;
-  vector[nt] a_h_tau_s2_sd;
-  vector[nt] b_h_tau_s2_sd;  
+  vector[nt] c_h_tau_log_s2; // variance on log metric
+  vector[nt] a_h_tau_log_s2;
+  vector[nt] b_h_tau_log_s2;
+  vector[nt] c_h_tau_log_s2_sd;
+  vector[nt] a_h_tau_log_s2_sd;
+  vector[nt] b_h_tau_log_s2_sd;  
 
   int Sdim;
   vector[Sdim] S_vec_tau_fixed;
@@ -243,11 +243,8 @@ transformed parameters {
   }
 
 
-  
-
-  
   // logit versions used elsewhere in my code
-  real l_a_q = logit(a_q_pop);
+  real l_a_q = logit(a_q_pop); // _q_pop correspons to simulation script scale _q_fixed
   real l_b_q = logit(b_q_pop);
   
   //Scale
@@ -317,11 +314,13 @@ transformed parameters {
     // R part
     l_a_q_r[j] = l_a_q_sigma * l_a_q_stdnorm[j];
     l_b_q_r[j] = l_b_q_sigma * l_b_q_stdnorm[j];
+    
     //a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
     // Replaced by stans inv_logit function:
     a_q[j] =          inv_logit( l_a_q + l_a_q_r[j] );
     //b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
     b_q[j] = (1 - a_q[j]) * inv_logit(l_b_q + l_b_q_r[j]);
+
     // D part
     // Should random effect corrleations be estimated:
     // Full estimation of corrmat with simplify_ch == 0
@@ -350,8 +349,9 @@ transformed parameters {
       b_h_random[j] = b_h_tau .* b_h_stdnorm[j];
     }
     // Bound sum of fixed and ranef between 0 and 1
-     b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
-    //b_h_sum[j] = (1 - a_h_sum[j]) .* inv_logit(b_h_fixed + b_h_random[j]);
+    // b_h_sum[j] = (1 - a_h_sum[j]) ./ (1 + exp(-(b_h_fixed + b_h_random[j])) );
+    b_h_sum[j] = (1 - a_h_sum[j]) .* inv_logit(b_h_fixed + b_h_random[j]);
+     
     /////////////////////
     // Model Structure //
     /////////////////////
@@ -402,7 +402,7 @@ transformed parameters {
       R[j,t] = quad_form_diag(Qr[j,t], Qr_sdi[j,t]); // 
       // H[j,t] = quad_form_diag(R[j,t],  D[j,t]);  // H = DRD;
 
-      /* Add Jitter to avoid non SPD matrix error: */
+      // Add Jitter to avoid non SPD matrix error: 
       matrix[nt,nt] Hij = quad_form_diag(R[j,t],  D[j,t]);
       // enforce symmetry
       Hij = 0.5 * (Hij + Hij');
@@ -446,9 +446,9 @@ model {
 
   phi0_tau_log ~ normal(sigma_phi0_log_stage1, sigma_phi0_log_stage1_sd);; // SD for multiplication with cholesky phi0_L
   //phi_tau ~ normal(0, 0.0063); // SD for multiplication with cholesky phi0_L
-  c_h_tau_log ~ normal(c_h_tau_s2, c_h_tau_s2_sd); // SD for c_h ranefs
-  a_h_tau_log ~ normal(a_h_tau_s2, a_h_tau_s2_sd); // SD for c_h ranefs
-  b_h_tau_log ~ normal(b_h_tau_s2, b_h_tau_s2_sd);
+  c_h_tau_log ~ normal(c_h_tau_log_s2, c_h_tau_log_s2_sd); // SD for c_h ranefs
+  a_h_tau_log ~ normal(a_h_tau_log_s2, a_h_tau_log_s2_sd); // SD for c_h ranefs
+  b_h_tau_log ~ normal(b_h_tau_log_s2, b_h_tau_log_s2_sd);
 
   // Horseshoe:
   //// standard normal prior

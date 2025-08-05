@@ -172,19 +172,22 @@ dcnet <- function(data,
             colnames(residuals[[i]]) <- colnames(stan_data$rts[[1]])
         }
 
-        ## Extract phi0 parameters:
-        
-        
-        ## Overwrite rts (data) in the stan_data object with the residuals
-        stan_data$rts <- residuals
+        ## Save residuals to pass along as data for other models
+        stan_data$residuals <- residuals
+
         ## Add phi and Sigma to stan_data
         stan_data$phi0_pop_stage1 <- phi0_pop
         stan_data$phi0_pop_stage1_sd <- phi0_pop_sd
         stan_data$sigma_phi0_log_stage1 <- sigma_phi0_log
         stan_data$sigma_phi0_log_stage1_sd <- sigma_phi0_log_sd
-        
+
         stan_data$phi_pop <- phi_pop
 
+        ## stage1_params <- list(
+        ##     phi0_pop = phi0_pop,
+        ##     sigma_phi0_log = sigma_phi0_log
+        ## )
+        
         ###############################################################
         ## Stage 2:                                                  ##
         ##   Step 1: Compute random effects for uncond corr matrix S ##
@@ -200,10 +203,12 @@ dcnet <- function(data,
         })
         ## S data
         Sdim <-  nt * (nt-1) / 2
-        s_data <- list(J = J,
-                       nt = stan_data$nt,
-                       Sdim = Sdim,
-                       zhat = zhat)
+        s_data <- list(
+            J = J,
+            nt = stan_data$nt,
+            Sdim = Sdim,
+            zhat = zhat
+        )
         cat("\n--------------------------------------------\n" )
         cat("Stage 2, Step 1: Estimate random effect of S\n")
         cat("--------------------------------------------\n\n" )
@@ -239,24 +244,25 @@ dcnet <- function(data,
         draws_df <- garch_fit$draws(format = "draws_df")
 
         ## population fixed effects (directly use the raw / logit-scale)
-        mu_c <- suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
+        ## mu_c is on log scale
+        mu_c <-     suppressWarnings(colMeans(draws_df[, grep("^mu_c\\[", colnames(draws_df))]))
         mu_a_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))]))
         mu_b_raw <- suppressWarnings(colMeans(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))]))
-        ## correspondind SD's
+        ## corresponding sampling SD's
         sd_mu_c     <- suppressWarnings(apply(draws_df[, grep("^mu_c\\[",     colnames(draws_df))], 2, sd, na.rm = TRUE))
         sd_mu_a_raw <- suppressWarnings(apply(draws_df[, grep("^mu_a_raw\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
         sd_mu_b_raw <- suppressWarnings(apply(draws_df[, grep("^mu_b_raw\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
 
         ## random effect SDs
-        tau_c <- suppressWarnings(colMeans(draws_df[, grep("^sd_c\\[", colnames(draws_df))]))
-        tau_a <- suppressWarnings(colMeans(draws_df[, grep("^sd_a\\[", colnames(draws_df))]))
-        tau_b <- suppressWarnings(colMeans(draws_df[, grep("^sd_b\\[", colnames(draws_df))]))
-        ## Corresponding SD's
-        sd_tau_c <- suppressWarnings(apply(draws_df[, grep("^sd_c\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
-        sd_tau_a <- suppressWarnings(apply(draws_df[, grep("^sd_a\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
-        sd_tau_b <- suppressWarnings(apply(draws_df[, grep("^sd_b\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        tau_c_log <- suppressWarnings(colMeans(draws_df[, grep("^c_h_tau_log\\[", colnames(draws_df))]))
+        tau_a_log <- suppressWarnings(colMeans(draws_df[, grep("^a_h_tau_log\\[", colnames(draws_df))]))
+        tau_b_log <- suppressWarnings(colMeans(draws_df[, grep("^b_h_tau_log\\[", colnames(draws_df))]))
+        ## Correspondings sampling SD's
+        sd_tau_c_log <- suppressWarnings(apply(draws_df[, grep("^c_h_tau_log\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_tau_a_log <- suppressWarnings(apply(draws_df[, grep("^a_h_tau_log\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
+        sd_tau_b_log <- suppressWarnings(apply(draws_df[, grep("^b_h_tau_log\\[", colnames(draws_df))], 2, sd, na.rm = TRUE))
 
-        
+
         ## Add to stan_data, all nt length vectors to pass to stan
         stan_data$c_h_fixed_s2 <- mu_c      # log-scale
         stan_data$a_h_fixed_s2 <- mu_a_raw  # logit-scale
@@ -264,22 +270,22 @@ dcnet <- function(data,
         stan_data$c_h_fixed_s2_sd <- sd_mu_c      # log-scale
         stan_data$a_h_fixed_s2_sd <- sd_mu_a_raw  # logit-scale
         stan_data$b_h_fixed_s2_sd <- sd_mu_b_raw  # logit-scale
-        
-        stan_data$c_h_tau_s2 <- tau_c
-        stan_data$a_h_tau_s2 <- tau_a
-        stan_data$b_h_tau_s2 <- tau_b
-        stan_data$c_h_tau_s2_sd <- sd_tau_c
-        stan_data$a_h_tau_s2_sd <- sd_tau_a
-        stan_data$b_h_tau_s2_sd <- sd_tau_b
-        
+
+        stan_data$c_h_tau_log_s2 <- tau_c_log
+        stan_data$a_h_tau_log_s2 <- tau_a_log
+        stan_data$b_h_tau_log_s2 <- tau_b_log
+        stan_data$c_h_tau_log_s2_sd <- sd_tau_c_log
+        stan_data$a_h_tau_log_s2_sd <- sd_tau_a_log
+        stan_data$b_h_tau_log_s2_sd <- sd_tau_b_log
+
         ## Assemble for easy read-out from fitted object
         stage2_summary <- list(
-            c_h_fixed = mu_c, # log-scale
+            c_h_fixed = mu_c,     # log-scale
             a_h_fixed = mu_a_raw, # logit-scale
             b_h_fixed = mu_b_raw, # logit-scale
-            c_h_tau   = sd_tau_c,
-            a_h_tau   = sd_tau_a,
-            b_h_tau   = sd_tau_b
+            c_h_tau   = exp(tau_c_log),
+            a_h_tau   = exp(tau_a_log),
+            b_h_tau   = exp(tau_b_log)
         )
 
         cat("\n---------------------------------------\n")
@@ -288,6 +294,13 @@ dcnet <- function(data,
     }
 
     ## HMC Sampling
+    ## If meanstructure = constant, only GARCH model is estimated on residuals from stge 1,
+    ## otherwise data remains original TS and meanstructure is estimated as well
+    if(meanstructure == 'constant') {
+        stan_data$rts <- residuals
+    }
+
+
     if (tolower(sampling_algorithm) == "hmc") {
         if (is.null(iterations)) {
             iter_warmup <- 1000
@@ -373,6 +386,7 @@ dcnet <- function(data,
                      sampling_algorithm = sampling_algorithm,
                      S_pred = S_pred,
                      S_vec_tau_post = post2draws,
+                     phi_pop = phi_pop,
                      stage2_summary = stage2_summary)
 
   class(return_fit) <- "dcnet"
