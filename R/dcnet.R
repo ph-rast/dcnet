@@ -10,7 +10,7 @@
 ##' @param group Vector with group id. If `NULL`, derived from data, otherwise user provided. 
 ##' @param xC Numeric vector or matrix. Covariates(s) for the constant variance terms in C, or c, used in a log-linear model on the constant variance terms \insertCite{Rast2020}{dcnet}. If vector, then it acts as a covariate for all constant variance terms. If matrix, must have columns equal to number of time series, and each column acts as a covariate for the respective time series (e.g., column 1 predicts constant variance for time series 1).
 ##' @param S_pred Dummy for S, for each time-point (same dimension as data)
-##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCr' or 'DCC', or 'DCCrs' for multithread.
+##' @param parameterization Character (Default: "DCC"). One of 'CCC', 'DCCj' or 'DCC', or 'DCCms' for multithread.
 ##' @param multistage Logical (Defaults to TRUE). Should a multi stage approach be used.
 ##' @param P Integer. Dimension of GARCH component in MGARCH(P,Q).
 ##' @param Q Integer. Dimension of ARCH component in MGARCH(P,Q).
@@ -82,11 +82,15 @@ dcnet <- function(data,
                         CCC = ccc_model,
                         DCC = dcc_model,
                         DCCr = dccr_model,
-                        DCCrs = dccrs_model,
+                        DCCms = dccms_model, ## Multistage TODO: Link to multistage argument
+                        DCCj = dccj_model,   ## joint TODO: Link to multistage argument
                         stop("Invalid parameterization"))
 
-    ## Precompute S if twostage == TRUE
+    ## Initialize objects to be passed to the output
     post2draws <- NA
+    phi_pop <- NA
+    stage2_summary <- NA
+    
     if (multistage == TRUE) {
         ####################################################
         ## Stage 1: Run mlVAR model to extract residuals. ##
@@ -400,4 +404,4 @@ dcnet <- function(data,
 #' May facilitate more parameterizations, as we only have to update these, and the switch statements.
 #' @keywords internal
 #' @author Philippe Rast
-supported_models <- c("CCC", "DCC", "DCCr", "DCCrs")
+supported_models <- c("CCC", "DCC", "DCCj", "DCCms")

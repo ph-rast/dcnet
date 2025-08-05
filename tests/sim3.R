@@ -3,7 +3,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 0) Install needed packages if not already installed
-needed <- c("furrr", "progressr", "purrr", "dcnet", "loo", "posterior",
+if (!requireNamespace("remotes")) { 
+  install.packages("remotes")   
+}   
+remotes::install_github("ph-rast/dcnet")
+
+needed <- c("furrr", "progressr", "purrr", "loo", "posterior",
             "dplyr", "tidyr")
 to_install <- needed[!needed %in% installed.packages()[, "Package"]]
 if (length(to_install)) install.packages(to_install)
@@ -53,14 +58,14 @@ simulate_data <- function(N = 10, tl = 5, nts = 3) {
 safe_sample <- function(s, replication_data, max_retries = 3) {
   fit_init <- dcnet(
     data             = replication_data[[1]],
-    parameterization = "DCCrs",
+    parameterization = "DCCms",
     J                = replication_data$N,
     group            = replication_data[[2]],
     standardize_data = FALSE,
     init             = 0,
     meanstructure    = "VAR",
     iterations       = 50000,
-    tol_rel_obj      = 0.005,
+    tol_rel_obj      = 0.007,
     sampling_algorithm = "variational"
   )
 
@@ -88,17 +93,16 @@ safe_sample <- function(s, replication_data, max_retries = 3) {
 
 # 4) Stan ↔ sim variable mappings
 variables_m <- c(
-  'phi0_fixed','phi0_tau','vec_phi_fixed','sigma_re_own','sigma_re_cross',
-  'tau_own','tau_cross','c_h_fixed','c_h_tau','a_h_fixed','a_h_tau',
-  'b_h_fixed','b_h_tau','l_a_q','l_a_q_sigma','l_b_q','l_b_q_sigma',
-  'S_vec_fixed','S_vec_tau'
+    'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
+    'tau_own', 'tau_cross',
+    'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
+    'a_q_pop', 'l_a_q_sigma', 'b_q_pop', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau'
 )
 var <- c(
-  "phi0_fixed","phi0_sd","fixed_phi","phi_ranef_sd","phi_ranef_sd",
-  "phi_sd_diag","phi_sd_off","log_c_fixed","log_c_r_sd",
-  "a_h_fixed","a_h_r_sd","b_h_fixed","b_h_r_sd",
-  "l_a_q_fixed","l_a_q_r_sd","l_b_q_fixed","l_b_q_r_sd",
-  "fixed_S_atanh","ranS_sd"
+    "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "phi_ranef_sd",
+    "phi_sd_diag", "phi_sd_off",
+    "log_c_fixed", "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
+    "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd"
 )
 stopifnot(length(variables_m) == length(var))
 

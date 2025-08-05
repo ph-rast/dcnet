@@ -31,7 +31,8 @@ summary.dcnet <- function(object, CrI = c(.025, .975), digits = 2,  ...) {
                    CCC = paste0(ccc_params,'|', var_params, '|', common_params),
                    DCC = paste0(dcc_params,'|', var_params,'|', common_params),
                    DCCr = paste0(dcc_params,'|', var_params,'|', common_params),
-                   DCCrs = paste0(dcc_params,'|', var_params,'|', common_params),
+                   DCCj = paste0(dcc_params,'|', var_params,'|', common_params),
+                   DCCms = paste0(dcc_params,'|', var_params,'|', common_params),
                    NULL
                    )
   if(is.null(params)) {

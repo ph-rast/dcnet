@@ -93,15 +93,15 @@ range(lapply(1:N, function(x) range(rtsgen[[x]])))
 
 
 fit0 <- dcnet(
-    data = rtsgen, parameterization = "DCCrs", J =  N,
+    data = rtsgen, parameterization = "DCCj", J =  N,
     group = groupvec,
     init = 0,
     meanstructure = "VAR",
     iterations = 30000,
+    multistage = FALSE,
     chains = 4,
     threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
     sampling_algorithm = "variational", # "pathfinder", # "laplace",
-    #algorithm = "fullrank",
     grainsize = 1)
 
 fit0
@@ -180,9 +180,10 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 
         fit <- tryCatch({
             fit_init <- dcnet(
-                data = replication_data[[1]], parameterization = "DCCrs", J = replication_data$N,
+                data = replication_data[[1]], parameterization = "DCCj", J = replication_data$N,
                 group = replication_data[[2]], standardize_data = FALSE,
                 init = 0,
+                multistage = FALSE,
                 meanstructure = "VAR",
                 iterations = 50000,
                 ## eta = 0.05,
@@ -322,7 +323,7 @@ looic_list <- list()
 
 for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 100, tl = 100)
+    replication_data <- simulate_data(N = 50, tl = 50)
     fit_r <- safe_sample(s, replication_data = replication_data)
 
     if (is.null(fit_r)) {
@@ -331,18 +332,18 @@ for (s in 1:10) {
 
     for (p in 1:length(variables_m)) {
         ## Add logic for S_vec_tau: Needs to be taken from step 1 fit, all others form step 2
-        if (variables_m[p] == "S_vec_tau") {
-            SF <- data.frame(t(apply(
-                fit_r$S_vec_tau_post, 2,
-                function(x) quantile(x, c(0.5, 0.025, .975))
-            )))
-            colnames(SF) <- c("mean", "q2.5", "q97.5")
-        } else {
+        ## if (variables_m[p] == "S_vec_tau") {
+        ##     SF <- data.frame(t(apply(
+        ##         fit_r$S_vec_tau_post, 2,
+        ##         function(x) quantile(x, c(0.5, 0.025, .975))
+        ##     )))
+        ##     colnames(SF) <- c("mean", "q2.5", "q97.5")
+        ## } else {
             SF <- fit_r$model_fit$summary(
                 variables = variables_m[p], "mean",
                 extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
             )
-        }
+        ##}
         cov_list[[variables_m[p]]][[s]] <-
             overlap(
                 unlist(replication_data[[3]][var[p]]),
