@@ -41,7 +41,7 @@ dcnet <- function(data,
                   xC = NULL,
                   S_pred =  NULL,
                   parameterization = "DCC",
-                  multistage = TRUE,
+                  multistage = FALSE,
                   P = 1,
                   Q = 1,
                   iterations = NULL,
@@ -58,6 +58,9 @@ dcnet <- function(data,
                   threads_per_chain = 4,
                   grainsize = 1, ...) {
 
+    ## Force into multistage, when DCCms is selected
+    if(parameterization == 'DCCms') multistage <- TRUE
+    
     ## Identify distribution type
     num_dist <- switch(tolower(distribution),
         "gaussian" = 0,
@@ -328,8 +331,8 @@ dcnet <- function(data,
         ## Sampling via Variational Bayes
         if (is.null(iterations)) iterations <- 30000
         model_fit <- stanmodel$variational(data = stan_data,
-                                           iter = iterations,
-                                           threads = threads_per_chain,
+                                            iter = iterations,
+                                            threads = threads_per_chain,
                                            ...)
     } else if (tolower(sampling_algorithm) == "pathfinder") {
         max_cores <- parallel::detectCores()
@@ -350,6 +353,9 @@ dcnet <- function(data,
         stop("\n\n Provide sampling algorithm: 'HMC', 'variational' or 'pathfinder' \n\n")
     }
 
+    ## For mutlistage: Paste the post2draws from stage 2 to the fitted model 
+    ## model_fit <- cbind(model_fit, post2draws)
+    
   ## Model fit is based on standardized values.
   if (standardize_data) {
     mns <- stan_data$grand_mean
