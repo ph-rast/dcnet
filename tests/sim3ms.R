@@ -1,13 +1,14 @@
-# Simulation for multistage
 # ─────────────────────────────────────────────────────────────────────────────
 # Full R script: future + progressr + possibly for 100 replications
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 0) Install needed packages if not already installed
-if (!requireNamespace("remotes")) { 
-  install.packages("remotes")   
-}   
-remotes::install_github("ph-rast/dcnet")
+
+## Only install after repo update
+#if (!requireNamespace("remotes")) { 
+#  install.packages("remotes")   
+#}   
+#remotes::install_github("ph-rast/dcnet")
 
 needed <- c("furrr", "progressr", "purrr", "loo", "posterior",
             "dplyr", "tidyr")
@@ -112,14 +113,14 @@ ns        <- c(25, 50, 100)
 tls       <- c(25, 50, 100)
 simcond   <- expand.grid(N = ns, tl = tls)
 n_conds   <- nrow(simcond)
-n_reps    <- 100
+n_reps    <- 10
 task_grid <- expand.grid(idx = seq_len(n_conds), rep = seq_len(n_reps))
 
 # 6) Setup future + progressr
 plan(multisession, workers = 56)
 handlers("txtprogressbar")
 
-# 7) Wrap your core task in a “possibly” to swallow errors:
+# 7) Wrap core task in a “possibly” to swallow errors:
 run_one <- possibly(function(idx, rep) {
   p()  # tick the progress bar
   N  <- simcond$N[idx]
@@ -192,12 +193,12 @@ final_results <- per_rep %>%
     .groups  = "drop"
   )
 
-final_results
+data.frame(final_results)
 
 # 10) Save
-#saveRDS(final_results, "simulation_performance_100reps.rds")
+#saveRDS(final_results, "simulation_performance_100OAreps.rds")
 
-final_results <- readRDS("simulation_performance_100reps.rds")
+final_results <- readRDS("simulation_performance_ms_100reps.rds")
 
 ## Plots:
 

@@ -60,7 +60,7 @@ simulate_data <- function(N = 10, tl = 5, nts = 3) {
 safe_sample <- function(s, replication_data, max_retries = 3) {
   fit_init <- dcnet(
     data             = replication_data[[1]],
-    parameterization = "DCCms",
+    parameterization = "DCCj",
     J                = replication_data$N,
     group            = replication_data[[2]],
     standardize_data = FALSE,
@@ -139,18 +139,19 @@ run_one <- possibly(function(idx, rep) {
     )
     truth_vec <- unlist(dat[[3]][[sim_var]])
 
-    SF <- if (stan_par == "S_vec_tau") {
-      tmp <- t(apply(fit$S_vec_tau_post, 2,
-                     quantile, probs = c(0.5,0.025,0.975)))
-      colnames(tmp) <- c("mean","q2.5","q97.5")
-      as.data.frame(tmp)
-    } else {
+    SF <-
+      ##if (stan_par == "S_vec_tau") {
+      ##tmp <- t(apply(fit$S_vec_tau_post, 2,
+      ##               quantile, probs = c(0.5,0.025,0.975)))
+      ##colnames(tmp) <- c("mean","q2.5","q97.5")
+      ##as.data.frame(tmp)
+    ##} else {
       fit$model_fit$summary(
         variables       = stan_par,
         fun             = "mean",
         extra_quantiles = ~ posterior::quantile2(., probs = c(.025, .975))
       )
-    }
+    ##}
 
     data.frame(
       N           = N,
@@ -193,12 +194,12 @@ final_results <- per_rep %>%
     .groups  = "drop"
   )
 
-final_results
+data.frame(final_results)
 
 # 10) Save
 #saveRDS(final_results, "simulation_performance_100reps.rds")
 
-final_results <- readRDS("simulation_performance_100reps.rds")
+final_results <- readRDS("simulation_performance_j_100reps.rds")
 
 ## Plots:
 
