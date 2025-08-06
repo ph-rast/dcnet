@@ -299,7 +299,7 @@ variables_m <- c(
     'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
     'tau_own', 'tau_cross',
     'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
-    'a_q_pop', 'l_a_q_sigma', 'b_q_pop', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
+    'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
 ## Simulation variables: Note that the simulatin script only defines one random
 ## effect for phi, phi_ranef_sd, but the stan model captures the random effects

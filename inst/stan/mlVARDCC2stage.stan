@@ -244,7 +244,7 @@ transformed parameters {
 
 
   // logit versions used elsewhere in my code
-  real l_a_q = logit(a_q_pop); // _q_pop correspons to simulation script scale _q_fixed
+  real l_a_q = logit(a_q_pop); //  correspons to simulation script scale _q_fixed
   real l_b_q = logit(b_q_pop);
   
   //Scale
