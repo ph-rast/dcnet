@@ -39,7 +39,7 @@ transformed parameters {
       real c_raw = mu_c[d] + c_h_tau[d] * z_c[j][d];
       real a_raw = mu_a_raw[d] + a_h_tau[d] * z_a[j][d];
       real b_raw = mu_b_raw[d] + b_h_tau[d] * z_b[j][d];
-
+      // transforms
       real a_val = inv_logit(a_raw);
       real b_val = (1 - a_val) * inv_logit(b_raw); 
 
@@ -73,21 +73,37 @@ model {
     for (d in 1:nt) {
       vector[T] h2; // variance over time for series d of subject j
 
-      // unconditional variance: exp(c) / (1 - a - b), safe because a+b<0.99
+      // unconditional variance: exp(c) / (1 - a - b)
+      real omega = exp(c_h[j,d]);
       real a_val = a_h[j,d];
       real b_val = b_h[j,d];
-      real omega = exp(c_h[j,d]);
-      real h2_uncond = omega / (1 - a_val - b_val);
-      h2[1] = h2_uncond;
 
-      for (t in 2:T) {
-        real eps_prev_sq = square(u[j][t-1, d]);
-        h2[t] = omega + a_val * eps_prev_sq + b_val * h2[t-1];
-        // observation
+      // enforce a + b < 1 (constructed) and guard denom > 0
+      real denom0   = 1 - a_val - b_val;
+      real denom    = denom0 > 1e-8 ? denom0 : 1e-8; // make sure it's not too small to avoid -nan in sqrt later
+      h2[1]         = omega / denom;
+
+      // optionally include first timepoint likelihood as anchor:
+      // target += normal_lpdf(u[j][1,d] | 0, sqrt(h2[1]));
+
+      //real h2_uncond = omega / (1 - a_val - b_val);
+      //h2[1] = h2_uncond;
+
+      // for (t in 2:T) {
+      //   real eps_prev_sq = square(u[j][t-1, d]);
+      //   h2[t] = omega + a_val * eps_prev_sq + b_val * h2[t-1];
+      //   // observation
+      //   target += normal_lpdf(u[j][t, d] | 0, sqrt(h2[t]));
+      // }
+            for (t in 2:T) {
+        real eps2 = square(u[j][t-1, d]);
+        h2[t]     = omega + a_val * eps2 + b_val * h2[t-1];
+        // guard against numerical underflow/negativity
+        if (h2[t] < 1e-8) h2[t] = 1e-8;
+
         target += normal_lpdf(u[j][t, d] | 0, sqrt(h2[t]));
       }
-      // optionally include first timepoint likelihood as anchor:
-      // target += normal_lpdf(u[j][1, d] | 0, sqrt(h2[1]));
+      
     }
   }
 }

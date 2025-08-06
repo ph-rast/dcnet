@@ -93,18 +93,16 @@ range(lapply(1:N, function(x) range(rtsgen[[x]])))
 
 
 fit0 <- dcnet(
-    data = rtsgen, parameterization = "DCCj", J =  N,
+    data = rtsgen, parameterization = "DCCms", J =  N,
     group = groupvec,
-    init = 0,
+    init = 0.5,
     meanstructure = "VAR",
     iterations = 30000,
-    multistage = FALSE,
     chains = 4,
     threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
     sampling_algorithm = "variational", # "pathfinder", # "laplace",
     grainsize = 1)
 
-fit0
 
 
 summary(fit0)
@@ -179,14 +177,14 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
         message(sprintf("Fitting attempt %d for index %d", attempt, s))
 
         fit <- tryCatch({
-            fit_init <- dcnet(
-                data = replication_data[[1]], parameterization = "DCCj", J = replication_data$N,
+            dcnet(
+                data = replication_data[[1]], parameterization = "DCCms", J = replication_data$N,
                 group = replication_data[[2]], standardize_data = FALSE,
                 init = 0,
-                multistage = FALSE,
+                multistage = TRUE,
                 meanstructure = "VAR",
                 iterations = 50000,
-                ## eta = 0.05,
+                eta = 0.1,
                 tol_rel_obj = 0.007,
                 sampling_algorithm = "variational"
             )
@@ -238,6 +236,8 @@ safe_sample <- function(s, max_retries = 3, replication_data) {
 }
 
 ## END V2
+
+
 
 ## Init all objects:
 ## phi0_fixed_cov <- phi0_sd_cov <-phi_fixed_covr <-phi_ranefdiag_covr<-phi_ranefoff_covr <-log_c_fixed_covr <-log_c_rand_covr <-log_a_fixed_covr <-a_h_r_covr <-log_b_fixed_covr <-b_h_r_covr <-l_a_q_fixed_covr <-l_a_q_r_covr <-l_b_q_fixed_covr <-l_b_q_r_covr <-fix_S <- ran_S <- list()
@@ -321,7 +321,7 @@ bins_list <- list()
 looic_list <- list()
 
 
-for (s in 1:10) {
+for (s in 1:100) {
 
     replication_data <- simulate_data(N = 50, tl = 50)
     fit_r <- safe_sample(s, replication_data = replication_data)
@@ -329,21 +329,21 @@ for (s in 1:10) {
     if (is.null(fit_r)) {
         next
     }
-
+    
     for (p in 1:length(variables_m)) {
         ## Add logic for S_vec_tau: Needs to be taken from step 1 fit, all others form step 2
-        ## if (variables_m[p] == "S_vec_tau") {
-        ##     SF <- data.frame(t(apply(
-        ##         fit_r$S_vec_tau_post, 2,
-        ##         function(x) quantile(x, c(0.5, 0.025, .975))
-        ##     )))
-        ##     colnames(SF) <- c("mean", "q2.5", "q97.5")
-        ## } else {
+        if (variables_m[p] == "S_vec_tau") {
+            SF <- data.frame(t(apply(
+                fit_r$S_vec_tau_post, 2,
+                function(x) quantile(x, c(0.5, 0.025, .975))
+            )))
+            colnames(SF) <- c("mean", "q2.5", "q97.5")
+        } else {
             SF <- fit_r$model_fit$summary(
-                variables = variables_m[p], "mean",
-                extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
-            )
-        ##}
+                                      variables = variables_m[p], "mean",
+                                      extra_quantiles = ~ posterior::quantile2(., probs = c(0.025, 0.975))
+                                  )
+        }
         cov_list[[variables_m[p]]][[s]] <-
             overlap(
                 unlist(replication_data[[3]][var[p]]),
