@@ -109,11 +109,11 @@ var <- c(
 stopifnot(length(variables_m) == length(var))
 
 # 5) Build condition grid + define 100 replications
-ns        <- c(25, 50, 100)
-tls       <- c(25, 50, 100)
+ns        <- c(25, 50, 100, 150)
+tls       <- c(25, 50, 100, 150)
 simcond   <- expand.grid(N = ns, tl = tls)
 n_conds   <- nrow(simcond)
-n_reps    <- 10
+n_reps    <- 25
 task_grid <- expand.grid(idx = seq_len(n_conds), rep = seq_len(n_reps))
 
 # 6) Setup future + progressr
@@ -196,9 +196,9 @@ final_results <- per_rep %>%
 data.frame(final_results)
 
 # 10) Save
-#saveRDS(final_results, "simulation_performance_100OAreps.rds")
+#saveRDS(final_results, "simulation_performance_25Areps.rds")
 
-final_results <- readRDS("simulation_performance_ms_100reps.rds")
+final_results <- readRDS("simulation_performance_ms_25reps.rds")
 
 ## Plots:
 
