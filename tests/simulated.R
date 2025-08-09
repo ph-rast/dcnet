@@ -60,8 +60,8 @@ array(S, c(4,4,3) )
 
 
 ## Create data:
-N <- 50
-tl <- 50
+N <- 20
+tl <- 20
 nts <- 3
 simdat <- .simuDCC(
     tslength = tl, N = N, n_ts = nts,
@@ -97,10 +97,10 @@ fit0 <- dcnet(
     group = groupvec,
     init = 0.5,
     meanstructure = "VAR",
-    iterations = 30000,
+    iterations = 200,
     chains = 4,
     threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
-    sampling_algorithm = "variational", # "pathfinder", # "laplace",
+    sampling_algorithm = "hmc", # "pathfinder", # "laplace",
     grainsize = 1)
 
 

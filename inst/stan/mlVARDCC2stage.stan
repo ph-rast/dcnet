@@ -3,7 +3,6 @@ functions {
   //#include /functions/jacobian.stan
 #include /functions/invvec.stan
 #include /functions/cov2cor.stan
-
 }
 
 data {
