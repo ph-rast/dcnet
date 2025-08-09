@@ -13,7 +13,7 @@
     stage2garch_file <- file.path(stan_path, "stage2_hierarchical_uvGARCH.stan")
     ccc_file    <- file.path(stan_path, "VARhs.stan")
     dcc_file    <- file.path(stan_path, "mlVARDCCfixedSrandQ.stan")
-    dccr_file   <- file.path(stan_path, "DCCMGARCHrandS.stan")
+    dccr_file   <- stage1_file #file.path(stan_path, "DCCMGARCHrandS.stan")
     dcc_multistage_file  <- file.path(stan_path, "mlVARDCC2stage.stan")
     dcc_joint_file  <- file.path(stan_path, "DCCMGARCHrandShs.stan")
     

@@ -14,8 +14,9 @@ needed <- c("furrr", "progressr", "purrr", "loo", "posterior",
             "dplyr", "tidyr")
 to_install <- needed[!needed %in% installed.packages()[, "Package"]]
 if (length(to_install)) install.packages(to_install)
+ devtools::load_all()
 
-# 1) Load libraries
+## 1) Load libraries
 library(furrr)
 library(progressr)
 library(purrr)
@@ -113,7 +114,7 @@ ns        <- c(25, 50, 100)
 tls       <- c(25, 50, 100)
 simcond   <- expand.grid(N = ns, tl = tls)
 n_conds   <- nrow(simcond)
-n_reps    <- 10
+n_reps    <- 20
 task_grid <- expand.grid(idx = seq_len(n_conds), rep = seq_len(n_reps))
 
 # 6) Setup future + progressr
@@ -197,7 +198,7 @@ final_results <- per_rep %>%
 data.frame(final_results)
 
 # 10) Save
-#saveRDS(final_results, "simulation_performance_100reps.rds")
+#saveRDS(final_results, "simulation_performance_20reps.rds")
 
 final_results <- readRDS("simulation_performance_j_100reps.rds")
 
