@@ -194,7 +194,7 @@ dcnet <- function(data,
     stan_data$phi_pop <- phi_pop
 
     ## Save full stage 1 model
-    stan_data$fit_stage1
+    stan_data$fit_stage1_draws <- draws
     
     ## stage1_params <- list(
     ##     phi0_pop = phi0_pop,
@@ -238,7 +238,7 @@ dcnet <- function(data,
         stan_data$Sdim <- Sdim
         stan_data$S_vec_tau_fixed <- sigma_z_hat
 
-    stan_data$precomp_fit
+    stan_data$precomp_fit_draws <- precomp_fit$draws(format = "draws_df")
     
         ## Step 2:
         ## Use residuals from Stage 1
@@ -303,7 +303,7 @@ dcnet <- function(data,
           b_h_tau   = exp(tau_b_log)
         )
 
-    stan_data$garch_fit
+    stan_data$garch_fit_draws <- draws_df
     
         cat("\n---------------------------------------\n")
         cat("\n Stage 3: Estimate final mlVAR-DCC\n")

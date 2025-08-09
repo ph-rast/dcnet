@@ -93,7 +93,7 @@ range(lapply(1:N, function(x) range(rtsgen[[x]])))
 
 
 fit0 <- dcnet(
-    data = rtsgen, parameterization = "CCC", J =  N,
+    data = rtsgen, parameterization = "DCCms", J =  N,
     group = groupvec,
     init = 0.5,
     meanstructure = "VAR",
@@ -104,6 +104,9 @@ fit0 <- dcnet(
     grainsize = 1)
 
 
+fit0$precomp_fit_draws
+
+fit0
 
 summary(fit0)
 
