@@ -57,7 +57,7 @@ simulate_data <- function(N = 10, tl = 5, nts = 3) {
   list(rtsgen, groupvec, simdat, N = N)
 }
 
-safe_sample <- function(s, replication_data, max_retries = 1, chains) {
+safe_sample <- function(s, replication_data, max_retries = 2) {
   fit_init <- dcnet(
     data             = replication_data[[1]],
     parameterization = "DCCms",
@@ -67,7 +67,7 @@ safe_sample <- function(s, replication_data, max_retries = 1, chains) {
     init             = 0,
     meanstructure    = "VAR",
     iterations       = 1500,
-    chains = chains,
+    chains = 1,
     sampling_algorithm = "hmc"
   )
 
@@ -85,7 +85,7 @@ safe_sample <- function(s, replication_data, max_retries = 1, chains) {
       as.character(unlist(o))
     }, error = function(e) "ERROR")
     fails <- any(grepl(
-      "ERROR|Error",
+      "ERROR|Error|finished unexpectedly",
       out_lines, ignore.case = TRUE
     ))
     if (!fails) return(fit_init)
@@ -118,7 +118,7 @@ task_grid <- expand.grid(idx = seq_len(n_conds), reps = seq_len(n_reps))
 
 ## 6) Setup future + progressr
 cores  <- parallelly::availableCores()
-chains <- 1 ## take chains from 
+chains <- 1 ## take chains from safe_sample function
 workers <- max(1, floor((cores - 1) / chains))
 plan(multisession, workers = workers)
 handlers("txtprogressbar")
@@ -130,7 +130,7 @@ run_one <- possibly(function(idx, reps) {
     tl <- simcond$tl[idx]
 
     dat <- simulate_data(N = N, tl = tl, nts = 3)
-    fit <- safe_sample(reps, replication_data = dat, chains)
+    fit <- safe_sample(reps, replication_data = dat)
     if (is.null(fit)) {
         return(NULL)
     }
@@ -182,6 +182,8 @@ run_one <- possibly(function(idx, reps) {
 ##         .options = furrr_options(seed = TRUE)
 ##     )
 ## })
+
+per_rep
 
 with_progress({
   p <- progressr::progressor(steps = nrow(task_grid))
