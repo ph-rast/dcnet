@@ -187,9 +187,9 @@ with_progress({
   p <- progressr::progressor(steps = nrow(task_grid))
   per_rep <- furrr::future_pmap_dfr(
     task_grid,
-    function(idx, rep) {
-      res <- run_one(idx, rep)  # do the heavy work first
-      p(sprintf("cond %d, rep %d done", idx, rep))  # tick on completion
+    function(idx, reps) {
+      res <- run_one(idx, reps)  # do the heavy work first
+      p(sprintf("cond %d, rep %d done", idx, reps))  # tick on completion
       res
     },
     .options = furrr::furrr_options(seed = TRUE, scheduling = 1)
