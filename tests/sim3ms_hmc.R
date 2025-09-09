@@ -109,11 +109,11 @@ var <- c(
 stopifnot(length(variables_m) == length(var))
 
 # 5) Build condition grid + define 100 replications
-ns        <- c(25, 50)#, 100, 150)
-tls       <- c(25, 50)#, 100, 150)
+ns        <- c(25, 50, 100)#, 150)
+tls       <- c(25, 50, 100)#, 150)
 simcond   <- expand.grid(N = ns, tl = tls)
 n_conds   <- nrow(simcond)
-n_reps    <- 5
+n_reps    <- 10
 task_grid <- expand.grid(idx = seq_len(n_conds), reps = seq_len(n_reps))
 
 ## 6) Setup future + progressr
@@ -215,9 +215,10 @@ final_results <- per_rep %>%
 data.frame(final_results)
 
 # 10) Save
-#saveRDS(final_results, "simulation_performance_25Areps.rds")
+# saveRDS(final_results, "simulation_performance_10Areps.rds")
 
-final_results <- readRDS("simulation_performance_ms_25reps.rds")
+final_results <- readRDS("simulation_performance_ms_5reps.rds")
+final_results <- readRDS("simulation_performance_20reps.rds")
 
 ## Plots:
 
@@ -307,14 +308,14 @@ plot_list <- list(
 )
 
 # 3. Write them all to a multi‐page PDF
-pdf("simulation_diagnostics.pdf", width = 11, height = 8.5)
+pdf("hmc_simulation_diagnostics_XX.pdf", width = 11, height = 8.5)
 for (nm in names(plot_list)) {
   print(plot_list[[nm]] + ggtitle(str_to_title(nm)))
 }
 dev.off()
 
 # 4. (Optional) save the list of plots for later use
-saveRDS(plot_list, "plot_list.rds")
+saveRDS(plot_list, "hmc_plot_list.rds")
 
 ## table
 summary_table <- final_results %>%

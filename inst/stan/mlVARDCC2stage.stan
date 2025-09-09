@@ -445,9 +445,9 @@ model {
 
   phi0_tau_log ~ normal(sigma_phi0_log_stage1, sigma_phi0_log_stage1_sd);; // SD for multiplication with cholesky phi0_L
   //phi_tau ~ normal(0, 0.0063); // SD for multiplication with cholesky phi0_L
-  c_h_tau_log ~ normal(c_h_tau_log_s2, c_h_tau_log_s2_sd); // SD for c_h ranefs
-  a_h_tau_log ~ normal(a_h_tau_log_s2, a_h_tau_log_s2_sd); // SD for c_h ranefs
-  b_h_tau_log ~ normal(b_h_tau_log_s2, b_h_tau_log_s2_sd);
+  c_h_tau_log ~ normal(c_h_tau_log_s2, 1.5*c_h_tau_log_s2_sd); // SD for c_h ranefs
+  a_h_tau_log ~ normal(a_h_tau_log_s2, 1.5*a_h_tau_log_s2_sd); // SD for c_h ranefs
+  b_h_tau_log ~ normal(b_h_tau_log_s2, 1.5*b_h_tau_log_s2_sd);
 
   // Horseshoe:
   //// standard normal prior
@@ -466,9 +466,9 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  c_h_fixed ~ normal(c_h_fixed_s2, c_h_fixed_s2_sd);
-  a_h_fixed ~ normal(a_h_fixed_s2, a_h_fixed_s2_sd);
-  b_h_fixed ~ normal(b_h_fixed_s2, b_h_fixed_s2_sd);
+  c_h_fixed ~ normal(c_h_fixed_s2, 1.5*c_h_fixed_s2_sd);
+  a_h_fixed ~ normal(a_h_fixed_s2, 1.5*a_h_fixed_s2_sd);
+  b_h_fixed ~ normal(b_h_fixed_s2, 1.5*b_h_fixed_s2_sd);
   // Prior for initial state
   
   // Prior on nu for student_t
