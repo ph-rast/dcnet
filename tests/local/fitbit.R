@@ -170,36 +170,31 @@ summary(fit_init)
 
 
 fit <- dcnet(data = tsdat, J = N, group = groupvec, S_pred = NULL,
-             parameterization = "DCCrs",
-             iterations = 30000,
-             standardize_data = TRUE,
-             sampling_algorithm = "variational",
-             algorithm = "fullrank",
-             #grad_samples = 20,
-             #elbo_samples = 200,
-             #adapt_iter = 200,
-             #eta = 0.005,
-             chains = 5,
-             init = fit_init$model_fit)
+             parameterization = "DCCms",
+             iterations = 1000,
+             standardize_data = FALSE,
+             sampling_algorithm = "hmc",
+             chains = 4)
 
 summary(fit)
+fit$model_fit$draws()
 
-grep("mu", colnames(fit$model_fit$draws()))
-colMeans(fit$model_fit$draws()[, 139346:139350])
+fit$model_fit$draws(variable = "mu", format = "draws_matrix")
 
-grep("phi0_fixed", colnames(fit$model_fit$draws()))
-colMeans(fit$model_fit$draws()[, 3:6])
-
-grep("phi0_fixed", colnames(fit$model_fit$draws()))
-int <- matrix(colMeans(fit$model_fit$draws()[, 3:6]), ncol = 1)
+int <- colMeans(fit$model_fit$draws(variable = "phi0_fixed", format = "draws_matrix"))
 int
 
-grep('vec_phi_fixed', colnames(fit$model_fit$draws( )) )
-phi <- matrix(colMeans(fit$model_fit$draws( )[, 183:198]), ncol = 4)
+vecphi <- colMeans(fit$model_fit$draws(variable = "vec_phi_fixed", format = "draws_matrix"))
+vecphi
+phi <- matrix(vecphi, ncol = 4)
 phi
 
-int + phi %*% t(tsdat[[1]][1,])
-
+tspred <- matrix(NA, nrow = 4,  ncol = 50 )
+for (i in 2:50) {
+    tspred[, 1] <- t(tsdat[[1]][1, ])
+    tspred[, i] <- int + phi %*% (tspred[, i - 1] - int)
+}
+plot(tspred[1,], type = "l")
 
 
 #fit <- read_cmdstan_csv( "/tmp/Rtmpv70rbe/DCCMGARCHrandS-202306221623-1-675102.csv", variables = "H")
@@ -248,35 +243,41 @@ fc
 loo::loo_compare(fr,  fc )
 ## random efx model is preferred
 
-fit$model_fit$draws(variables = "pcor[1,1,1,1]" )
+fit$model_fit$draws(variables = "pcor[1,1,1,1]", format = "draws_matrix")
+
+median(fit$model_fit$draws(variables = "pcor[38,98,3,4]"))
+
+
 
 ## Plots
 ind <- seq_len(N)
 nts <- 4
 
-plout <- sapply(2:nts,  function(p) {
-  sapply(ind,  function(f) {
-    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',1,',p,']')]))
-  })
-})
 
-plout2 <- sapply(3:nts,  function(p) {
-  sapply(ind,  function(f) {
-    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',2,',p,']')]))
-  })
-})
+library(posterior)
+## 1) Extract once (any draws_* format is fine)
+d <- fit$model_fit$draws(variables = "pcor")     # default is draws_array
 
-plout3 <- sapply(4,  function(p) {
-  sapply(ind,  function(f) {
-    sapply(seq_len(tl), function(x) median(fit$model_fit$draws( )[, paste0('pcor[',f,',',x,',3,',p,']')]))
-  })
-})
+## 2) Convert to rvars
+r <- posterior::as_draws_rvars(d)
 
-df <- data.frame( plout, time = rep(seq(1:tl), N ), id = as.factor(rep(ind,  each = tl)))
+pc <- r$pcor
+pc[1, 1, ,]
+
+## 3) Take medians over draws for slice [ind, 1:tl, 1, 2:nts]
+plout1 <- median(pc[ind, 1:tl, 1, 2:nts]) # returns a plain numeric array (draws collapsed)
+plout2 <- median(pc[ind, 1:tl, 2, 3:nts]) # returns a plain numeric array (draws collapsed)
+plout3 <- median(pc[ind, 1:tl, 3, 4:nts])  # returns a plain numeric array (draws collapsed)
+
+plot(plout1[1, , 1, 1], type = "l")
+plot(plout1[38, , 1, 1], type = "l")
+
+c(t(plout1[, , 1, 1])[1:89])
+plout1[1, , 1, 1]
+
+df <- data.frame(c(t(plout1[, , 1, 1])), c(t(plout1[, , 1, 2])), c(t(plout1[, , 1, 3])), time = rep(seq(1:tl), N), id = as.factor(rep(ind, each = tl)))
+df
 names(df)[1:3] <- c('cor12',  'cor13',  'cor14' )
-
-names(df)[1:2] <- c('cor12',  'cor13' )
-names(df)[1] <- c('cor12')
 
 head(df)
 
@@ -292,30 +293,34 @@ c12 <-
 c13 <-
   ggplot(df,  aes(x = time,  y = cor13 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[3], ")") )#+ geom_vline( xintercept = 36)
-c14 <- ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+c14 <-
+    ggplot(df,  aes(x = time,  y = cor14 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous( paste0("PCor(", varnames[1], ", ", varnames[4], ")") )#+ geom_vline( xintercept = 36)
 
 
 
-df2 <- data.frame( plout2, time = rep(seq(1:tl), N ), id = as.factor(rep(ind,  each = tl)))
+df2 <- data.frame(c(t(plout2[, , 1, 1])),c(t(plout2[, , 1, 2])), time = rep(seq(1:tl), N), id = as.factor(rep(ind, each = tl)))
 names(df2)[1:2] <- c('cor23',  'cor24' )
 head(df2)
 
-c23 <- ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+c23 <-
+    ggplot(df2,  aes(x = time,  y = cor23 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[3], ")") )#+ geom_vline( xintercept = 36)
-c24 <- ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+c24 <-
+    ggplot(df2,  aes(x = time,  y = cor24 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous( paste0("PCor(", varnames[2], ", ", varnames[4], ")") )#+ geom_vline( xintercept = 36)
 
 
 
-df3 <- data.frame( plout3, time = rep(seq(1:tl), N ), id = as.factor(rep(ind,  each = tl)))
+df3 <- data.frame(c(t(plout3[, , 1, 1])), time = rep(seq(1:tl), N), id = as.factor(rep(ind, each = tl)))
 names(df3)[1] <- c('cor34')
 head(df3)
 
-c34 <- ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
+c34 <-
+    ggplot(df3,  aes(x = time,  y = cor34 , color = id)) + geom_line(show.legend = FALSE ) + coord_cartesian(ylim = c(-1, 1 ) ) +
   scale_y_continuous(paste0("PCor(", varnames[3], ", ", varnames[4], ")"))#+ geom_vline( xintercept = 36)
 
-ggsave(filename = "~/Dropbox/Public/singlecorr.pdf",  width = 6,  height = 3,  plot = c34 )
+ggsave(filename = "~/Dropbox/Public/hmc_singlecorr.pdf",  width = 6,  height = 3,  plot = c34 )
 
 nn <- ggplot( ) + theme_void()
 
@@ -329,7 +334,7 @@ patched <- (c12 | c13 | c14 ) /
 ( c34 | c23 | c24 )
 patched
 
-ggsave(filename = "~/Nextcloud/Documents/pcor.pdf", width = 9, height = 4.5, plot = patched)
+ggsave(filename = "~/Dropbox/Public/hmc_pcor.pdf", width = 9, height = 4.5, plot = patched)
 
 
 ### rtsout holds yrep
@@ -343,26 +348,26 @@ fit$model_fit$draws( )[,'rts_out[34,68,4]'][1:5,]
 variable <- 4
 variables[variable]
 
+fit$model_fit$draws( variable = "rts_out[1,1,1]", format = "draws_matrix")
+
 yrep1 <- sapply(seq_len(N), function(person) {
   sapply(seq_len(tl), function(x) {
-    fit$model_fit$draws( )[, paste0('rts_out[',person,',',x,',',variable,']')]
+    fit$model_fit$draws( variable = paste0('rts_out[',person,',',x,',',variable,']'), format = "draws_matrix")
   })
 })
 
-head(yrep1)
 
-tsl
-yrep1ext <- cbind(yrep1, 1:tsl, rep(1:1000,  each = tsl ))
 
-## randomly select 100 samples from yrep1ext
-sel <- sample(1:1000,  100 )
-## then paste these 100 samples into one row, so that we have a matirx with 100 rows representing the samples and the columns concatenate all 34 indivduals time their 99 time points
+## 1) Extract once (any draws_* format is fine)
+rtsd <- fit$model_fit$draws(variables = "rts_out")     # default is draws_array
+## 2) Convert to rvars
+rtsout <- posterior::as_draws_matrix(rtsd)
 
-ysamp <- list()
-for(i in 1:100) {
-  smp <- sel[i]
-  ysamp[[i]] <- c(yrep1ext[yrep1ext[,N+2] == smp, c(1:N)])
-}
+dim(rtsout)
+
+
+rtsout[, "rts_out[38,98,4]"]
+
 
 ## Convert the list into a matrix with 100 rows
 ysamp_matrix <- do.call(rbind, ysamp)
@@ -373,7 +378,14 @@ dim(ysamp_matrix)
 variables
 plots <- list( )
 for(i in 1:N ) {
-  p <- bayesplot::ppc_dens_overlay(y = dt[dt$id == i, get(variables[variable])],  yrep = ysamp_matrix[,(1:tsl)+(i-1)*tsl], trim =  TRUE )
+    p <-
+        bayesplot::ppc_dens_overlay(
+                       y =
+                           dt[dt$id == i, get(variables[variable])]
+                     , yrep =
+                           rtsout[, "rts_out[1,1,1]"]
+                                        #ysamp_matrix[, (1:tsl) + (i - 1) * tsl], trim = TRUE
+    )
   plots[[i]] <- p
 }
 

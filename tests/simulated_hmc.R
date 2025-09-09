@@ -93,7 +93,7 @@ range(lapply(1:N, function(x) range(rtsgen[[x]])))
 
 
 fit0 <- dcnet(
-    data = rtsgen, parameterization = "DCCms", J =  N,
+    data = rtsgen, parameterization = "DCCr", J =  N,
     group = groupvec,
     init = 0.5,
     meanstructure = "VAR",
@@ -102,7 +102,6 @@ fit0 <- dcnet(
     threads = 1, # tol_rel_obj =  0.01, ## 8 threads: 188 mins /
     sampling_algorithm = "variational", # "pathfinder", # "laplace",
     grainsize = 1)
-
 
 
 summary(fit0)
@@ -295,18 +294,18 @@ looic <- function(fit) {
 ## Stan variables:
 variables_m <- c(
     'phi0_fixed', 'phi0_tau', 'vec_phi_fixed', 'sigma_re_own', 'sigma_re_cross',
-    'tau_own', 'tau_cross' )
-   # 'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
-   # 'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
+    'tau_own', 'tau_cross',
+    'c_h_fixed', 'c_h_tau', 'a_h_fixed', 'a_h_tau', 'b_h_fixed', 'b_h_tau',
+    'l_a_q', 'l_a_q_sigma', 'l_b_q', 'l_b_q_sigma', 'S_vec_fixed', 'S_vec_tau')
 
 ## Simulation variables: Note that the simulatin script only defines one random
 ## effect for phi, phi_ranef_sd, but the stan model captures the random effects
 ## in both, the own and cross lag of phi in sigma_re_own/cross
 var <- c(
     "phi0_fixed", "phi0_sd", "fixed_phi", "phi_ranef_sd", "phi_ranef_sd",
-    "phi_sd_diag", "phi_sd_off" )
-    #"log_c_fixed", "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
-    #"l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd")
+    "phi_sd_diag", "phi_sd_off",
+    "log_c_fixed", "log_c_r_sd", "a_h_fixed", "a_h_r_sd", "b_h_fixed", "b_h_r_sd",
+    "l_a_q_fixed", "l_a_q_r_sd", "l_b_q_fixed", "l_b_q_r_sd", "fixed_S_atanh", "ranS_sd")
 
 if(!length(variables_m) == length(var)) stop("variable list does not match!")
 
@@ -321,7 +320,7 @@ looic_list <- list()
 
 for (s in 1:10) {
 
-    replication_data <- simulate_data(N = 50, tl = 50)
+    replication_data <- simulate_data(N = 25, tl = 25)
     fit_r <- safe_sample(s, replication_data = replication_data)
     
     if (is.null(fit_r)) {

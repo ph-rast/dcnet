@@ -118,11 +118,6 @@ parameters {
   vector[nt] b_h_tau_log; // ranef SD for phi0
   array[J] vector[nt] b_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
 
-  // Create raws to facilitate prior assignments
-  vector<lower=0, upper=1>[nt] a_h_pop_raw;
-  vector<lower=0, upper=1>[nt] b_h_pop_raw_raw;
-
-  
   // GARCH q parameters
   //real l_a_q; // Define on log scale so that it can go below 0
   
@@ -204,34 +199,10 @@ transformed parameters {
   real<lower=0, upper=1> a_q_pop = a_q_pop_raw;
   real<lower=0, upper=1> b_q_pop = (1 - a_q_pop - 0.01) * b_q_pop_raw_raw;
 
-  vector<lower=0, upper=1>[nt] a_h_pop;
-  vector<lower=0, upper=1>[nt] b_h_pop;
-  for (d in 1:nt) {
-    a_h_pop[d] = 0.50 * a_h_pop_raw[d];                        // centred ~0.25
-    b_h_pop[d] = (0.99 - a_h_pop[d]) * b_h_pop_raw_raw[d];     // centred ~0.37
-  }
   // --------- subject-specific coefficients -------------------------
   array[J] vector<lower=0, upper=1>[nt] a_h_sum;
   array[J] vector<lower=0, upper=1>[nt] b_h_sum;
   
-  for (j in 1:J) {
-    vector[nt] a_re = a_h_tau .* a_h_stdnorm[j];               // non-centred RE
-    vector[nt] b_re = b_h_tau .* b_h_stdnorm[j];
-    
-    // add REs on logit scale, then transform back  
-    a_h_sum[j] =
-      inv_logit( logit(a_h_pop) + a_re );                      // stays in (0,1)
-    
-    // ensure a_h + b_h < 0.99 element-wise
-    for (d in 1:nt) {
-      real b_raw = inv_logit( logit(b_h_pop[d]) + b_re[d] );   // (0,1)
-      b_h_sum[j,d] = (0.99 - a_h_sum[j,d]) * b_raw;            // (0, 0.99-a)
-    }
-  }
-
-
-  
-
   
   // logit versions used elsewhere in my code
   real l_a_q = logit(a_q_pop);
@@ -246,9 +217,6 @@ transformed parameters {
   //vector[nt] a_h[J];
   array[J] vector[nt] a_h_random; // variance on log metric
   array[J] vector[nt] b_h_random;
-
-  //array[J] vector<lower=0, upper = 1>[nt] a_h_sum;
-  //array[J] vector<lower=0, upper = 1>[nt] b_h_sum;
 
   //old
   //array[J,T] cov_matrix[nt] H;
@@ -408,11 +376,7 @@ model {
   // print("Upper Limits:", UPs);
   // population-level priors
   a_q_pop_raw     ~ beta(1.8, 8.2);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
-  b_q_pop_raw_raw ~ beta(3.8,  6.2);   // mean ≈ 0.25 BEFORE scaling
-  // population means: weak Beta priors (most mass ≤ 0.3)
-  a_h_pop_raw      ~ beta(1.5, 18.5);         // mean ≈ 0.20
-  b_h_pop_raw_raw  ~ beta(3.4, 16.6);         // mean ≈ 0.25 (scaled later)
-  
+  b_q_pop_raw_raw ~ beta(3.8,  6.2);   // mean ≈ 0.25 BEFORE scaling  
   
   // priors
   //l_a_q ~ student_t(3, -1.5, 2);
