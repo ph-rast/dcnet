@@ -8,7 +8,7 @@
 #if (!requireNamespace("remotes")) { 
 #  install.packages("remotes")   
 #}   
-#remotes::install_github("ph-rast/dcnet")
+#remotes::install_githlub("ph-rast/dcnet")
 
 needed <- c("furrr", "progressr", "purrr", "loo", "posterior",
             "dplyr", "tidyr")
@@ -120,7 +120,7 @@ task_grid <- expand.grid(idx = seq_len(n_conds), reps = seq_len(n_reps))
 cores  <- parallelly::availableCores()
 chains <- 1 ## take chains from safe_sample function
 workers <- max(1, floor((cores - 1) / chains))
-plan(multisession, workers = workers)
+# plan(multisession, workers = workers) ## Don't spawn here - do it later and remove workers after use (or feel the wrath of John... )
 handlers("txtprogressbar")
 
 # 7) Wrap core task in a “possibly” to swallow errors:
@@ -185,17 +185,19 @@ run_one <- possibly(function(idx, reps) {
 
 per_rep
 
-with_progress({
-  p <- progressr::progressor(steps = nrow(task_grid))
-  per_rep <- furrr::future_pmap_dfr(
-    task_grid,
-    function(idx, reps) {
-      res <- run_one(idx, reps)  # do the heavy work first
-      p(sprintf("cond %d, rep %d done", idx, reps))  # tick on completion
-      res
-    },
-    .options = furrr::furrr_options(seed = TRUE, scheduling = 1)
-  )
+future::with_plan(multisession, workers = workers, {
+  with_progress({
+    p <- progressr::progressor(steps = nrow(task_grid))
+    per_rep <- furrr::future_pmap_dfr(
+                        task_grid,
+                        function(idx, reps) {
+                          res <- run_one(idx, reps)  # do the heavy work first
+                          p(sprintf("cond %d, rep %d done", idx, reps))  # tick on completion
+                          res
+                        },
+                        .options = furrr::furrr_options(seed = TRUE, scheduling = Inf)
+                      )
+  })
 })
 
 per_rep
@@ -215,24 +217,32 @@ final_results <- per_rep %>%
 data.frame(final_results)
 
 # 10) Save
-# saveRDS(final_results, "simulation_performance_10Areps.rds")
+# saveRDS(final_results, "simulation_performance_10reps.rds")
 
 final_results <- readRDS("simulation_performance_ms_5reps.rds")
 final_results <- readRDS("simulation_performance_20reps.rds")
+final_results2 <- readRDS("simulation_performance_10Areps.rds")
+
+head(final_results[,4:8])
+final_result <- (final_results[, 4:8] + final_results2[,4:8])/2
+final_result <- cbind(final_results[,1:3], final_result)
+
+final_result
 
 ## Plots:
 
 ##reshape for plotting
 library(tidyverse)
 
-fr_long <- final_results %>%
+fr_long <- final_result %>%
   pivot_longer(
     cols      = coverage:looic,
     names_to  = "metric",
     values_to = "value"
   )
 
-fr_long
+print(fr_long, n = 30)
+dim(fr_long )
 
 ## coverage heatmap
 fr_long %>%
@@ -272,7 +282,7 @@ plot_list <- list(
       facet_wrap(~ parameter, ncol = 3) +
       scale_fill_viridis_c(limits = c(0,1)) +
       labs(x = "N", y = "T", fill = "Coverage") +
-      theme_minimal(),
+       theme_minimal(),
 
   bias = fr_long %>%
     filter(metric == "bias") %>%
@@ -308,7 +318,7 @@ plot_list <- list(
 )
 
 # 3. Write them all to a multi‐page PDF
-pdf("hmc_simulation_diagnostics_XX.pdf", width = 11, height = 8.5)
+pdf("hmc_simulation_diagnostics_10v2.pdf", width = 11, height = 8.5)
 for (nm in names(plot_list)) {
   print(plot_list[[nm]] + ggtitle(str_to_title(nm)))
 }
