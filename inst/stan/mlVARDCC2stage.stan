@@ -130,20 +130,35 @@ parameters {
   array[J] vector[nt] b_h_stdnorm; // Used to multiply with phi0_sd to obtain ranef on phi0
 
   // GARCH q parameters
-  //real l_a_q; // Define on log scale so that it can go below 0
+  // //real l_a_q; // Define on log scale so that it can go below 0
   
-  real l_a_q_sigma_log; //random effect variance
+  // real l_a_q_sigma_log; //random effect variance
+  // array[J] real l_a_q_stdnorm;
+  
+  // //real<lower=0, upper = (1 - a_q) > b_q; //
+  // //real l_b_q; 
+  // real l_b_q_sigma_log; //random effect variance
+  // array[J] real l_b_q_stdnorm;
+
+  // // Try with a_q/b_q params that are on original scale for priors:
+  // real<lower=0, upper=1> a_q_pop_raw;         // population mean of a_q
+  // real<lower=0, upper=1> b_q_pop_raw_raw;     // temporary, to enforce sum<1
+
+  // STICK BREAKING parameters: Attempt to reduce hmc burden to sample a_q and b_q in highly correlated posterior space
+  // DCC q-parameters (stick-breaking: total + split)
+  // population-level, unconstrained:
+  real u_pop;  // controls total persistence s in (0, 1 - m)
+  real v_pop;  // controls split w in (0, 1)
+
+  // random-effect scales (reuse your names to avoid downstream edits)
+  real l_a_q_sigma_log;      // actually: log(sigma_u)
   array[J] real l_a_q_stdnorm;
-  
-  //real<lower=0, upper = (1 - a_q) > b_q; //
-  //real l_b_q; 
-  real l_b_q_sigma_log; //random effect variance
+
+  real l_b_q_sigma_log;      // actually: log(sigma_v)
   array[J] real l_b_q_stdnorm;
 
-  // Try with a_q/b_q params that are on original scale for priors:
-  real<lower=0, upper=1> a_q_pop_raw;         // population mean of a_q
-  real<lower=0, upper=1> b_q_pop_raw_raw;     // temporary, to enforce sum<1
-
+  
+  
   
   //corr_matrix[nt] S;
   array[J] vector[Sdim] S_vec_stdnorm; 
@@ -208,20 +223,41 @@ transformed parameters {
 
   
   // shrink b_q so that a_q + b_q ≤ 0.99   (add a small error margin)
-  real<lower=0, upper=1> a_q_pop = a_q_pop_raw;
-  real<lower=0, upper=1> b_q_pop = (1 - a_q_pop - 0.01) * b_q_pop_raw_raw;
+  // PROBLEM: a_q_pop and b_q_pop_raw_raw are highly correlated in posterior sampling space
+  // making hmc slow -- try to decouple with stick-breaking
+  // comment out:
+  //real<lower=0, upper=1> a_q_pop = a_q_pop_raw;
+  //real<lower=0, upper=1> b_q_pop = (1 - a_q_pop - 0.01) * b_q_pop_raw_raw;
 
+
+  // ---- stick-breaking for DCC (with margin m) ----
+  real m = 0.01;
+  // reuse your sigma names (now on u/v):
+  real<lower=0> sigma_u = exp(l_a_q_sigma_log);
+  real<lower=0> sigma_v = exp(l_b_q_sigma_log);
+  // population-level total & split
+  real s_pop = (1 - m) * inv_logit(u_pop);  // total persistence a+b
+  real w_pop =           inv_logit(v_pop);  // share for a within total
+  // expose for backwards-compat monitoring:
+  real l_a_q = logit(s_pop * w_pop);            // = logit(a_q_pop)
+  real l_b_q = logit(s_pop * (1 - w_pop));      // = logit(b_q_pop)
+  // subject-specific coefficients
+  array[J] real<lower=0, upper=1> a_q;
+  array[J] real<lower=0, upper=1> b_q;
+  // keep these names but reinterpret as RE contributions on u, v
+  array[J] real l_a_q_r;
+  array[J] real l_b_q_r;
+  
+
+  
   // --------- subject-specific coefficients -------------------------
   array[J] vector<lower=0, upper=1>[nt] a_h_sum;
   array[J] vector<lower=0, upper=1>[nt] b_h_sum;
   
   // logit versions used elsewhere in my code
-  real l_a_q = logit(a_q_pop); //  correspons to simulation script scale _q_fixed
-  real l_b_q = logit(b_q_pop);
-  
-  //Scale
-  array[J] real<lower = 0, upper = 1> a_q;
-  array[J] real<lower = 0, upper = 1> b_q;
+  // Drop in favor of stick breaking:
+  //real l_a_q = logit(a_q_pop); //  correspons to simulation script scale _q_fixed
+  //real l_b_q = logit(b_q_pop);
 
   array[J] vector[nt] c_h;
   array[J] vector[nt] c_h_random; // variance on log metric
@@ -251,8 +287,7 @@ transformed parameters {
   array[J] vector[Sdim] S_Lv;
   array[J] corr_matrix[nt] S;
 
-  array[J] real l_a_q_r;
-  array[J] real l_b_q_r;
+  // array
   
   // VAR phi parameter
 
@@ -281,15 +316,23 @@ transformed parameters {
     ////////////
     
     // R part
-    l_a_q_r[j] = l_a_q_sigma * l_a_q_stdnorm[j];
-    l_b_q_r[j] = l_b_q_sigma * l_b_q_stdnorm[j];
-    
-    //a_q[j] =          1 ./ ( 1 + exp(-(l_a_q + l_a_q_r[j])) );
-    // Replaced by stans inv_logit function:
-    a_q[j] =          inv_logit( l_a_q + l_a_q_r[j] );
-    //b_q[j] = (1-a_q[j]) ./ ( 1 + exp(-(l_b_q + l_b_q_r[j])) );
-    b_q[j] = (1 - a_q[j]) * inv_logit(l_b_q + l_b_q_r[j]);
+    // comment out for stick breaking:
+    //l_a_q_r[j] = l_a_q_sigma * l_a_q_stdnorm[j];
+    //l_b_q_r[j] = l_b_q_sigma * l_b_q_stdnorm[j];
+    //a_q[j] =          inv_logit( l_a_q + l_a_q_r[j] );
+    //b_q[j] = (1 - a_q[j]) * inv_logit(l_b_q + l_b_q_r[j]);
 
+     // RE on u and v (total and split)
+    l_a_q_r[j] = sigma_u * l_a_q_stdnorm[j];  // RE on u
+    l_b_q_r[j] = sigma_v * l_b_q_stdnorm[j];  // RE on v
+    real u_j = u_pop + l_a_q_r[j];
+    real v_j = v_pop + l_b_q_r[j];
+    real s_j = (1 - m) * inv_logit(u_j);
+    real w_j =           inv_logit(v_j);
+    a_q[j] = s_j * w_j;
+    b_q[j] = s_j * (1 - w_j);
+    
+    
     // D part
     // Should random effect corrleations be estimated:
     // Full estimation of corrmat with simplify_ch == 0
@@ -389,17 +432,27 @@ transformed parameters {
 model {
   // print("Upper Limits:", UPs);
   // population-level priors
-  a_q_pop_raw     ~ beta(1.8, 8.2);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
-  b_q_pop_raw_raw ~ beta(3.8,  6.2);   // mean ≈ 0.25 BEFORE scaling 
+  //a_q_pop_raw     ~ beta(1.8, 8.2);   // mean ≈ 0.09,  95 % ≈ (0.01, 0.23)
+  //b_q_pop_raw_raw ~ beta(3.8,  6.2);   // mean ≈ 0.25 BEFORE scaling 
   
   // priors
-  //l_a_q ~ student_t(3, -1.5, 2);
-  //l_b_q ~ student_t(3, -1.5, 2);
-  l_a_q_sigma_log ~ normal(log(0.63), 0.5); //student_t(3, 0, 2);
-  to_vector(l_a_q_stdnorm) ~ std_normal();
-  l_b_q_sigma_log ~ normal(log(0.63), .5); //student_t(3, 0, 2);
-  to_vector(l_b_q_stdnorm) ~ std_normal();
+  //l_a_q_sigma_log ~ normal(log(0.63), 0.5); //student_t(3, 0, 2);
+  //to_vector(l_a_q_stdnorm) ~ std_normal();
+  //l_b_q_sigma_log ~ normal(log(0.63), .5); //student_t(3, 0, 2);
+  //to_vector(l_b_q_stdnorm) ~ std_normal();
+  
+  // population-level priors
+  // prior mean: a+b ≈ 0.9  -> u_pop ~ N(logit(0.9), 0.7)
+  // prior mean: a/(a+b) ≈ 0.25 -> v_pop ~ N(logit(0.25), 0.7)
+  u_pop ~ normal(logit(0.9), 0.7);
+  v_pop ~ normal(logit(0.25), 0.7);
 
+  // RE scales on u and v (log scale priors as before; 0.63 ~ exp(-0.46) was your old default)
+  l_a_q_sigma_log ~ normal(log(0.63), 0.5);
+  l_b_q_sigma_log ~ normal(log(0.63), 0.5);
+  to_vector(l_a_q_stdnorm) ~ std_normal();
+  to_vector(l_b_q_stdnorm) ~ std_normal();
+  
   // VAR
   phi0_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
   phi_L ~ lkj_corr_cholesky(1); // Cholesky of location random intercept effects
@@ -432,7 +485,7 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  c_h_fixed ~ normal(c_h_fixed_s2, 1.5*c_h_fixed_s2_sd);
+  c_h_fixed ~ normal(1,1);//c_h_fixed_s2, 1.5*c_h_fixed_s2_sd);
   a_h_fixed ~ normal(a_h_fixed_s2, 1.5*a_h_fixed_s2_sd);
   b_h_fixed ~ normal(b_h_fixed_s2, 1.5*b_h_fixed_s2_sd);
   // Prior for initial state

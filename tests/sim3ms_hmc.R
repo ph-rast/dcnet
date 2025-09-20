@@ -109,15 +109,16 @@ var <- c(
 stopifnot(length(variables_m) == length(var))
 
 # 5) Build condition grid + define 100 replications
-ns        <- c(25, 50, 100)#, 150)
-tls       <- c(25, 50, 100)#, 150)
+ns        <- c(50)#c(25,  50, 100)#, 150)
+tls       <- c(50)#c(25, 50, 100)#, 150)
 simcond   <- expand.grid(N = ns, tl = tls)
 n_conds   <- nrow(simcond)
-n_reps    <- 10
+n_reps    <- 1
 task_grid <- expand.grid(idx = seq_len(n_conds), reps = seq_len(n_reps))
 
 ## 6) Setup future + progressr
 cores  <- parallelly::availableCores()
+cores <- 4
 chains <- 1 ## take chains from safe_sample function
 workers <- max(1, floor((cores - 1) / chains))
 # plan(multisession, workers = workers) ## Don't spawn here - do it later and remove workers after use (or feel the wrath of John... )
@@ -130,6 +131,18 @@ run_one <- possibly(function(idx, reps) {
     tl <- simcond$tl[idx]
 
     dat <- simulate_data(N = N, tl = tl, nts = 3)
+    ## extract a_q and b_q implied by the simulation
+    ## Recover per-person a_q, b_q used by the simulator to build Q_t
+    a_q_j <- 1 / (1 + exp(-(dat[[3]]$l_a_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_a_q_r_sd))))
+    b_q_j <- (1 - a_q_j) * (1 / (1 + exp(-(dat[[3]]$l_b_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_b_q_r_sd)))))
+    ## Population means on probability scale:
+    a_q_pop_true <- mean(a_q_j)
+    b_q_pop_true <- mean(b_q_j)
+    ## Truths on the *logit* scale to match Stan’s l_* parameters:
+    l_a_q_truth <- qlogis(a_q_pop_true)
+    l_b_q_truth <- qlogis(b_q_pop_true)
+    
+    
     fit <- safe_sample(reps, replication_data = dat)
     if (is.null(fit)) {
         return(NULL)
@@ -139,34 +152,41 @@ run_one <- possibly(function(idx, reps) {
         stan_par <- variables_m[pi]
         sim_var  <- var[pi]
         draws_mat <- fit$model_fit$draws(
-            variables = stan_par, format = "matrix"
-            )
-        truth_vec <- unlist(dat[[3]][[sim_var]])
+                                     variables = stan_par, format = "matrix"
+                                   )
+        truth_vec <- switch(stan_par,
+                            "l_a_q"        = rep(l_a_q_truth,  length.out = ncol(draws_mat)),
+                            "l_b_q"        = rep(l_b_q_truth,  length.out = ncol(draws_mat)),
+                            "l_a_q_sigma"  = rep(dat[[3]]$l_a_q_r_sd, length.out = ncol(draws_mat)),
+                            "l_b_q_sigma"  = rep(dat[[3]]$l_b_q_r_sd, length.out = ncol(draws_mat)),
+                            ## default:
+                            unlist(dat[[3]][[sim_var]])
+                            )
         SF <- if (stan_par == "S_vec_tau") {
-                  tmp <- t(apply(fit$S_vec_tau_post, 2,
-                                 quantile, probs = c(0.5,0.025,0.975)))
-                  colnames(tmp) <- c("mean","q2.5","q97.5")
-                  as.data.frame(tmp)
+                tmp <- t(apply(fit$S_vec_tau_post, 2,
+                               quantile, probs = c(0.5,0.025,0.975)))
+                colnames(tmp) <- c("mean","q2.5","q97.5")
+                as.data.frame(tmp)
               } else {
-                  fit$model_fit$summary(
-                                    variables       = stan_par,
-                                    fun             = "mean",
-                                    extra_quantiles = ~ posterior::quantile2(., probs = c(.025, .975))
-                                )
+                fit$model_fit$summary(
+                                variables       = stan_par,
+                                fun             = "mean",
+                                extra_quantiles = ~ posterior::quantile2(., probs = c(.025, .975))
+                              )
               }
         data.frame(
-            N           = N,
-            tl          = tl,
-            replication = reps,
-            parameter   = stan_par,
-            coverage    = mean(truth_vec > SF$q2.5 & truth_vec < SF$q97.5),
-            bias        = mean(as.numeric(draws_mat) -
-                               rep(truth_vec, each = nrow(draws_mat))),
-            rmse        = sqrt(mean((as.numeric(draws_mat) -
-                                     rep(truth_vec, each = nrow(draws_mat)))^2)),
-            ci_width    = mean(abs(SF$q97.5 - SF$q2.5)),
-            looic       = suppressWarnings(looic(fit)),
-            stringsAsFactors = FALSE
+          N           = N,
+          tl          = tl,
+          replication = reps,
+          parameter   = stan_par,
+          coverage    = mean(truth_vec > SF$q2.5 & truth_vec < SF$q97.5),
+          bias        = mean(as.numeric(draws_mat) -
+                             rep(truth_vec, each = nrow(draws_mat))),
+          rmse        = sqrt(mean((as.numeric(draws_mat) -
+                                   rep(truth_vec, each = nrow(draws_mat)))^2)),
+          ci_width    = mean(abs(SF$q97.5 - SF$q2.5)),
+          looic       = suppressWarnings(looic(fit)),
+          stringsAsFactors = FALSE
         )
     })
 
@@ -183,22 +203,24 @@ run_one <- possibly(function(idx, reps) {
 ##     )
 ## })
 
-per_rep
 
-future::with_plan(multisession, workers = workers, {
-  with_progress({
-    p <- progressr::progressor(steps = nrow(task_grid))
-    per_rep <- furrr::future_pmap_dfr(
-                        task_grid,
-                        function(idx, reps) {
-                          res <- run_one(idx, reps)  # do the heavy work first
-                          p(sprintf("cond %d, rep %d done", idx, reps))  # tick on completion
-                          res
-                        },
-                        .options = furrr::furrr_options(seed = TRUE, scheduling = Inf)
-                      )
-  })
+##old_plan <-
+future::plan(multisession, workers = workers)
+##on.exit(future::plan(old_plan), add = TRUE)  # auto-restore when the block exits
+
+with_progress({
+  p <- progressr::progressor(steps = nrow(task_grid))
+  per_rep <- furrr::future_pmap_dfr(
+                      task_grid,
+                      function(idx, reps) {
+                        res <- run_one(idx, reps)  # do the heavy work first
+                        p(sprintf("cond %d, rep %d done", idx, reps))  # tick on completion
+                        res
+                      },
+                      .options = furrr::furrr_options(seed = TRUE, scheduling = Inf)
+                    )
 })
+future::plan(sequential)
 
 per_rep
 
@@ -317,14 +339,14 @@ plot_list <- list(
       theme_minimal()
 )
 
-# 3. Write them all to a multi‐page PDF
+## Write them all to a multi‐page PDF
 pdf("hmc_simulation_diagnostics_10v2.pdf", width = 11, height = 8.5)
 for (nm in names(plot_list)) {
   print(plot_list[[nm]] + ggtitle(str_to_title(nm)))
 }
 dev.off()
 
-# 4. (Optional) save the list of plots for later use
+## save the list of plots for later use
 saveRDS(plot_list, "hmc_plot_list.rds")
 
 ## table
@@ -335,7 +357,7 @@ summary_table <- final_results %>%
     cov_mean  = mean(coverage),
     bias_abs  = mean(abs(bias)),
     rmse_mean = mean(rmse),
-    ciw_mean  = mean(crir),
+    ciw_mean  = mean(ci_width),
     looic     = mean(looic)
   ) %>%
   arrange(cov_mean)
