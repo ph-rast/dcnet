@@ -109,16 +109,19 @@ var <- c(
 stopifnot(length(variables_m) == length(var))
 
 # 5) Build condition grid + define 100 replications
-ns        <- c(50)#c(25,  50, 100)#, 150)
-tls       <- c(50)#c(25, 50, 100)#, 150)
+ns        <- c(50, 100)#c(25,  50, 100)#, 150)
+tls       <- c(50, 100)#c(25, 50, 100)#, 150)
 simcond   <- expand.grid(N = ns, tl = tls)
+simcond <- simcond[c(1, 4),]
 n_conds   <- nrow(simcond)
-n_reps    <- 1
+n_reps    <- 5
 task_grid <- expand.grid(idx = seq_len(n_conds), reps = seq_len(n_reps))
+task_grid
+nrow(task_grid)
 
 ## 6) Setup future + progressr
 cores  <- parallelly::availableCores()
-cores <- 4
+cores <- 11
 chains <- 1 ## take chains from safe_sample function
 workers <- max(1, floor((cores - 1) / chains))
 # plan(multisession, workers = workers) ## Don't spawn here - do it later and remove workers after use (or feel the wrath of John... )
@@ -131,6 +134,7 @@ run_one <- possibly(function(idx, reps) {
     tl <- simcond$tl[idx]
 
     dat <- simulate_data(N = N, tl = tl, nts = 3)
+<<<<<<< HEAD
     ## ## Recover per-person a_q, b_q used by the simulator to build Q_t
     ## ## a_q_j <- 1 / (1 + exp(-(dat[[3]]$l_a_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_a_q_r_sd))))
     ## ## b_q_j <- (1 - a_q_j) * (1 / (1 + exp(-(dat[[3]]$l_b_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_b_q_r_sd)))))
@@ -148,6 +152,21 @@ run_one <- possibly(function(idx, reps) {
 
 
     fit <- safe_sample(reps, replication_data = dat)
+=======
+    ## extract a_q and b_q implied by the simulation
+    ## Recover per-person a_q, b_q used by the simulator to build Q_t
+    a_q_j <- 1 / (1 + exp(-(dat[[3]]$l_a_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_a_q_r_sd))))
+    b_q_j <- (1 - a_q_j) * (1 / (1 + exp(-(dat[[3]]$l_b_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_b_q_r_sd)))))
+    ## Population means on probability scale:
+    a_q_pop_true <- mean(a_q_j)
+    b_q_pop_true <- mean(b_q_j)
+    ## Truths on the *logit* scale to match Stan’s l_* parameters:
+    l_a_q_truth <- qlogis(a_q_pop_true)
+    l_b_q_truth <- qlogis(b_q_pop_true)
+    
+    
+    cfit <- safe_sample(reps, replication_data = dat)
+>>>>>>> a4c117dc549b6f5ae3f1086b0da30b90e9a02543
     if (is.null(fit)) {
         return(NULL)
     }
@@ -229,6 +248,7 @@ with_progress({
 })
 future::plan(sequential)
 
+## Note; testing only for 50,50 adnd 100,100
 per_rep
 
 ## 9) Aggregate over all reps

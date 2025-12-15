@@ -485,7 +485,7 @@ model {
   
   // C
   to_vector(beta) ~ std_normal();
-  c_h_fixed ~ normal(1,1);//c_h_fixed_s2, 1.5*c_h_fixed_s2_sd);
+  c_h_fixed ~ normal(c_h_fixed_s2, 2);//1.5*c_h_fixed_s2_sd);
   a_h_fixed ~ normal(a_h_fixed_s2, 1.5*a_h_fixed_s2_sd);
   b_h_fixed ~ normal(b_h_fixed_s2, 1.5*b_h_fixed_s2_sd);
   // Prior for initial state
