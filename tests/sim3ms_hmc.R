@@ -131,18 +131,22 @@ run_one <- possibly(function(idx, reps) {
     tl <- simcond$tl[idx]
 
     dat <- simulate_data(N = N, tl = tl, nts = 3)
-    ## extract a_q and b_q implied by the simulation
-    ## Recover per-person a_q, b_q used by the simulator to build Q_t
-    a_q_j <- 1 / (1 + exp(-(dat[[3]]$l_a_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_a_q_r_sd))))
-    b_q_j <- (1 - a_q_j) * (1 / (1 + exp(-(dat[[3]]$l_b_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_b_q_r_sd)))))
-    ## Population means on probability scale:
-    a_q_pop_true <- mean(a_q_j)
-    b_q_pop_true <- mean(b_q_j)
-    ## Truths on the *logit* scale to match Stan’s l_* parameters:
-    l_a_q_truth <- qlogis(a_q_pop_true)
-    l_b_q_truth <- qlogis(b_q_pop_true)
-    
-    
+    ## ## Recover per-person a_q, b_q used by the simulator to build Q_t
+    ## ## a_q_j <- 1 / (1 + exp(-(dat[[3]]$l_a_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_a_q_r_sd))))
+    ## ## b_q_j <- (1 - a_q_j) * (1 / (1 + exp(-(dat[[3]]$l_b_q_fixed + rnorm(dat$N, 0, dat[[3]]$l_b_q_r_sd)))))
+    ## a_q_j <- dat[[3]]$a_q
+    ## b_q_j <- dat[[3]]$b_q
+    ## ## Population means on probability scale:
+    ## a_q_pop_true <- mean(a_q_j)
+    ## b_q_pop_true <- mean(b_q_j)
+    ## ## Truths on the *logit* scale to match Stan’s l_* parameters:
+    ## l_a_q_truth <- qlogis(a_q_pop_true)
+    ## l_b_q_truth <- qlogis(b_q_pop_true)
+    ## ## fit <- safe_sample(reps, replication_data = dat)
+    ## l_a_q_sigma_truth <- sd(qlogis(a_q_j))
+    ## l_b_q_sigma_truth <- sd(qlogis(b_q_j))
+
+
     fit <- safe_sample(reps, replication_data = dat)
     if (is.null(fit)) {
         return(NULL)
@@ -152,16 +156,19 @@ run_one <- possibly(function(idx, reps) {
         stan_par <- variables_m[pi]
         sim_var  <- var[pi]
         draws_mat <- fit$model_fit$draws(
-                                     variables = stan_par, format = "matrix"
+                                       variables = stan_par, format = "matrix"
                                    )
-        truth_vec <- switch(stan_par,
-                            "l_a_q"        = rep(l_a_q_truth,  length.out = ncol(draws_mat)),
-                            "l_b_q"        = rep(l_b_q_truth,  length.out = ncol(draws_mat)),
-                            "l_a_q_sigma"  = rep(dat[[3]]$l_a_q_r_sd, length.out = ncol(draws_mat)),
-                            "l_b_q_sigma"  = rep(dat[[3]]$l_b_q_r_sd, length.out = ncol(draws_mat)),
-                            ## default:
-                            unlist(dat[[3]][[sim_var]])
-                            )
+        ## truth_vec <- switch(stan_par,
+        ##                     "l_a_q"        = rep(l_a_q_truth,  length.out = ncol(draws_mat)),
+        ##                     "l_b_q"        = rep(l_b_q_truth,  length.out = ncol(draws_mat)),
+        ##                     ##"l_a_q_sigma"  = rep(dat[[3]]$l_a_q_r_sd, length.out = ncol(draws_mat)),
+        ##                     ##"l_b_q_sigma"  = rep(dat[[3]]$l_b_q_r_sd, length.out = ncol(draws_mat)),
+        ##                     "l_a_q_sigma"  = rep(l_a_q_sigma_truth, length.out = ncol(draws_mat)),
+        ##                     "l_b_q_sigma"  = rep(l_b_q_sigma_truth, length.out = ncol(draws_mat)),
+        ##                     ## default:
+        ##                     unlist(dat[[3]][[sim_var]])
+        ##                     )
+        truth_vec <- unlist(dat[[3]][[sim_var]])
         SF <- if (stan_par == "S_vec_tau") {
                 tmp <- t(apply(fit$S_vec_tau_post, 2,
                                quantile, probs = c(0.5,0.025,0.975)))
@@ -193,7 +200,7 @@ run_one <- possibly(function(idx, reps) {
     do.call(rbind, out)
 }, otherwise = NULL)
 
-# 8) Run with live progress
+#  Run with live progress
 ## with_progress({
 ##     p <- progressor(steps = nrow(task_grid))
 ##     per_rep <- future_pmap_dfr(
